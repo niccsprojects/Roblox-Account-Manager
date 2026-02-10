@@ -47,13 +47,13 @@ fn find_roblosecurity_tauri(app: &AppHandle) -> Option<String> {
 #[cfg(target_os = "macos")]
 fn find_roblosecurity_native() -> Option<String> {
     use objc2_app_kit::NSApplication;
+    use objc2::MainThreadMarker;
     use objc2_foundation::NSHTTPCookieStorage;
 
     unsafe {
         let shared = NSHTTPCookieStorage::sharedHTTPCookieStorage();
         if let Some(cookies) = shared.cookies() {
-            for i in 0..cookies.len() {
-                let cookie = &cookies[i];
+            for cookie in cookies.iter() {
                 let name = cookie.name().to_string();
                 if name == ".ROBLOSECURITY" {
                     let value = cookie.value().to_string();
@@ -65,11 +65,10 @@ fn find_roblosecurity_native() -> Option<String> {
         }
     }
 
-    unsafe {
-        let app = NSApplication::sharedApplication();
+    if let Some(mtm) = MainThreadMarker::new() {
+        let app = NSApplication::sharedApplication(mtm);
         let windows = app.windows();
-        for i in 0..windows.len() {
-            let window = &windows[i];
+        for window in windows.iter() {
             let title = window.title().to_string();
             if !title.contains("Roblox Login") {
                 continue;
@@ -101,14 +100,9 @@ fn extract_from_view_hierarchy(view: &objc2_app_kit::NSView) -> Option<String> {
 
             let (tx, rx) = mpsc::sync_channel::<Option<String>>(1);
             let block =
-                block2::RcBlock::new(move |cookies: *mut objc2_foundation::NSArray<objc2_foundation::NSHTTPCookie>| {
-                    if cookies.is_null() {
-                        let _ = tx.send(None);
-                        return;
-                    }
-                    let cookies = &*cookies;
-                    for j in 0..cookies.len() {
-                        let c = &cookies[j];
+                block2::RcBlock::new(move |cookies: std::ptr::NonNull<objc2_foundation::NSArray<objc2_foundation::NSHTTPCookie>>| {
+                    let cookies = cookies.as_ref();
+                    for c in cookies.iter() {
                         if c.name().to_string() == ".ROBLOSECURITY" {
                             let v = c.value().to_string();
                             if !v.is_empty() {
@@ -124,7 +118,7 @@ fn extract_from_view_hierarchy(view: &objc2_app_kit::NSView) -> Option<String> {
         }
 
         for sub in view.subviews().iter() {
-            if let Some(val) = extract_from_view_hierarchy(sub) {
+            if let Some(val) = extract_from_view_hierarchy(&sub) {
                 return Some(val);
             }
         }
