@@ -23,7 +23,7 @@ if (!window.__ramPoll) {
 }
 "#;
 
-fn find_roblosecurity(app: &AppHandle) -> Option<String> {
+fn find_roblosecurity_tauri(app: &AppHandle) -> Option<String> {
     let browser = app.get_webview_window("login-browser")?;
     let urls: [&str; 2] = [
         "https://www.roblox.com",
@@ -42,6 +42,106 @@ fn find_roblosecurity(app: &AppHandle) -> Option<String> {
         }
     }
     None
+}
+
+#[cfg(target_os = "macos")]
+fn find_roblosecurity_native() -> Option<String> {
+    use objc2_app_kit::NSApplication;
+    use objc2_foundation::NSHTTPCookieStorage;
+
+    unsafe {
+        let shared = NSHTTPCookieStorage::sharedHTTPCookieStorage();
+        if let Some(cookies) = shared.cookies() {
+            for i in 0..cookies.len() {
+                let cookie = &cookies[i];
+                let name = cookie.name().to_string();
+                if name == ".ROBLOSECURITY" {
+                    let value = cookie.value().to_string();
+                    if !value.is_empty() {
+                        return Some(value);
+                    }
+                }
+            }
+        }
+    }
+
+    unsafe {
+        let app = NSApplication::sharedApplication();
+        let windows = app.windows();
+        for i in 0..windows.len() {
+            let window = &windows[i];
+            let title = window.title().to_string();
+            if !title.contains("Roblox Login") {
+                continue;
+            }
+            if let Some(cv) = window.contentView() {
+                if let Some(val) = extract_from_view_hierarchy(&cv) {
+                    return Some(val);
+                }
+            }
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn extract_from_view_hierarchy(view: &objc2_app_kit::NSView) -> Option<String> {
+    use objc2::ClassType;
+    use objc2_web_kit::WKWebView;
+    use std::sync::mpsc;
+
+    unsafe {
+        let obj: &objc2::runtime::AnyObject = &*(view as *const _ as *const _);
+        if obj.class() == WKWebView::class() {
+            let webview: &WKWebView = &*(view as *const _ as *const WKWebView);
+            let config = webview.configuration();
+            let store = config.websiteDataStore();
+            let cookie_store = store.httpCookieStore();
+
+            let (tx, rx) = mpsc::sync_channel::<Option<String>>(1);
+            let block =
+                block2::RcBlock::new(move |cookies: *mut objc2_foundation::NSArray<objc2_foundation::NSHTTPCookie>| {
+                    if cookies.is_null() {
+                        let _ = tx.send(None);
+                        return;
+                    }
+                    let cookies = &*cookies;
+                    for j in 0..cookies.len() {
+                        let c = &cookies[j];
+                        if c.name().to_string() == ".ROBLOSECURITY" {
+                            let v = c.value().to_string();
+                            if !v.is_empty() {
+                                let _ = tx.send(Some(v));
+                                return;
+                            }
+                        }
+                    }
+                    let _ = tx.send(None);
+                });
+            cookie_store.getAllCookies(&block);
+            return rx.recv_timeout(Duration::from_secs(5)).ok().flatten();
+        }
+
+        for sub in view.subviews().iter() {
+            if let Some(val) = extract_from_view_hierarchy(sub) {
+                return Some(val);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn find_roblosecurity_native() -> Option<String> {
+    None
+}
+
+fn find_roblosecurity(app: &AppHandle) -> Option<String> {
+    if let Some(v) = find_roblosecurity_tauri(app) {
+        return Some(v);
+    }
+    find_roblosecurity_native()
 }
 
 async fn extract_and_emit_cookie(app: AppHandle) {

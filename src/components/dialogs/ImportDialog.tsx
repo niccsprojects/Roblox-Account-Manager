@@ -47,6 +47,10 @@ export function ImportDialog({
     setResults([]);
     setProgress("");
     setSelectedFileName("");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") handleClose();
     }

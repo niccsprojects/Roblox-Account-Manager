@@ -3267,9 +3267,14 @@ name = "roblox-account-manager"
 version = "4.0.0"
 dependencies = [
  "axum",
+ "block2",
  "chrono",
  "cookie",
  "futures-util",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "objc2-web-kit",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
