@@ -102,9 +102,18 @@ fn parse_pid_output(output: &str) -> Vec<u32> {
 
 pub fn get_roblox_pids() -> Vec<u32> {
     let mut all = HashSet::new();
-    for name in ["RobloxPlayer", "Roblox"] {
+    for name in ["RobloxPlayer", "Roblox", "RobloxPlayerBeta"] {
         let output = Command::new("pgrep").args(["-x", name]).output();
         if let Ok(out) = output {
+            let stdout = String::from_utf8_lossy(&out.stdout);
+            for pid in parse_pid_output(&stdout) {
+                all.insert(pid);
+            }
+        }
+    }
+
+    if all.is_empty() {
+        if let Ok(out) = Command::new("pgrep").args(["-if", "roblox"]).output() {
             let stdout = String::from_utf8_lossy(&out.stdout);
             for pid in parse_pid_output(&stdout) {
                 all.insert(pid);
@@ -216,23 +225,23 @@ pub fn build_launch_url(
 pub fn launch_url(url: &str) -> Result<(), String> {
     pre_launch_multi_step();
 
-    if Command::new("open").arg(url).spawn().is_ok() {
-        return Ok(());
-    }
-
     if MULTI_ROBLOX_ENABLED.load(Ordering::Relaxed) {
         if let Ok(app_path) = get_roblox_path() {
             Command::new("open")
                 .args(["-n", "-a"])
-                .arg(app_path)
+                .arg(&app_path)
                 .arg(url)
                 .spawn()
-                .map_err(|e| format!("Failed to launch via open -n -a fallback: {}", e))?;
+                .map_err(|e| format!("Failed to launch Roblox: {}", e))?;
             return Ok(());
         }
     }
 
-    Err("Failed to launch Roblox URL".into())
+    Command::new("open")
+        .arg(url)
+        .spawn()
+        .map_err(|e| format!("Failed to launch Roblox URL: {}", e))?;
+    Ok(())
 }
 
 pub fn launch_old_join(

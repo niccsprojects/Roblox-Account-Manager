@@ -837,7 +837,16 @@ async fn launch_account_for_cycle(
     patch_client_settings_for_launch(settings);
 
     let tracker = windows::tracker();
-    if auto_close_last_process && tracker.get_pid(user_id).is_some() {
+    if !multi_rbx {
+        let existing = windows::get_roblox_pids();
+        if !existing.is_empty() {
+            windows::kill_all_roblox();
+            for p in tracker.get_all() {
+                tracker.untrack(p.user_id);
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    } else if auto_close_last_process && tracker.get_pid(user_id).is_some() {
         tracker.kill_for_user(user_id);
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
@@ -1339,7 +1348,16 @@ async fn launch_roblox(
     patch_client_settings_for_launch(&settings);
 
     let tracker = windows::tracker();
-    if auto_close_last_process && tracker.get_pid(user_id).is_some() {
+    if !multi_rbx {
+        let existing = windows::get_roblox_pids();
+        if !existing.is_empty() {
+            windows::kill_all_roblox();
+            for p in tracker.get_all() {
+                tracker.untrack(p.user_id);
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    } else if auto_close_last_process && tracker.get_pid(user_id).is_some() {
         tracker.kill_for_user(user_id);
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
@@ -1489,7 +1507,16 @@ async fn launch_roblox(
         patch_client_settings_for_launch(&settings);
 
         let tracker = macos::tracker();
-        if auto_close_last_process && tracker.get_pid(user_id).is_some() {
+        if !multi_rbx {
+            let existing = macos::get_roblox_pids();
+            if !existing.is_empty() {
+                macos::kill_all_roblox();
+                for p in tracker.get_all() {
+                    tracker.untrack(p.user_id);
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        } else if auto_close_last_process && tracker.get_pid(user_id).is_some() {
             tracker.kill_for_user(user_id);
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
@@ -1655,7 +1682,16 @@ async fn launch_multiple(
 
         patch_client_settings_for_launch(&settings);
 
-        if auto_close_last_process && tracker.get_pid(uid).is_some() {
+        if !multi_rbx {
+            let existing = windows::get_roblox_pids();
+            if !existing.is_empty() {
+                windows::kill_all_roblox();
+                for p in tracker.get_all() {
+                    tracker.untrack(p.user_id);
+                }
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        } else if auto_close_last_process && tracker.get_pid(uid).is_some() {
             tracker.kill_for_user(uid);
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
@@ -1799,7 +1835,16 @@ async fn launch_multiple(
 
             patch_client_settings_for_launch(&settings);
 
-            if auto_close_last_process && tracker.get_pid(uid).is_some() {
+            if !multi_rbx {
+                let existing = macos::get_roblox_pids();
+                if !existing.is_empty() {
+                    macos::kill_all_roblox();
+                    for p in tracker.get_all() {
+                        tracker.untrack(p.user_id);
+                    }
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                }
+            } else if auto_close_last_process && tracker.get_pid(uid).is_some() {
                 tracker.kill_for_user(uid);
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             }

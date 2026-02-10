@@ -52,7 +52,7 @@ export function ImportDialog({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, handleClose, defaultTab]);
+  }, [open, handleClose]);
 
   useEffect(() => {
     if (open && tab === "cookie" && textareaRef.current) {
