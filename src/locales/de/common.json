@@ -378,7 +378,7 @@
   "Port {{port}} - {{count}} connected": "Port {{port}} - {{count}} verbunden",
   "Preparing Roblox launch for this account...": "Roblox-Start wird vorbereitet...",
   "Preset deleted: {{name}}": "Preset gelöscht: {{name}}",
-  "Preset file path (.json or .ram-theme.json):": "Pfad zur Preset-Datei (.json oder .ram-theme.json):",
+  "Preset file path (.json, .ram-theme.json, or .ram-theme.zip):": "Preset file path (.json, .ram-theme.json, or .ram-theme.zip):",
   "Preset name:": "Preset-Name:",
   "Preset saved: {{name}}": "Preset gespeichert: {{name}}",
   "Private server privacy updated": "Privatsphäre für Private Server aktualisiert",
