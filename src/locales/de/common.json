@@ -464,7 +464,7 @@
   "{{count}} server": "{{count}} Server",
   "{{count}} servers": "{{count}} Server",
   "{\"assets\":[{\"id\":12345}]}": "{\"assets\":[{\"id\":12345}]}",
-  "<city>, <countryCode>": "<city>, <countryCode>",
+  "<city>, <countryCode>": "<Stadt>, <Postleitzahl>",
   "Accept connections from other devices. Requires admin privileges.": "Verbindungen von anderen Geräten akzeptieren. Administratorrechte erforderlich.",
   "Allow Account Editing": "Kontobearbeitung erlauben",
   "Allow External Connections": "Externe Verbindungen erlauben",
