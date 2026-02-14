@@ -378,7 +378,7 @@
   "Port {{port}} - {{count}} connected": "Port {{port}} - {{count}} connected",
   "Preparing Roblox launch for this account...": "Preparing Roblox launch for this account...",
   "Preset deleted: {{name}}": "Preset deleted: {{name}}",
-  "Preset file path (.json or .ram-theme.json):": "Preset file path (.json or .ram-theme.json):",
+  "Preset file path (.json, .ram-theme.json, or .ram-theme.zip):": "Preset file path (.json, .ram-theme.json, or .ram-theme.zip):",
   "Preset name:": "Preset name:",
   "Preset saved: {{name}}": "Preset saved: {{name}}",
   "Private server privacy updated": "Private server privacy updated",
