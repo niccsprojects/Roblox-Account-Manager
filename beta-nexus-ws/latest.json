@@ -1,0 +1,19 @@
+{
+  "version": "4.3.21-beta",
+  "notes": "> [!WARNING]\nThis is a beta release. Missing features, bugs, and crashes are possible. Run at your own risk.\n\nChannel: Beta\nRelease commit: d93669a\nApp version: 4.3.21\n\n## What's Changed\n* feat(release): split standard and full feature v4 assets by @niccdevs in https://github.com/niccsprojects/Roblox-Account-Manager/pull/39\n\n\n**Full Changelog**: https://github.com/niccsprojects/Roblox-Account-Manager/compare/v4.3.20-beta...v4.3.21-beta",
+  "pub_date": "2026-03-01T21:18:49.2045024Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QmJaSWJURmt2TXRJRzZjai9yWmNqbzlQemhWK0I3VUE1cEdlQjZjQmlZNm9XQmJGdC8zeGZVK2hMWkJEMFdmOHdObk5XNFlnYWY5SU9LdC9DMWl6SFE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzcyMzk5OTI4CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjMuMjFfeDY0X2VuLVVTLm1zaQp4dGxCOTNZOVdtVkk1Ym5iVXppekVwcGdsci9oU2NObTVJRnVIZVBFbStkY3lGbnlKdXRJUWVUdC8yUy9WalJRdGtTcktOSFIxWXUyRkFvaFE5YklEUT09Cg==",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.3.21-beta/Roblox.Account.Manager_4.3.21_x64_en-US_full-nexus-ws.msi"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QmJaSWJURmt2TXRJRzZjai9yWmNqbzlQemhWK0I3VUE1cEdlQjZjQmlZNm9XQmJGdC8zeGZVK2hMWkJEMFdmOHdObk5XNFlnYWY5SU9LdC9DMWl6SFE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzcyMzk5OTI4CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjMuMjFfeDY0X2VuLVVTLm1zaQp4dGxCOTNZOVdtVkk1Ym5iVXppekVwcGdsci9oU2NObTVJRnVIZVBFbStkY3lGbnlKdXRJUWVUdC8yUy9WalJRdGtTcktOSFIxWXUyRkFvaFE5YklEUT09Cg==",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.3.21-beta/Roblox.Account.Manager_4.3.21_x64_en-US_full-nexus-ws.msi"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QmJTR0twZWQxbWprTHEyMmRMb0tSSlJkTVIvZ1ZRdldNNmtMR2k0bDVwc01pZ3VPT1ByQzl5dHN5Q2JrdlZaZ1c4Q1F1RjI4UGxnYmRPWk9XQmZwdUFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzcyMzk5OTI4CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjMuMjFfeDY0LXNldHVwLmV4ZQpDRW1oaGl3bnZiZytJcFBBRFkxWENuM0U5VUtFQlNSTWd6UUlEVEN2cmsrcGl6c0lOS204dWVDcXE4em9xNVNZUUxZaVVOMCtLb3dsVUVCaEN4NVVEdz09Cg==",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.3.21-beta/Roblox.Account.Manager_4.3.21_x64-setup_full-nexus-ws.exe"
+    }
+  }
+}
