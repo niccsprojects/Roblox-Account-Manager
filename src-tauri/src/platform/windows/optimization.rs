@@ -13,8 +13,8 @@ use windows_sys::Win32::System::Threading::{
     MEMORY_PRIORITY_INFORMATION, NORMAL_PRIORITY_CLASS,
     PROCESS_POWER_THROTTLING_CURRENT_VERSION, PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
     PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION, PROCESS_POWER_THROTTLING_STATE,
-    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, ProcessMemoryPriority,
-    ProcessPowerThrottling,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_SET_QUOTA,
+    ProcessMemoryPriority, ProcessPowerThrottling,
 };
 
 const MEMORY_PRIORITY_VERY_LOW: u32 = 1;
@@ -416,11 +416,12 @@ pub(crate) fn apply_optimization_to_pid(
     }
 
     unsafe {
-        let process = OpenProcess(
-            PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION,
-            0,
-            pid,
-        );
+        let mut access = PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION;
+        if needs_job {
+            access |= PROCESS_SET_QUOTA | PROCESS_TERMINATE;
+        }
+
+        let process = OpenProcess(access, 0, pid);
         if process.is_null() {
             return Err(format!("Failed to open Roblox process {}", pid));
         }
