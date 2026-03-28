@@ -10,7 +10,7 @@ use windows_sys::Win32::System::JobObjects::{
 };
 use windows_sys::Win32::System::Threading::{
     SetPriorityClass, SetProcessInformation, BELOW_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS,
-    MEMORY_PRIORITY_INFORMATION, NORMAL_PRIORITY_CLASS, PROCESS_MODE_BACKGROUND_BEGIN,
+    MEMORY_PRIORITY_INFORMATION, NORMAL_PRIORITY_CLASS,
     PROCESS_POWER_THROTTLING_CURRENT_VERSION, PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
     PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION, PROCESS_POWER_THROTTLING_STATE,
     PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, ProcessMemoryPriority,
@@ -277,17 +277,14 @@ fn power_throttling_mask(profile: &WindowsProcessPolicy) -> u32 {
 
 fn apply_priority_class(process: HANDLE, profile: &WindowsProcessPolicy) -> Result<(), String> {
     unsafe {
-        if profile.background_mode {
-            if SetPriorityClass(process, PROCESS_MODE_BACKGROUND_BEGIN) == 0 {
-                return Err("Failed to enable process background mode".into());
+        let class = if profile.background_mode {
+            IDLE_PRIORITY_CLASS
+        } else {
+            match profile.priority_class {
+                WindowsPriorityClass::Normal => NORMAL_PRIORITY_CLASS,
+                WindowsPriorityClass::BelowNormal => BELOW_NORMAL_PRIORITY_CLASS,
+                WindowsPriorityClass::Idle => IDLE_PRIORITY_CLASS,
             }
-            return Ok(());
-        }
-
-        let class = match profile.priority_class {
-            WindowsPriorityClass::Normal => NORMAL_PRIORITY_CLASS,
-            WindowsPriorityClass::BelowNormal => BELOW_NORMAL_PRIORITY_CLASS,
-            WindowsPriorityClass::Idle => IDLE_PRIORITY_CLASS,
         };
         if SetPriorityClass(process, class) == 0 {
             return Err("Failed to set process priority class".into());
