@@ -438,6 +438,12 @@ pub(crate) async fn apply_windows_post_launch_profile(
 ) {
     let effective_profile = effective_launch_profile(settings, profile);
     let optimization_profile = platform::windows::load_optimization_profile(settings, effective_profile);
+    let has_process_policy = optimization_profile.process.enabled;
+    let has_job_limits = optimization_profile.experimental.enable_job_cpu_limit
+        || optimization_profile.experimental.enable_job_memory_limit;
+    if !has_process_policy && !has_job_limits {
+        return;
+    }
     if optimization_profile.process.delay_ms > 0 {
         tokio::time::sleep(std::time::Duration::from_millis(
             optimization_profile.process.delay_ms,
