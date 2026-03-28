@@ -63,7 +63,11 @@ async fn handle_launch_account(
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
 
-        let browser_tracker_id = windows::generate_browser_tracker_id();
+        let browser_tracker_id =
+            match crate::get_or_create_browser_tracker_id(state.accounts, account.user_id) {
+                Ok(id) => id,
+                Err(e) => return reply(500, &e, v2),
+            };
         let ticket = match auth::get_auth_ticket(&account.security_token).await {
             Ok(t) => t,
             Err(e) => return reply(400, &format!("Failed to get auth ticket: {}", e), v2),
@@ -135,11 +139,17 @@ async fn handle_launch_account(
             return reply(500, &format!("Failed to launch: {}", e), v2);
         }
 
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-
-        let pids_after = windows::get_roblox_pids();
-        if let Some(&pid) = pids_after.iter().find(|p| !pids_before.contains(p)) {
+        if let Some(pid) =
+            crate::wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(12)).await
+        {
             tracker.track(account.user_id, pid, browser_tracker_id);
+            crate::apply_windows_post_launch_profile(
+                None,
+                state.settings,
+                crate::LaunchClientProfile::Normal,
+                pid,
+            )
+            .await;
         }
 
         reply(200, &format!("Launched {} to {}", account.username, place_id), v2)
@@ -218,7 +228,11 @@ async fn handle_follow_user(
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
 
-        let browser_tracker_id = windows::generate_browser_tracker_id();
+        let browser_tracker_id =
+            match crate::get_or_create_browser_tracker_id(state.accounts, account.user_id) {
+                Ok(id) => id,
+                Err(e) => return reply(500, &e, v2),
+            };
         let ticket = match auth::get_auth_ticket(&account.security_token).await {
             Ok(t) => t,
             Err(e) => return reply(400, &format!("Failed to get auth ticket: {}", e), v2),
@@ -258,11 +272,17 @@ async fn handle_follow_user(
             return reply(500, &format!("Failed to launch: {}", e), v2);
         }
 
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-
-        let pids_after = windows::get_roblox_pids();
-        if let Some(&pid) = pids_after.iter().find(|p| !pids_before.contains(p)) {
+        if let Some(pid) =
+            crate::wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(12)).await
+        {
             tracker.track(account.user_id, pid, browser_tracker_id);
+            crate::apply_windows_post_launch_profile(
+                None,
+                state.settings,
+                crate::LaunchClientProfile::Normal,
+                pid,
+            )
+            .await;
         }
 
         reply(200, &format!("Following {} to {}", account.username, target_username), v2)

@@ -36,5 +36,6 @@ include!("windows/core.rs");
 include!("windows/process.rs");
 include!("windows/launch.rs");
 include!("windows/client_settings.rs");
+include!("windows/optimization.rs");
 include!("windows/windowing.rs");
 include!("windows/tracker.rs");

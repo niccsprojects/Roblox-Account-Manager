@@ -10,7 +10,13 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { Account, ThemeData, ThumbnailData, ParsedGroup } from "./types";
+import type {
+  Account,
+  ThemeData,
+  ThumbnailData,
+  ParsedGroup,
+  PlatformCapabilities,
+} from "./types";
 import { parseGroupName } from "./types";
 import { applyThemeCssVariables, normalizeTheme, DEFAULT_THEME } from "./theme";
 import i18n, { normalizeLanguage } from "./i18n";
@@ -34,6 +40,11 @@ interface RunningInstanceEntry {
   userId?: number;
   user_id?: number;
   pid?: number;
+}
+
+interface OptimizationWarningPayload {
+  pid?: number;
+  message?: string;
 }
 
 interface LaunchProgressState {
@@ -136,6 +147,7 @@ export interface StoreValue {
   closeContextMenu: () => void;
 
   settings: Record<string, Record<string, string>> | null;
+  platformCapabilities: PlatformCapabilities | null;
   theme: ThemeData | null;
   applyThemePreview: (theme: ThemeData) => void;
   saveTheme: (theme: ThemeData) => Promise<void>;
@@ -290,6 +302,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settings, setSettings] = useState<Record<string, Record<string, string>> | null>(null);
+  const [platformCapabilities, setPlatformCapabilities] = useState<PlatformCapabilities | null>(null);
   const [theme, setThemeState] = useState<ThemeData | null>(null);
   const [avatarUrls, setAvatarUrls] = useState<Map<number, string>>(new Map());
   const [presenceByUserId, setPresenceByUserId] = useState<Map<number, number>>(new Map());
@@ -797,6 +810,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   async function launchMultiple(userIds: number[]) {
     if (userIds.length === 0) return;
+    if (userIds.length > 1 && platformCapabilities?.os === "linux" && !platformCapabilities.supportsMultiLaunch) {
+      const message =
+        platformCapabilities.reasons[0] ||
+        platformCapabilities.warnings[0] ||
+        "Linux multi-launch requires a compatible custom runner and experimental Multi Roblox";
+      setError(message);
+      setActionStatusMessage(message, "error", 5000);
+      throw new Error(message);
+    }
 
     clearLaunchTimeout();
     setJoiningAccounts(new Set([userIds[0]]));
@@ -892,6 +914,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   async function startBottingMode(config: BottingStartConfig) {
+    if (platformCapabilities?.os === "linux" && !platformCapabilities.supportsBotting) {
+      const message =
+        platformCapabilities.reasons[0] ||
+        platformCapabilities.warnings[0] ||
+        "Botting Mode is unavailable for the active Linux runner";
+      setError(message);
+      throw new Error(message);
+    }
     try {
       const status = await invoke<BottingStatus>("start_botting_mode", {
         userIds: config.userIds,
@@ -992,8 +1022,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const s = await invoke<Record<string, Record<string, string>>>("get_all_settings");
       setSettings(s);
       void i18n.changeLanguage(normalizeLanguage(s?.General?.Language));
+      try {
+        const capabilities = await invoke<PlatformCapabilities>("get_platform_capabilities");
+        setPlatformCapabilities(capabilities);
+      } catch {
+      }
     } catch {}
   }
+
+  const refreshPlatformCapabilities = useCallback(async () => {
+    try {
+      const capabilities = await invoke<PlatformCapabilities>("get_platform_capabilities");
+      setPlatformCapabilities(capabilities);
+    } catch {
+    }
+  }, []);
 
   const refreshEncryptionState = useCallback(async () => {
     try {
@@ -1210,6 +1253,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const s = await invoke<Record<string, Record<string, string>>>("get_all_settings");
         loadedSettings = s;
         setSettings(s);
+        try {
+          const capabilities = await invoke<PlatformCapabilities>("get_platform_capabilities");
+          setPlatformCapabilities(capabilities);
+        } catch {
+        }
         void i18n.changeLanguage(normalizeLanguage(s?.General?.Language));
         if (s?.General?.HideUsernames === "true") setHideUsernamesState(true);
         if (s?.General?.ShuffleJobId === "true") setShuffleJobId(true);
@@ -1267,6 +1315,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void i18n.changeLanguage(normalizeLanguage(settings?.General?.Language));
   }, [settings?.General?.Language]);
+
+  useEffect(() => {
+    if (!initialized) return;
+    void refreshPlatformCapabilities();
+  }, [
+    initialized,
+    refreshPlatformCapabilities,
+    settings?.Linux?.PreferredRunner,
+    settings?.Linux?.CustomLaunchCommand,
+    settings?.Linux?.CustomProcessMatch,
+    settings?.Linux?.CustomLogDir,
+    settings?.Linux?.EnableExperimentalMultiRbx,
+    settings?.Linux?.WindowControlBackend,
+  ]);
 
   useEffect(() => {
     if (!theme) return;
@@ -1348,6 +1410,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           launchClearTimeoutRef.current = null;
         }, 1500);
       }),
+      listen<OptimizationWarningPayload>("roblox-optimization-warning", (e) => {
+        const pid = typeof e.payload?.pid === "number" ? e.payload.pid : null;
+        const message =
+          typeof e.payload?.message === "string" && e.payload.message.trim().length > 0
+            ? e.payload.message.trim()
+            : tr("Unknown");
+        addToast(
+          pid !== null
+            ? tr("Optimization warning for PID {{pid}}: {{message}}", { pid, message })
+            : tr("Optimization warning: {{message}}", { message })
+        );
+      }),
     ];
 
     Promise.all(listeners).then((fns) => fns.forEach((fn) => unsubs.push(fn)));
@@ -1355,7 +1429,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubs.forEach((fn) => fn());
     };
-  }, [needsPassword, initialized, setActionStatusMessage]);
+  }, [needsPassword, initialized, setActionStatusMessage, addToast]);
 
   useEffect(() => {
     if (needsPassword || !initialized) return;
@@ -1722,6 +1796,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     openContextMenu,
     closeContextMenu,
     settings,
+    platformCapabilities,
     theme,
     applyThemePreview,
     saveTheme,

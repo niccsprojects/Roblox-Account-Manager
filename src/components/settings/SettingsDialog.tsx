@@ -5,7 +5,7 @@ import { TabBar } from "./TabBar";
 import { TabContent } from "./TabContent";
 import { useTr } from "../../i18n/text";
 import { ENABLE_WEBSERVER } from "../../featureFlags";
-import { Settings as SettingsIcon, Code, Server, Eye, MoreHorizontal, X } from "lucide-react";
+import { Settings as SettingsIcon, Code, Gauge, Server, Eye, MoreHorizontal, X } from "lucide-react";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -14,11 +14,17 @@ interface SettingsDialogProps {
   onRequestEncryptionSetup?: () => void;
 }
 
-export type TabId = "general" | "developer" | "webserver" | "watcher" | "miscellaneous";
+export type TabId =
+  | "general"
+  | "developer"
+  | "webserver"
+  | "watcher"
+  | "optimization"
+  | "miscellaneous";
 
 export const TAB_ORDER: TabId[] = ENABLE_WEBSERVER
-  ? ["general", "developer", "webserver", "watcher", "miscellaneous"]
-  : ["general", "developer", "watcher", "miscellaneous"];
+  ? ["general", "developer", "webserver", "watcher", "optimization", "miscellaneous"]
+  : ["general", "developer", "watcher", "optimization", "miscellaneous"];
 
 export interface TabDef {
   id: TabId;
@@ -88,6 +94,11 @@ export function SettingsDialog({
       id: "watcher",
       label: "Watcher",
       icon: <Eye size={15} strokeWidth={1.5} />,
+    },
+    {
+      id: "optimization",
+      label: "Optimization",
+      icon: <Gauge size={15} strokeWidth={1.5} />,
     },
     {
       id: "miscellaneous",

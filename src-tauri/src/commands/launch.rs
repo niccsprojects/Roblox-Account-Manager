@@ -1,6 +1,7 @@
 #[cfg(target_os = "windows")]
 #[tauri::command]
 async fn launch_roblox(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AccountStore>,
     settings: tauri::State<'_, SettingsStore>,
     user_id: i64,
@@ -98,6 +99,8 @@ async fn launch_roblox(
     if let Some(pid) = wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(12)).await
     {
         tracker.track(user_id, pid, browser_tracker_id.clone());
+        apply_windows_post_launch_profile(Some(&app), &settings, LaunchClientProfile::Normal, pid)
+            .await;
 
         let accounts = state.get_all()?;
         if let Some(account) = accounts.iter().find(|a| a.user_id == user_id) {
@@ -146,6 +149,7 @@ async fn launch_roblox(
 #[cfg(not(target_os = "windows"))]
 #[tauri::command]
 async fn launch_roblox(
+    _app: tauri::AppHandle,
     state: tauri::State<'_, AccountStore>,
     settings: tauri::State<'_, SettingsStore>,
     user_id: i64,
@@ -399,6 +403,13 @@ async fn launch_multiple(
         if let Some(pid) = wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(12)).await
         {
             tracker.track(uid, pid, browser_tracker_id);
+            apply_windows_post_launch_profile(
+                Some(&app),
+                &settings,
+                LaunchClientProfile::Normal,
+                pid,
+            )
+            .await;
             if start_minimized {
                 let baseline = pids_before.clone();
                 tokio::spawn(async move {

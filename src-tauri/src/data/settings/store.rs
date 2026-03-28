@@ -210,6 +210,71 @@ impl SettingsStore {
             }
         }
 
+        let optimization_defaults: &[(&str, &str)] = &[
+            ("NormalEnableProcessPolicy", "false"),
+            ("NormalProcessPolicyDelayMs", "1500"),
+            ("NormalPriorityClass", "normal"),
+            ("NormalBackgroundMode", "false"),
+            ("NormalEcoQos", "false"),
+            ("NormalIgnoreTimerResolution", "false"),
+            ("NormalMemoryPriority", "normal"),
+            ("NormalEnableFastFlags", "false"),
+            ("NormalFastFlagsJson", ""),
+            ("NormalEnableJobCpuLimit", "false"),
+            ("NormalJobCpuLimitPercent", "25"),
+            ("NormalEnableJobMemoryLimit", "false"),
+            ("NormalJobMemoryLimitMb", "2048"),
+            ("BottingPlayerEnableProcessPolicy", "false"),
+            ("BottingPlayerProcessPolicyDelayMs", "1500"),
+            ("BottingPlayerPriorityClass", "normal"),
+            ("BottingPlayerBackgroundMode", "false"),
+            ("BottingPlayerEcoQos", "false"),
+            ("BottingPlayerIgnoreTimerResolution", "false"),
+            ("BottingPlayerMemoryPriority", "normal"),
+            ("BottingPlayerEnableFastFlags", "false"),
+            ("BottingPlayerFastFlagsJson", ""),
+            ("BottingPlayerEnableJobCpuLimit", "false"),
+            ("BottingPlayerJobCpuLimitPercent", "25"),
+            ("BottingPlayerEnableJobMemoryLimit", "false"),
+            ("BottingPlayerJobMemoryLimitMb", "2048"),
+            ("BottingBotEnableProcessPolicy", "false"),
+            ("BottingBotProcessPolicyDelayMs", "1500"),
+            ("BottingBotPriorityClass", "below_normal"),
+            ("BottingBotBackgroundMode", "true"),
+            ("BottingBotEcoQos", "true"),
+            ("BottingBotIgnoreTimerResolution", "true"),
+            ("BottingBotMemoryPriority", "low"),
+            ("BottingBotEnableFastFlags", "false"),
+            ("BottingBotFastFlagsJson", ""),
+            ("BottingBotEnableJobCpuLimit", "false"),
+            ("BottingBotJobCpuLimitPercent", "20"),
+            ("BottingBotEnableJobMemoryLimit", "false"),
+            ("BottingBotJobMemoryLimitMb", "1536"),
+        ];
+
+        let optimization = ini.section("Optimization");
+        for (key, value) in optimization_defaults {
+            if !optimization.exists(key) {
+                optimization.set(key, value, None);
+            }
+        }
+
+        let linux_defaults: &[(&str, &str)] = &[
+            ("PreferredRunner", "sober"),
+            ("CustomLaunchCommand", ""),
+            ("CustomProcessMatch", "sober,flatpak,roblox,robloxplayerbeta"),
+            ("CustomLogDir", ""),
+            ("EnableExperimentalMultiRbx", "false"),
+            ("WindowControlBackend", "auto"),
+        ];
+
+        let linux = ini.section("Linux");
+        for (key, value) in linux_defaults {
+            if !linux.exists(key) {
+                linux.set(key, value, None);
+            }
+        }
+
         ini.section("Prompts");
 
         drop(ini);

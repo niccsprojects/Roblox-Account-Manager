@@ -5,17 +5,26 @@ export function Toggle({
   onChange,
   label,
   description,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: React.ReactNode;
   description?: string;
+  disabled?: boolean;
 }) {
   const t = useTr();
   return (
     <div
-      className="group flex items-start gap-3 py-2 px-1 rounded-lg cursor-pointer select-none transition-colors hover:bg-white/[0.02]"
-      onClick={() => onChange(!checked)}
+      className={`group flex items-start gap-3 py-2 px-1 rounded-lg select-none transition-colors ${
+        disabled
+          ? "cursor-not-allowed opacity-60"
+          : "cursor-pointer hover:bg-white/[0.02]"
+      }`}
+      onClick={() => {
+        if (disabled) return;
+        onChange(!checked);
+      }}
     >
       <div className="relative mt-0.5 shrink-0">
         <div

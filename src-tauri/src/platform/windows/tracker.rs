@@ -9,6 +9,7 @@ pub struct TrackedProcess {
 
 pub struct ProcessTracker {
     instances: Mutex<HashMap<i64, TrackedProcess>>,
+    job_handles: Mutex<HashMap<u32, SendHandle>>,
     watcher_active: AtomicBool,
     watcher_session: AtomicU64,
     watcher_state_lock: Mutex<()>,
@@ -20,6 +21,7 @@ impl ProcessTracker {
     pub fn new() -> Self {
         Self {
             instances: Mutex::new(HashMap::new()),
+            job_handles: Mutex::new(HashMap::new()),
             watcher_active: AtomicBool::new(false),
             watcher_session: AtomicU64::new(0),
             watcher_state_lock: Mutex::new(()),
@@ -30,20 +32,24 @@ impl ProcessTracker {
 
     pub fn track(&self, user_id: i64, pid: u32, browser_tracker_id: String) {
         if let Ok(mut instances) = self.instances.lock() {
-            instances.insert(
+            if let Some(previous) = instances.insert(
                 user_id,
                 TrackedProcess {
                     pid,
                     user_id,
                     browser_tracker_id,
                 },
-            );
+            ) {
+                self.clear_job_handle_for_pid(previous.pid);
+            }
         }
     }
 
     pub fn untrack(&self, user_id: i64) {
         if let Ok(mut instances) = self.instances.lock() {
-            instances.remove(&user_id);
+            if let Some(previous) = instances.remove(&user_id) {
+                self.clear_job_handle_for_pid(previous.pid);
+            }
         }
     }
 
@@ -69,6 +75,33 @@ impl ProcessTracker {
             .ok()
             .map(|i| i.values().cloned().collect())
             .unwrap_or_default()
+    }
+
+    pub fn set_job_handle(&self, pid: u32, handle: HANDLE) {
+        if handle.is_null() {
+            return;
+        }
+        self.clear_job_handle_for_pid(pid);
+        if let Ok(mut jobs) = self.job_handles.lock() {
+            jobs.insert(pid, SendHandle(handle));
+        } else {
+            unsafe {
+                CloseHandle(handle);
+            }
+        }
+    }
+
+    pub fn clear_job_handle_for_pid(&self, pid: u32) {
+        let handle = self
+            .job_handles
+            .lock()
+            .ok()
+            .and_then(|mut jobs| jobs.remove(&pid));
+        if let Some(SendHandle(handle)) = handle {
+            unsafe {
+                CloseHandle(handle);
+            }
+        }
     }
 
     pub fn kill_for_user(&self, user_id: i64) -> bool {
@@ -178,6 +211,7 @@ impl ProcessTracker {
     pub fn cleanup_dead_processes(&self) -> Vec<i64> {
         let alive_pids = get_roblox_pids();
         let mut dead_user_ids = Vec::new();
+        let mut dead_pids = Vec::new();
 
         if let Ok(mut instances) = self.instances.lock() {
             instances.retain(|user_id, process| {
@@ -185,9 +219,14 @@ impl ProcessTracker {
                     true
                 } else {
                     dead_user_ids.push(*user_id);
+                    dead_pids.push(process.pid);
                     false
                 }
             });
+        }
+
+        for pid in dead_pids {
+            self.clear_job_handle_for_pid(pid);
         }
 
         dead_user_ids

@@ -129,6 +129,11 @@ async fn launch_account_for_cycle(
     };
 
     tracker.track(user_id, pid, browser_tracker_id);
+    {
+        let settings_state = app.state::<SettingsStore>();
+        apply_windows_post_launch_profile(Some(app), settings_state.inner(), launch_profile, pid)
+            .await;
+    }
     if detect_auth_failure_window(pid).await {
         let _ = tracker.kill_for_user(user_id);
         return Err("Roblox authentication failed (429) while joining".into());
