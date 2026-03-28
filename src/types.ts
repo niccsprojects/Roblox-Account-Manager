@@ -71,6 +71,24 @@ export interface ParsedGroup {
   accounts: Account[];
 }
 
+export interface PlatformCapabilities {
+  os: string;
+  sessionType: string;
+  preferredRunner: string;
+  detectedRunner: string;
+  runnerPath: string | null;
+  supportsSingleLaunch: boolean;
+  supportsMultiLaunch: boolean;
+  supportsWatcher: boolean;
+  supportsWatcherMemory: boolean;
+  supportsWindowControls: boolean;
+  supportsBotting: boolean;
+  supportsUpdater: boolean;
+  supportsClientSettings: boolean;
+  reasons: string[];
+  warnings: string[];
+}
+
 export function parseGroupName(group: string): { sortKey: number; displayName: string } {
   const match = group.match(/^(\d{1,3})\s*/);
   if (match) {
