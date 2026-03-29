@@ -10,6 +10,7 @@ import { TextAreaField } from "../ui/TextAreaField";
 import { TextField } from "../ui/TextField";
 import { Toggle } from "../ui/Toggle";
 import { WarningBadge } from "../ui/WarningBadge";
+import { isWindowsPlatform } from "../../utils/platform";
 
 type OptimizationProfileId = "Normal" | "BottingPlayer" | "BottingBot";
 
@@ -356,7 +357,7 @@ function OptimizationProfileSection({
 export function OptimizationTab({ s }: { s: UseSettingsReturn }) {
   const t = useTr();
   const store = useStore();
-  const isWindows = store.platformCapabilities?.os === "windows";
+  const isWindows = isWindowsPlatform(store.platformCapabilities);
   const bottingEnabled = s.getBool("General", "BottingEnabled");
   const sharedProfile = s.get("General", "BottingUseSharedClientProfile", "true") === "true";
 
