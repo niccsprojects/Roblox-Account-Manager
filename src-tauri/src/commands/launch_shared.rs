@@ -1,19 +1,20 @@
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct WindowsClientOverrides {
     max_fps: Option<u32>,
     master_volume: Option<f32>,
     graphics_level: Option<u32>,
     window_size: Option<(u32, u32)>,
+    fast_flags: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
-#[derive(Clone, Copy)]
-enum LaunchClientProfile {
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum LaunchClientProfile {
     Normal,
     BottingPlayer,
     BottingBot,
 }
 
-fn profile_key(
+pub(crate) fn profile_key(
     profile: LaunchClientProfile,
     normal: &'static str,
     player: &'static str,
@@ -23,6 +24,18 @@ fn profile_key(
         LaunchClientProfile::Normal => normal,
         LaunchClientProfile::BottingPlayer => player,
         LaunchClientProfile::BottingBot => bot,
+    }
+}
+
+pub(crate) fn effective_launch_profile(
+    settings: &SettingsStore,
+    profile: LaunchClientProfile,
+) -> LaunchClientProfile {
+    if matches!(profile, LaunchClientProfile::Normal) || !botting_uses_shared_client_profile(settings)
+    {
+        profile
+    } else {
+        LaunchClientProfile::Normal
     }
 }
 
@@ -36,7 +49,10 @@ fn custom_client_settings_path(settings: &SettingsStore, profile: LaunchClientPr
     settings.get_string("General", key)
 }
 
-fn start_minimized_for_profile(settings: &SettingsStore, profile: LaunchClientProfile) -> bool {
+pub(crate) fn start_minimized_for_profile(
+    settings: &SettingsStore,
+    profile: LaunchClientProfile,
+) -> bool {
     let key = profile_key(
         profile,
         "StartRobloxMinimized",
@@ -46,7 +62,7 @@ fn start_minimized_for_profile(settings: &SettingsStore, profile: LaunchClientPr
     settings.get_bool("General", key)
 }
 
-fn botting_uses_shared_client_profile(settings: &SettingsStore) -> bool {
+pub(crate) fn botting_uses_shared_client_profile(settings: &SettingsStore) -> bool {
     settings
         .get("General", "BottingUseSharedClientProfile")
         .ok()
@@ -170,19 +186,39 @@ fn windows_client_overrides(
         None
     };
 
+    let optimization_profile = platform::windows::load_optimization_profile(settings, profile);
+    let fast_flags = if optimization_profile.experimental.enable_fast_flags {
+        match platform::windows::parse_allowlisted_fast_flags_json(
+            &optimization_profile.experimental.fast_flags_json,
+        ) {
+            Ok(flags) => Some(flags),
+            Err(err) => {
+                eprintln!("Skipped allowlisted fast flags for {:?}: {}", profile, err);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     WindowsClientOverrides {
         max_fps,
         master_volume,
         graphics_level,
         window_size,
+        fast_flags,
     }
 }
 
 #[cfg(target_os = "windows")]
-fn patch_client_settings_for_launch(settings: &SettingsStore, profile: LaunchClientProfile) {
+pub(crate) fn patch_client_settings_for_launch(
+    settings: &SettingsStore,
+    profile: LaunchClientProfile,
+) {
     use platform::windows;
 
-    let custom_settings = custom_client_settings_path(settings, profile);
+    let effective_profile = effective_launch_profile(settings, profile);
+    let custom_settings = custom_client_settings_path(settings, effective_profile);
     let custom_settings = custom_settings.trim();
     let mut custom_applied = false;
 
@@ -194,12 +230,16 @@ fn patch_client_settings_for_launch(settings: &SettingsStore, profile: LaunchCli
         custom_applied = true;
     }
 
-    let overrides = windows_client_overrides(settings, !custom_applied, profile);
+    let mut overrides = windows_client_overrides(settings, !custom_applied, effective_profile);
+    if custom_applied {
+        overrides.fast_flags = None;
+    }
     let _ = windows::apply_runtime_client_settings(
         overrides.max_fps,
         overrides.master_volume,
         overrides.graphics_level,
         overrides.window_size,
+        overrides.fast_flags.as_ref(),
     );
 }
 
@@ -261,7 +301,10 @@ fn save_browser_tracker_id(
 }
 
 #[cfg(target_os = "windows")]
-fn get_or_create_browser_tracker_id(state: &AccountStore, user_id: i64) -> Result<String, String> {
+pub(crate) fn get_or_create_browser_tracker_id(
+    state: &AccountStore,
+    user_id: i64,
+) -> Result<String, String> {
     let accounts = state.get_all()?;
     if let Some(existing) = accounts
         .iter()
@@ -295,7 +338,10 @@ fn get_or_create_browser_tracker_id(state: &AccountStore, user_id: i64) -> Resul
 }
 
 #[cfg(target_os = "windows")]
-async fn wait_for_new_roblox_pid(pids_before: &[u32], timeout: std::time::Duration) -> Option<u32> {
+pub(crate) async fn wait_for_new_roblox_pid(
+    pids_before: &[u32],
+    timeout: std::time::Duration,
+) -> Option<u32> {
     let deadline = std::time::Instant::now() + timeout;
     loop {
         let pids_after = platform::windows::get_roblox_pids();
@@ -380,6 +426,42 @@ async fn minimize_new_roblox_windows(pids_before: Vec<u32>, timeout: std::time::
             break;
         }
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) async fn apply_windows_post_launch_profile(
+    app: Option<&tauri::AppHandle>,
+    settings: &SettingsStore,
+    profile: LaunchClientProfile,
+    pid: u32,
+) {
+    let effective_profile = effective_launch_profile(settings, profile);
+    let optimization_profile = platform::windows::load_optimization_profile(settings, effective_profile);
+    let has_process_policy = optimization_profile.process.enabled;
+    let has_job_limits = optimization_profile.experimental.enable_job_cpu_limit
+        || optimization_profile.experimental.enable_job_memory_limit;
+    if !has_process_policy && !has_job_limits {
+        return;
+    }
+    if has_process_policy && optimization_profile.process.delay_ms > 0 {
+        tokio::time::sleep(std::time::Duration::from_millis(
+            optimization_profile.process.delay_ms,
+        ))
+        .await;
+    }
+
+    if let Err(err) = platform::windows::apply_optimization_to_pid(pid, &optimization_profile) {
+        eprintln!("Failed to apply Windows optimization to pid {}: {}", pid, err);
+        if let Some(app) = app {
+            let _ = app.emit(
+                "roblox-optimization-warning",
+                serde_json::json!({
+                    "pid": pid,
+                    "message": err,
+                }),
+            );
+        }
     }
 }
 

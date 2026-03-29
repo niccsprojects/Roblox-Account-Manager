@@ -4,6 +4,7 @@ import type { TabId } from "./SettingsDialog";
 import { TAB_ORDER } from "./SettingsDialog";
 import { GeneralTab } from "./GeneralTab";
 import { DeveloperTab } from "./DeveloperTab";
+import { OptimizationTab } from "./OptimizationTab";
 import { WebServerTab } from "./WebServerTab";
 import { WatcherTab } from "./WatcherTab";
 import { MiscellaneousTab } from "./MiscellaneousTab";
@@ -64,6 +65,7 @@ export function TabContent({
             {tab === "developer" && <DeveloperTab s={s} />}
             {tab === "webserver" && <WebServerTab s={s} />}
             {tab === "watcher" && <WatcherTab s={s} />}
+            {tab === "optimization" && <OptimizationTab s={s} />}
             {tab === "miscellaneous" && (
               <MiscellaneousTab s={s} onRequestEncryptionSetup={onRequestEncryptionSetup} />
             )}

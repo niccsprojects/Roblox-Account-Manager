@@ -12,9 +12,10 @@ interface SelectProps {
   options: SelectOption[];
   onChange: (value: string) => void;
   className?: string;
+  disabled?: boolean;
 }
 
-export function Select({ value, options, onChange, className = "" }: SelectProps) {
+export function Select({ value, options, onChange, className = "", disabled = false }: SelectProps) {
   const t = useTr();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -41,13 +42,21 @@ export function Select({ value, options, onChange, className = "" }: SelectProps
     <div ref={ref} className={`relative theme-modal-scope ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-xs text-zinc-300 hover:border-zinc-600 focus:outline-none focus:border-zinc-600 transition-colors"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setOpen(!open);
+        }}
+        className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
+          disabled
+            ? "cursor-not-allowed border border-zinc-800/60 bg-zinc-800/40 text-zinc-500"
+            : "bg-zinc-800/50 border border-zinc-700/50 text-zinc-300 hover:border-zinc-600 focus:outline-none focus:border-zinc-600"
+        }`}
       >
         <span className="truncate">{selected?.label ? t(selected.label) : t(value)}</span>
         <ChevronDown size={10} strokeWidth={2.5} className={`shrink-0 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
+      {open && !disabled && (
         <div className="theme-panel theme-border absolute z-50 mt-1 w-full bg-zinc-900 border border-zinc-700/60 rounded-lg shadow-2xl py-0.5 animate-scale-in overflow-hidden">
           {options.map((o) => (
             <button

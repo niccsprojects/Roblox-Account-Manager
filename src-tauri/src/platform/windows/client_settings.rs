@@ -1,22 +1,52 @@
-pub fn apply_fps_unlock(max_fps: u32) -> Result<(), String> {
-    let settings_file = get_client_settings_file()?;
-
-    let mut settings: serde_json::Value = if settings_file.exists() {
-        std::fs::read_to_string(&settings_file)
+fn load_client_app_settings(settings_file: &std::path::Path) -> serde_json::Value {
+    if settings_file.exists() {
+        std::fs::read_to_string(settings_file)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or(serde_json::json!({}))
     } else {
         serde_json::json!({})
-    };
+    }
+}
 
-    settings["DFIntTaskSchedulerTargetFps"] = serde_json::json!(max_fps);
-
+fn write_client_app_settings(
+    settings_file: &std::path::Path,
+    settings: &serde_json::Value,
+) -> Result<(), String> {
     std::fs::write(
-        &settings_file,
-        serde_json::to_string(&settings).unwrap_or_default(),
+        settings_file,
+        serde_json::to_string(settings).unwrap_or_default(),
     )
     .map_err(|e| format!("Failed to write ClientAppSettings.json: {}", e))
+}
+
+fn apply_client_app_settings_overrides(
+    max_fps: Option<u32>,
+    fast_flags: Option<&serde_json::Map<String, serde_json::Value>>,
+) -> Result<(), String> {
+    let settings_file = get_client_settings_file()?;
+    let mut settings = load_client_app_settings(&settings_file);
+
+    if let Some(fps) = max_fps {
+        settings["DFIntTaskSchedulerTargetFps"] = serde_json::json!(fps);
+    }
+
+    if let Some(flags) = fast_flags {
+        if !settings.is_object() {
+            settings = serde_json::json!({});
+        }
+        if let Some(target) = settings.as_object_mut() {
+            for (key, value) in flags {
+                target.insert(key.clone(), value.clone());
+            }
+        }
+    }
+
+    write_client_app_settings(&settings_file, &settings)
+}
+
+pub fn apply_fps_unlock(max_fps: u32) -> Result<(), String> {
+    apply_client_app_settings_overrides(Some(max_fps), None)
 }
 
 fn get_global_basic_settings_file() -> Option<PathBuf> {
@@ -157,9 +187,10 @@ pub fn apply_runtime_client_settings(
     master_volume: Option<f32>,
     graphics_level: Option<u32>,
     window_size: Option<(u32, u32)>,
+    fast_flags: Option<&serde_json::Map<String, serde_json::Value>>,
 ) -> Result<(), String> {
-    if let Some(fps) = max_fps {
-        apply_fps_unlock(fps)?;
+    if max_fps.is_some() || fast_flags.is_some() {
+        apply_client_app_settings_overrides(max_fps, fast_flags)?;
     }
 
     if max_fps.is_some()
