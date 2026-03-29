@@ -444,7 +444,7 @@ pub(crate) async fn apply_windows_post_launch_profile(
     if !has_process_policy && !has_job_limits {
         return;
     }
-    if optimization_profile.process.delay_ms > 0 {
+    if has_process_policy && optimization_profile.process.delay_ms > 0 {
         tokio::time::sleep(std::time::Duration::from_millis(
             optimization_profile.process.delay_ms,
         ))

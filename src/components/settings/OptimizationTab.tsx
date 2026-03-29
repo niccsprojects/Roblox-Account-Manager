@@ -11,24 +11,6 @@ import { TextField } from "../ui/TextField";
 import { Toggle } from "../ui/Toggle";
 import { WarningBadge } from "../ui/WarningBadge";
 
-const WINDOWS_FASTFLAG_ALLOWLIST = [
-  "DFFlagTextureQualityOverrideEnabled",
-  "DFIntTextureQualityOverride",
-  "DFFlagDebugRenderForceTechnologyVoxel",
-  "DFFlagDebugRenderForceTechnologyFuture",
-  "DFFlagRenderForceLowQualityLightmaps",
-  "DFFlagDisableDPIScale",
-  "FFlagDebugGraphicsDisableDirect3D11",
-  "FFlagDebugGraphicsPreferD3D11FL10",
-  "FIntDebugForceMSAASamples",
-  "FFlagDebugSkyGray",
-  "DFFlagDebugPauseVoxelizer",
-  "DFFlagDebugRenderForceMoonAngularSize",
-  "DFIntDebugRenderForceMoonTextureSize",
-  "DFIntDebugFRMQualityLevelOverride",
-  "DFIntRenderShadowIntensity",
-] as const;
-
 type OptimizationProfileId = "Normal" | "BottingPlayer" | "BottingBot";
 
 function generalKey(profile: OptimizationProfileId, suffix: string): string {
@@ -49,13 +31,6 @@ function optimizationJsonError(raw: string, enabled: boolean, t: (text: string) 
     const parsed = JSON.parse(trimmed);
     if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
       return t("Allowlisted fast flags JSON must be a JSON object");
-    }
-
-    const invalidKeys = Object.keys(parsed).filter(
-      (key) => !WINDOWS_FASTFLAG_ALLOWLIST.includes(key as (typeof WINDOWS_FASTFLAG_ALLOWLIST)[number])
-    );
-    if (invalidKeys.length > 0) {
-      return `${t("Only Roblox allowlisted keys are accepted")}: ${invalidKeys.join(", ")}`;
     }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
@@ -381,12 +356,7 @@ function OptimizationProfileSection({
 export function OptimizationTab({ s }: { s: UseSettingsReturn }) {
   const t = useTr();
   const store = useStore();
-  const platform = store.platformCapabilities?.os || "";
-  const isWindows =
-    platform === "windows" ||
-    (platform === "" &&
-      typeof navigator !== "undefined" &&
-      navigator.userAgent.toLowerCase().includes("windows"));
+  const isWindows = store.platformCapabilities?.os === "windows";
   const bottingEnabled = s.getBool("General", "BottingEnabled");
   const sharedProfile = s.get("General", "BottingUseSharedClientProfile", "true") === "true";
 
