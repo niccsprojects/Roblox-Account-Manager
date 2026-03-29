@@ -1684,6 +1684,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         currentVersion: string;
         date: string;
         body: string;
+        releaseChannel: UpdaterReleaseChannel;
+        featureChannel: UpdaterFeatureChannel;
       } | null>("check_for_updates_with_channels", {
         releaseChannel,
         featureChannel,
@@ -1694,7 +1696,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const skipped = localStorage.getItem(getUpdaterSkipVersionKey(releaseChannel, featureChannel));
+      const resolvedReleaseChannel = normalizeUpdaterReleaseChannel(update.releaseChannel);
+      const resolvedFeatureChannel = normalizeUpdaterFeatureChannel(update.featureChannel);
+      const skipped = localStorage.getItem(
+        getUpdaterSkipVersionKey(resolvedReleaseChannel, resolvedFeatureChannel)
+      );
       if (!manual && skipped === update.version) return;
 
       setUpdateInfo({
@@ -1702,8 +1708,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         currentVersion: update.currentVersion,
         date: update.date ?? "",
         body: update.body ?? "",
-        releaseChannel,
-        featureChannel,
+        releaseChannel: resolvedReleaseChannel,
+        featureChannel: resolvedFeatureChannel,
       });
       setUpdateDialogOpen(true);
     } catch (e) {
