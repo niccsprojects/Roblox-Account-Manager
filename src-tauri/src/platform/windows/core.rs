@@ -2,13 +2,11 @@ struct SendHandle(HANDLE);
 unsafe impl Send for SendHandle {}
 
 static MULTI_ROBLOX_HANDLE: Mutex<Option<SendHandle>> = Mutex::new(None);
+static COOKIES_LOCK_HANDLE: Mutex<Option<SendHandle>> = Mutex::new(None);
 static TRACKER: LazyLock<ProcessTracker> = LazyLock::new(ProcessTracker::new);
 
-fn encode_wide(s: &str) -> Vec<u16> {
-    OsStr::new(s)
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect()
+fn encode_wide(s: impl AsRef<OsStr>) -> Vec<u16> {
+    s.as_ref().encode_wide().chain(std::iter::once(0)).collect()
 }
 
 pub fn tracker() -> &'static ProcessTracker {
@@ -27,27 +25,36 @@ pub fn generate_browser_tracker_id() -> String {
 
 pub fn enable_multi_roblox() -> Result<bool, String> {
     let mut handle = MULTI_ROBLOX_HANDLE.lock().map_err(|e| e.to_string())?;
-    if handle.is_some() {
-        return Ok(true);
+    if handle.is_none() {
+        let name = encode_wide("ROBLOX_singletonMutex");
+        unsafe {
+            let h = CreateMutexW(std::ptr::null(), 1, name.as_ptr());
+            if h.is_null() {
+                return Err("Failed to create mutex".into());
+            }
+            let result = WaitForSingleObject(h, 0);
+            if result != WAIT_OBJECT_0 && result != WAIT_ABANDONED_0 {
+                CloseHandle(h);
+                return Ok(false);
+            }
+            *handle = Some(SendHandle(h));
+        }
     }
+    drop(handle);
 
-    let name = encode_wide("ROBLOX_singletonMutex");
-    unsafe {
-        let h = CreateMutexW(std::ptr::null(), 1, name.as_ptr());
-        if h.is_null() {
-            return Err("Failed to create mutex".into());
-        }
-        let result = WaitForSingleObject(h, 0);
-        if result != WAIT_OBJECT_0 && result != WAIT_ABANDONED_0 {
-            CloseHandle(h);
-            return Ok(false);
-        }
-        *handle = Some(SendHandle(h));
-    }
+    lock_roblox_cookies()?;
     Ok(true)
 }
 
 pub fn disable_multi_roblox() -> Result<(), String> {
+    let mut cookie_handle = COOKIES_LOCK_HANDLE.lock().map_err(|e| e.to_string())?;
+    if let Some(SendHandle(h)) = cookie_handle.take() {
+        unsafe {
+            CloseHandle(h);
+        }
+    }
+    drop(cookie_handle);
+
     let mut handle = MULTI_ROBLOX_HANDLE.lock().map_err(|e| e.to_string())?;
     if let Some(SendHandle(h)) = handle.take() {
         unsafe {
@@ -56,6 +63,54 @@ pub fn disable_multi_roblox() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn lock_roblox_cookies() -> Result<(), String> {
+    let mut handle = COOKIES_LOCK_HANDLE.lock().map_err(|e| e.to_string())?;
+    if handle.is_some() || is_773_fix_disabled() {
+        return Ok(());
+    }
+
+    let Some(path) = get_roblox_cookies_path() else {
+        return Ok(());
+    };
+
+    let wide = encode_wide(path.as_os_str());
+    unsafe {
+        let cookie_handle = CreateFileW(
+            wide.as_ptr(),
+            GENERIC_READ | GENERIC_WRITE,
+            0,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            std::ptr::null_mut(),
+        );
+        if cookie_handle == INVALID_HANDLE_VALUE {
+            eprintln!("Warning: Could not lock RobloxCookies.dat for the 773 fix");
+            return Ok(());
+        }
+        *handle = Some(SendHandle(cookie_handle));
+    }
+
+    Ok(())
+}
+
+fn get_roblox_cookies_path() -> Option<PathBuf> {
+    let local_app_data = std::env::var_os("LOCALAPPDATA")?;
+    let path = PathBuf::from(local_app_data)
+        .join("Roblox")
+        .join("LocalStorage")
+        .join("RobloxCookies.dat");
+    path.exists().then_some(path)
+}
+
+fn is_773_fix_disabled() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|dir| dir.join("no773fix.txt")))
+        .map(|path| path.exists())
+        .unwrap_or(false)
 }
 
 pub fn get_roblox_path() -> Result<String, String> {

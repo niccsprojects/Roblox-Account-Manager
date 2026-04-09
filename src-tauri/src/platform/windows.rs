@@ -9,7 +9,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
-use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, HWND, RECT};
+use windows_sys::Win32::Foundation::{
+    CloseHandle, GENERIC_READ, GENERIC_WRITE, HANDLE, HWND, RECT,
+};
+use windows_sys::Win32::Storage::FileSystem::{CreateFileW, FILE_ATTRIBUTE_NORMAL, OPEN_EXISTING};
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
 };
