@@ -1,26 +1,50 @@
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Account {
-    pub valid: bool,
-    pub security_token: String,
-    pub username: String,
-    #[serde(with = "csharp_datetime")]
-    pub last_use: DateTime<Utc>,
-    #[serde(rename = "Alias")]
-    pub alias: String,
-    #[serde(rename = "Description")]
-    pub description: String,
-    #[serde(rename = "Password")]
-    pub password: String,
-    #[serde(default = "default_group", skip_serializing_if = "is_default_group")]
-    pub group: String,
-    #[serde(rename = "UserID")]
-    pub user_id: i64,
     #[serde(default)]
+    pub valid: bool,
+    #[serde(default, deserialize_with = "string_or_default")]
+    pub security_token: String,
+    #[serde(default, deserialize_with = "string_or_default")]
+    pub username: String,
+    #[serde(
+        default = "default_timestamp",
+        deserialize_with = "csharp_datetime::deserialize_or_default",
+        serialize_with = "csharp_datetime::serialize"
+    )]
+    pub last_use: DateTime<Utc>,
+    #[serde(rename = "Alias", default, deserialize_with = "string_or_default")]
+    pub alias: String,
+    #[serde(
+        rename = "Description",
+        default,
+        deserialize_with = "string_or_default"
+    )]
+    pub description: String,
+    #[serde(rename = "Password", default, deserialize_with = "string_or_default")]
+    pub password: String,
+    #[serde(
+        default = "default_group",
+        deserialize_with = "group_or_default",
+        skip_serializing_if = "is_default_group"
+    )]
+    pub group: String,
+    #[serde(rename = "UserID", default)]
+    pub user_id: i64,
+    #[serde(default, deserialize_with = "fields_or_default")]
     pub fields: HashMap<String, String>,
-    #[serde(with = "csharp_datetime")]
+    #[serde(
+        default = "default_timestamp",
+        deserialize_with = "csharp_datetime::deserialize_or_default",
+        serialize_with = "csharp_datetime::serialize"
+    )]
     pub last_attempted_refresh: DateTime<Utc>,
-    #[serde(rename = "BrowserTrackerID", alias = "BrowserTrackerId", default)]
+    #[serde(
+        rename = "BrowserTrackerID",
+        alias = "BrowserTrackerId",
+        default,
+        deserialize_with = "string_or_default"
+    )]
     pub browser_tracker_id: String,
 }
 
@@ -28,8 +52,39 @@ fn default_group() -> String {
     "Default".to_string()
 }
 
+fn default_timestamp() -> DateTime<Utc> {
+    Utc::now()
+}
+
 fn is_default_group(group: &String) -> bool {
     group == "Default"
+}
+
+fn string_or_default<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<String>::deserialize(deserializer)?.unwrap_or_default())
+}
+
+fn group_or_default<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Option::<String>::deserialize(deserializer)?.unwrap_or_else(default_group))
+}
+
+fn fields_or_default<'de, D>(deserializer: D) -> Result<HashMap<String, String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(
+        Option::<HashMap<String, Option<String>>>::deserialize(deserializer)?
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(key, value)| (key, value.unwrap_or_default()))
+            .collect(),
+    )
 }
 
 mod csharp_datetime {
@@ -51,7 +106,26 @@ mod csharp_datetime {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
+        parse_datetime(&s)
+    }
 
+    pub fn deserialize_or_default<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let Some(s) = Option::<String>::deserialize(deserializer)? else {
+            return Ok(Utc::now());
+        };
+        if s.trim().is_empty() {
+            return Ok(Utc::now());
+        }
+        parse_datetime(&s)
+    }
+
+    fn parse_datetime<E>(s: &str) -> Result<DateTime<Utc>, E>
+    where
+        E: serde::de::Error,
+    {
         if let Ok(dt) = DateTime::parse_from_rfc3339(&s) {
             return Ok(dt.with_timezone(&Utc));
         }
