@@ -86,8 +86,7 @@ impl AccountStore {
         let accounts = if crypto::is_encrypted(&data) {
             let decrypted =
                 crypto::decrypt(&data, &hash).map_err(|e| format!("Failed to decrypt: {}", e))?;
-            serde_json::from_slice::<Vec<Account>>(&decrypted)
-                .map_err(|e| format!("Failed to parse account JSON: {}", e))?
+            Self::parse_accounts_json(&decrypted)?
         } else {
             Self::decode_plain_or_legacy_accounts(&data)?
         };
@@ -208,13 +207,12 @@ impl AccountStore {
     }
 
     fn decode_plain_or_legacy_accounts(data: &[u8]) -> Result<Vec<Account>, String> {
-        if let Ok(accounts) = serde_json::from_slice::<Vec<Account>>(data) {
+        if let Ok(accounts) = Self::parse_accounts_json(data) {
             return Ok(accounts);
         }
 
         if let Some(legacy_decrypted) = crypto::try_decrypt_legacy_dpapi(data) {
-            return serde_json::from_slice::<Vec<Account>>(&legacy_decrypted)
-                .map_err(|e| format!("Failed to parse account JSON: {}", e));
+            return Self::parse_accounts_json(&legacy_decrypted);
         }
 
         Err("Invalid account data format (failed plaintext and legacy DPAPI decode)".to_string())
@@ -232,8 +230,7 @@ impl AccountStore {
                 .ok_or_else(|| "Password required for encrypted file".to_string())?;
             let decrypted =
                 crypto::decrypt(data, hash).map_err(|e| format!("Failed to decrypt: {}", e))?;
-            return serde_json::from_slice::<Vec<Account>>(&decrypted)
-                .map_err(|e| format!("Failed to parse account JSON: {}", e));
+            return Self::parse_accounts_json(&decrypted);
         }
 
         Self::decode_plain_or_legacy_accounts(data)
@@ -255,11 +252,15 @@ impl AccountStore {
             let hash = crypto::hash_password(password);
             let decrypted = crypto::decrypt(data, &hash)
                 .map_err(|_| "Import password is incorrect".to_string())?;
-            return serde_json::from_slice::<Vec<Account>>(&decrypted)
-                .map_err(|e| format!("Failed to parse account JSON: {}", e));
+            return Self::parse_accounts_json(&decrypted);
         }
 
         Self::decode_plain_or_legacy_accounts(data)
+    }
+
+    fn parse_accounts_json(data: &[u8]) -> Result<Vec<Account>, String> {
+        serde_json::from_slice::<Vec<Account>>(data)
+            .map_err(|e| format!("Failed to parse account JSON: {}", e))
     }
 
     pub fn import_old_account_data(
@@ -329,5 +330,113 @@ impl AccountStore {
             replaced,
             skipped,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_test_path(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        std::env::temp_dir().join(format!("ram-{name}-{nanos}.json"))
+    }
+
+    fn new_test_store(name: &str) -> AccountStore {
+        crypto::init();
+        AccountStore::new(unique_test_path(name))
+    }
+
+    #[test]
+    fn decode_plain_or_legacy_accounts_should_accept_legacy_null_string_fields() {
+        let json = br#"
+        [
+          {
+            "Valid": true,
+            "SecurityToken": "_|WARNING:-DO-NOT-SHARE",
+            "Username": "LegacyUser",
+            "LastUse": "2024-03-05T12:34:56",
+            "Alias": null,
+            "Description": null,
+            "Password": null,
+            "Group": null,
+            "UserID": 12345,
+            "Fields": { "Note": null, "Rank": "Admin" },
+            "LastAttemptedRefresh": "2024-03-05T12:34:56",
+            "BrowserTrackerID": null
+          }
+        ]
+        "#;
+
+        let accounts = AccountStore::decode_plain_or_legacy_accounts(json).unwrap();
+
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].alias, "");
+        assert_eq!(accounts[0].description, "");
+        assert_eq!(accounts[0].password, "");
+        assert_eq!(accounts[0].group, "Default");
+        assert_eq!(accounts[0].browser_tracker_id, "");
+        assert_eq!(accounts[0].fields.get("Note").map(String::as_str), Some(""));
+        assert_eq!(
+            accounts[0].fields.get("Rank").map(String::as_str),
+            Some("Admin")
+        );
+    }
+
+    #[test]
+    fn import_old_account_data_should_accept_current_v4_encrypted_exports() {
+        let store = new_test_store("import-current-v4");
+        let current = vec![Account::new(
+            "_|WARNING:-DO-NOT-SHARE".to_string(),
+            "CurrentUser".to_string(),
+            67890,
+        )];
+        let json = serde_json::to_string(&current).unwrap();
+        let password = "compatibility-pass";
+        let hash = crypto::hash_password(password);
+        let encrypted = crypto::encrypt(&json, &hash).unwrap();
+
+        let summary = store
+            .import_old_account_data(&encrypted, Some(password))
+            .unwrap();
+        let imported = store.get_all().unwrap();
+
+        assert_eq!(summary.total, 1);
+        assert_eq!(summary.added, 1);
+        assert_eq!(summary.replaced, 0);
+        assert_eq!(summary.skipped, 0);
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].user_id, 67890);
+        assert_eq!(imported[0].username, "CurrentUser");
+
+        let _ = fs::remove_file(&store.file_path);
+    }
+
+    #[test]
+    fn import_old_account_data_should_accept_current_v4_plain_exports() {
+        let store = new_test_store("import-current-v4-plain");
+        let current = vec![Account::new(
+            "_|WARNING:-DO-NOT-SHARE".to_string(),
+            "PlainUser".to_string(),
+            24680,
+        )];
+        let json = serde_json::to_vec(&current).unwrap();
+
+        let summary = store.import_old_account_data(&json, None).unwrap();
+        let imported = store.get_all().unwrap();
+
+        assert_eq!(summary.total, 1);
+        assert_eq!(summary.added, 1);
+        assert_eq!(summary.replaced, 0);
+        assert_eq!(summary.skipped, 0);
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].user_id, 24680);
+        assert_eq!(imported[0].username, "PlainUser");
+
+        let _ = fs::remove_file(&store.file_path);
     }
 }
