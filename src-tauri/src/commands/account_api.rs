@@ -1,3 +1,104 @@
+use std::future::Future;
+
+fn session_relogin_error() -> String {
+    "Roblox invalidated this session. Re-login required.".to_string()
+}
+
+fn is_auth_session_error(error: &str) -> bool {
+    let lower = error.to_ascii_lowercase();
+    lower.contains("status 401")
+        || lower.contains("[401")
+        || lower.contains("unauthorized")
+        || lower.contains("not authenticated")
+        || lower.contains("user is not authenticated")
+        || lower.contains("invalid cookie")
+        || lower.contains("token validation failed")
+        || lower.contains("authorization has been denied")
+        || lower.contains("\"code\":9002")
+        || lower.contains("code 9002")
+}
+
+fn get_account(state: &AccountStore, user_id: i64) -> Result<crate::data::accounts::Account, String> {
+    state
+        .get_all()?
+        .into_iter()
+        .find(|a| a.user_id == user_id)
+        .ok_or_else(|| format!("Account {} not found", user_id))
+}
+
+fn mark_refresh_attempt(
+    state: &AccountStore,
+    user_id: i64,
+) -> Result<crate::data::accounts::Account, String> {
+    let mut account = get_account(state, user_id)?;
+    account.last_attempted_refresh = chrono::Utc::now();
+    state.update(account.clone())?;
+    Ok(account)
+}
+
+fn persist_cookie_update(state: &AccountStore, user_id: i64, new_cookie: &str) -> Result<(), String> {
+    let mut account = get_account(state, user_id)?;
+    account.security_token = new_cookie.to_string();
+    account.valid = true;
+    state.update(account)?;
+    Ok(())
+}
+
+async fn refresh_account_session(state: &AccountStore, user_id: i64) -> Result<String, String> {
+    let account = mark_refresh_attempt(state, user_id)?;
+    let result = api::auth::log_out_other_sessions(&account.security_token).await?;
+    if !result.success {
+        return Err(session_relogin_error());
+    }
+    let new_cookie = result
+        .new_cookie
+        .filter(|cookie| !cookie.trim().is_empty())
+        .ok_or_else(session_relogin_error)?;
+    persist_cookie_update(state, user_id, &new_cookie)?;
+    Ok(new_cookie)
+}
+
+async fn run_with_session_retry<T, F, Fut>(
+    state: &AccountStore,
+    user_id: i64,
+    mut operation: F,
+) -> Result<T, String>
+where
+    F: FnMut(String) -> Fut,
+    Fut: Future<Output = Result<T, String>>,
+{
+    let cookie = get_cookie(state, user_id)?;
+    match operation(cookie).await {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            if !is_auth_session_error(&error) {
+                return Err(error);
+            }
+
+            let refreshed_cookie = refresh_account_session(state, user_id)
+                .await
+                .map_err(|refresh_error| {
+                    if is_auth_session_error(&refresh_error) {
+                        session_relogin_error()
+                    } else {
+                        refresh_error
+                    }
+                })?;
+
+            match operation(refreshed_cookie).await {
+                Ok(value) => Ok(value),
+                Err(retry_error) => {
+                    if is_auth_session_error(&retry_error) {
+                        Err(session_relogin_error())
+                    } else {
+                        Err(retry_error)
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[tauri::command]
 async fn validate_cookie(cookie: String) -> Result<api::auth::AccountInfo, String> {
     api::auth::validate_cookie(&cookie).await
@@ -8,8 +109,10 @@ async fn get_csrf_token(
     state: tauri::State<'_, AccountStore>,
     user_id: i64,
 ) -> Result<String, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::auth::get_csrf_token(&cookie).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::auth::get_csrf_token(&cookie).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -17,14 +120,18 @@ async fn get_auth_ticket(
     state: tauri::State<'_, AccountStore>,
     user_id: i64,
 ) -> Result<String, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::auth::get_auth_ticket(&cookie).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::auth::get_auth_ticket(&cookie).await
+    })
+    .await
 }
 
 #[tauri::command]
 async fn check_pin(state: tauri::State<'_, AccountStore>, user_id: i64) -> Result<bool, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::auth::check_pin(&cookie).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::auth::check_pin(&cookie).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -33,8 +140,11 @@ async fn unlock_pin(
     user_id: i64,
     pin: String,
 ) -> Result<bool, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::auth::unlock_pin(&cookie, &pin).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let pin = pin.clone();
+        async move { api::auth::unlock_pin(&cookie, &pin).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -42,24 +152,16 @@ async fn refresh_cookie(
     state: tauri::State<'_, AccountStore>,
     user_id: i64,
 ) -> Result<bool, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    let result = api::auth::log_out_other_sessions(&cookie).await?;
-
-    if let Some(new_cookie) = result.new_cookie {
-        let accounts = state.get_all()?;
-        if let Some(mut account) = accounts.into_iter().find(|a| a.user_id == user_id) {
-            account.security_token = new_cookie;
-            state.update(account)?;
-        }
-    }
-
-    Ok(result.success)
+    refresh_account_session(state.inner(), user_id).await?;
+    Ok(true)
 }
 
 #[tauri::command]
 async fn get_robux(state: tauri::State<'_, AccountStore>, user_id: i64) -> Result<i64, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::get_robux(&cookie).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::get_robux(&cookie).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -108,8 +210,10 @@ async fn send_friend_request(
     user_id: i64,
     target_user_id: i64,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::send_friend_request(&cookie, target_user_id).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::send_friend_request(&cookie, target_user_id).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -118,8 +222,10 @@ async fn block_user(
     user_id: i64,
     target_user_id: i64,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::block_user(&cookie, target_user_id).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::block_user(&cookie, target_user_id).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -128,8 +234,10 @@ async fn unblock_user(
     user_id: i64,
     target_user_id: i64,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::unblock_user(&cookie, target_user_id).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::unblock_user(&cookie, target_user_id).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -137,8 +245,10 @@ async fn get_blocked_users(
     state: tauri::State<'_, AccountStore>,
     user_id: i64,
 ) -> Result<Vec<api::roblox::BlockedUser>, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::get_blocked_users(&cookie).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::get_blocked_users(&cookie).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -146,8 +256,10 @@ async fn unblock_all_users(
     state: tauri::State<'_, AccountStore>,
     user_id: i64,
 ) -> Result<i32, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::unblock_all_users(&cookie).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::unblock_all_users(&cookie).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -156,8 +268,11 @@ async fn set_follow_privacy(
     user_id: i64,
     privacy: String,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::set_follow_privacy(&cookie, &privacy).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let privacy = privacy.clone();
+        async move { api::roblox::set_follow_privacy(&cookie, &privacy).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -165,8 +280,10 @@ async fn get_private_server_invite_privacy(
     state: tauri::State<'_, AccountStore>,
     user_id: i64,
 ) -> Result<String, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::get_private_server_invite_privacy(&cookie).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::get_private_server_invite_privacy(&cookie).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -175,8 +292,11 @@ async fn set_private_server_invite_privacy(
     user_id: i64,
     privacy: String,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::set_private_server_invite_privacy(&cookie, &privacy).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let privacy = privacy.clone();
+        async move { api::roblox::set_private_server_invite_privacy(&cookie, &privacy).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -185,8 +305,11 @@ async fn set_avatar(
     user_id: i64,
     avatar_json: serde_json::Value,
 ) -> Result<Vec<i64>, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::set_avatar(&cookie, avatar_json).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let avatar_json = avatar_json.clone();
+        async move { api::roblox::set_avatar(&cookie, avatar_json).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -229,8 +352,11 @@ async fn join_game_instance(
     game_id: String,
     is_teleport: bool,
 ) -> Result<serde_json::Value, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::join_game_instance(&cookie, place_id, &game_id, is_teleport).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let game_id = game_id.clone();
+        async move { api::roblox::join_game_instance(&cookie, place_id, &game_id, is_teleport).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -239,8 +365,10 @@ async fn join_game(
     user_id: i64,
     place_id: i64,
 ) -> Result<serde_json::Value, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::join_game(&cookie, place_id).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::join_game(&cookie, place_id).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -269,8 +397,11 @@ async fn parse_private_server_link_code(
     place_id: i64,
     link_code: String,
 ) -> Result<String, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::parse_private_server_link_code(&cookie, place_id, &link_code).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let link_code = link_code.clone();
+        async move { api::roblox::parse_private_server_link_code(&cookie, place_id, &link_code).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -279,8 +410,10 @@ async fn join_group(
     user_id: i64,
     group_id: i64,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::join_group(&cookie, group_id).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::join_group(&cookie, group_id).await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -332,8 +465,11 @@ async fn purchase_product(
     expected_price: i64,
     expected_seller_id: i64,
 ) -> Result<api::roblox::PurchaseResult, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::roblox::purchase_product(&cookie, product_id, expected_price, expected_seller_id).await
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::purchase_product(&cookie, product_id, expected_price, expected_seller_id)
+            .await
+    })
+    .await
 }
 
 #[tauri::command]
@@ -343,15 +479,15 @@ async fn change_password(
     current_password: String,
     new_password: String,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    let new_cookie = api::auth::change_password(&cookie, &current_password, &new_password).await?;
+    let new_cookie = run_with_session_retry(state.inner(), user_id, |cookie| {
+        let current_password = current_password.clone();
+        let new_password = new_password.clone();
+        async move { api::auth::change_password(&cookie, &current_password, &new_password).await }
+    })
+    .await?;
 
     if let Some(new_cookie) = new_cookie {
-        let accounts = state.get_all()?;
-        if let Some(mut account) = accounts.into_iter().find(|a| a.user_id == user_id) {
-            account.security_token = new_cookie;
-            state.update(account)?;
-        }
+        persist_cookie_update(state.inner(), user_id, &new_cookie)?;
     }
 
     Ok(())
@@ -364,8 +500,12 @@ async fn change_email(
     password: String,
     new_email: String,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::auth::change_email(&cookie, &password, &new_email).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let password = password.clone();
+        let new_email = new_email.clone();
+        async move { api::auth::change_email(&cookie, &password, &new_email).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -374,8 +514,11 @@ async fn set_display_name(
     user_id: i64,
     display_name: String,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::auth::set_display_name(&cookie, user_id, &display_name).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let display_name = display_name.clone();
+        async move { api::auth::set_display_name(&cookie, user_id, &display_name).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -384,8 +527,11 @@ async fn quick_login_enter_code(
     user_id: i64,
     code: String,
 ) -> Result<serde_json::Value, String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::auth::quick_login_enter_code(&cookie, &code).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let code = code.clone();
+        async move { api::auth::quick_login_enter_code(&cookie, &code).await }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -394,6 +540,9 @@ async fn quick_login_validate_code(
     user_id: i64,
     code: String,
 ) -> Result<(), String> {
-    let cookie = get_cookie(&state, user_id)?;
-    api::auth::quick_login_validate_code(&cookie, &code).await
+    run_with_session_retry(state.inner(), user_id, |cookie| {
+        let code = code.clone();
+        async move { api::auth::quick_login_validate_code(&cookie, &code).await }
+    })
+    .await
 }

@@ -647,7 +647,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   async function refreshCookie(userId: number): Promise<boolean> {
-    return await invoke<boolean>("refresh_cookie", { userId });
+    const ok = await invoke<boolean>("refresh_cookie", { userId });
+    await loadAccounts();
+    return ok;
   }
 
   async function moveToGroup(userIds: number[], group: string) {
@@ -784,6 +786,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         linkCode,
         shuffleJob: shuffleJobId,
       });
+      await loadAccounts();
       addToast(tr("Launching game..."));
     } catch (e) {
       setJoiningAccounts((prev) => {
@@ -838,6 +841,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         jobId,
         launchData,
       });
+      await loadAccounts();
       addToast(tr("Launching {{count}} accounts...", { count: userIds.length }));
     } catch (e) {
       setJoiningAccounts(new Set());

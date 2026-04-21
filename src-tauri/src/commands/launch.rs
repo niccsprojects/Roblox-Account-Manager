@@ -15,7 +15,6 @@ async fn launch_roblox(
 ) -> Result<(), String> {
     use platform::windows;
 
-    let cookie = get_cookie(&state, user_id)?;
     let is_teleport = settings.get_bool("Developer", "IsTeleport");
     let use_old_join = settings.get_bool("Developer", "UseOldJoin");
     let auto_close_last_process = settings.get_bool("General", "AutoCloseLastProcess");
@@ -48,8 +47,10 @@ async fn launch_roblox(
 
     let mut actual_job = resolved_launch.job_id.clone();
     if shuffle_job && !follow_user && actual_job.trim().is_empty() {
-        if let Ok(response) =
+        if let Ok(response) = run_with_session_retry(state.inner(), user_id, |cookie| async move {
             api::roblox::get_servers(place_id, "Public", None, Some(&cookie)).await
+        })
+        .await
         {
             if !response.data.is_empty() {
                 let idx = (std::time::SystemTime::now()
@@ -63,8 +64,15 @@ async fn launch_roblox(
     }
 
     let browser_tracker_id = get_or_create_browser_tracker_id(&state, user_id)?;
-    let ticket = api::auth::get_auth_ticket(&cookie).await?;
-    let private_join = resolve_private_join(&cookie, place_id, &resolved_launch).await?;
+    let ticket = run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::auth::get_auth_ticket(&cookie).await
+    })
+    .await?;
+    let private_join = run_with_session_retry(state.inner(), user_id, |cookie| {
+        let resolved_launch = resolved_launch.clone();
+        async move { resolve_private_join(&cookie, place_id, &resolved_launch).await }
+    })
+    .await?;
 
     let pids_before = windows::get_roblox_pids();
 
@@ -165,7 +173,6 @@ async fn launch_roblox(
     {
         use platform::macos;
 
-        let cookie = get_cookie(&state, user_id)?;
         let is_teleport = settings.get_bool("Developer", "IsTeleport");
         let use_old_join = settings.get_bool("Developer", "UseOldJoin");
         let auto_close_last_process = settings.get_bool("General", "AutoCloseLastProcess");
@@ -200,7 +207,10 @@ async fn launch_roblox(
         let mut actual_job = resolved_launch.job_id.clone();
         if shuffle_job && !follow_user && actual_job.trim().is_empty() {
             if let Ok(response) =
-                api::roblox::get_servers(place_id, "Public", None, Some(&cookie)).await
+                run_with_session_retry(state.inner(), user_id, |cookie| async move {
+                    api::roblox::get_servers(place_id, "Public", None, Some(&cookie)).await
+                })
+                .await
             {
                 if !response.data.is_empty() {
                     let idx = (std::time::SystemTime::now()
@@ -214,8 +224,15 @@ async fn launch_roblox(
         }
 
         let browser_tracker_id = get_or_create_browser_tracker_id(&state, user_id)?;
-        let ticket = api::auth::get_auth_ticket(&cookie).await?;
-        let private_join = resolve_private_join(&cookie, place_id, &resolved_launch).await?;
+        let ticket = run_with_session_retry(state.inner(), user_id, |cookie| async move {
+            api::auth::get_auth_ticket(&cookie).await
+        })
+        .await?;
+        let private_join = run_with_session_retry(state.inner(), user_id, |cookie| {
+            let resolved_launch = resolved_launch.clone();
+            async move { resolve_private_join(&cookie, place_id, &resolved_launch).await }
+        })
+        .await?;
 
         let pids_before = macos::get_roblox_pids();
 
@@ -325,11 +342,6 @@ async fn launch_multiple(
             }),
         );
 
-        let cookie = match get_cookie(&state, uid) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
         let resolved_launch = resolve_launch_job(&acct_job, false, "");
 
         if multi_rbx {
@@ -350,14 +362,23 @@ async fn launch_multiple(
         }
 
         let browser_tracker_id = get_or_create_browser_tracker_id(&state, uid)?;
-        let ticket = match api::auth::get_auth_ticket(&cookie).await {
+        let ticket = match run_with_session_retry(state.inner(), uid, |cookie| async move {
+            api::auth::get_auth_ticket(&cookie).await
+        })
+        .await
+        {
             Ok(t) => t,
             Err(_) => {
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 continue;
             }
         };
-        let private_join = match resolve_private_join(&cookie, acct_place, &resolved_launch).await {
+        let private_join = match run_with_session_retry(state.inner(), uid, |cookie| {
+            let resolved_launch = resolved_launch.clone();
+            async move { resolve_private_join(&cookie, acct_place, &resolved_launch).await }
+        })
+        .await
+        {
             Ok(value) => value,
             Err(_) => {
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -489,11 +510,6 @@ async fn launch_multiple(
                 }),
             );
 
-            let cookie = match get_cookie(&state, uid) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
             let resolved_launch = resolve_launch_job(&acct_job, false, "");
 
             if multi_rbx {
@@ -516,15 +532,24 @@ async fn launch_multiple(
             }
 
             let browser_tracker_id = get_or_create_browser_tracker_id(&state, uid)?;
-            let ticket = match api::auth::get_auth_ticket(&cookie).await {
+            let ticket = match run_with_session_retry(state.inner(), uid, |cookie| async move {
+                api::auth::get_auth_ticket(&cookie).await
+            })
+            .await
+            {
                 Ok(t) => t,
                 Err(_) => {
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                     continue;
                 }
             };
-            let private_join = match resolve_private_join(&cookie, acct_place, &resolved_launch).await
-            {
+            let private_join =
+                match run_with_session_retry(state.inner(), uid, |cookie| {
+                    let resolved_launch = resolved_launch.clone();
+                    async move { resolve_private_join(&cookie, acct_place, &resolved_launch).await }
+                })
+                .await
+                {
                 Ok(value) => value,
                 Err(_) => {
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
