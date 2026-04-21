@@ -127,6 +127,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
     setLoading("display");
     try {
       await invoke("set_display_name", { userId: account!.UserID, displayName: displayName.trim() });
+      await store.loadAccounts();
       store.addToast(t("Display name updated"));
     } catch (e) {
       store.addToast(t("Error: {{error}}", { error: String(e) }));
@@ -138,6 +139,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
     setFollowPrivacy(value);
     try {
       await invoke("set_follow_privacy", { userId: account!.UserID, privacy: value });
+      await store.loadAccounts();
     } catch (e) {
       store.addToast(t("Error: {{error}}", { error: String(e) }));
     }
@@ -150,6 +152,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
         userId: account!.UserID,
         privacy: value,
       });
+      await store.loadAccounts();
       store.addToast(t("Private server privacy updated"));
     } catch (e) {
       store.addToast(t("Error: {{error}}", { error: String(e) }));
@@ -165,6 +168,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
         currentPassword,
         newPassword,
       });
+      await store.loadAccounts();
       store.addToast(t("Password changed"));
       setCurrentPassword("");
       setNewPassword("");
@@ -183,6 +187,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
         password: currentPassword,
         newEmail: emailInput,
       });
+      await store.loadAccounts();
       store.addToast(t("Email changed"));
       setEmailInput("");
     } catch (e) {
@@ -196,6 +201,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
     setLoading("pin");
     try {
       const ok = await invoke<boolean>("unlock_pin", { userId: account!.UserID, pin: pinInput });
+      await store.loadAccounts();
       store.addToast(ok ? t("PIN unlocked") : t("Invalid PIN"));
       setPinInput("");
     } catch (e) {
@@ -232,6 +238,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
     setLoading("block");
     try {
       await invoke("block_user", { userId: account!.UserID, targetUserId: target.id });
+      await store.loadAccounts();
       store.addToast(t("Blocked {{name}}", { name: target.name }));
     } catch (e) {
       store.addToast(t("Error: {{error}}", { error: String(e) }));
@@ -245,6 +252,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
     setLoading("friend");
     try {
       await invoke("send_friend_request", { userId: account!.UserID, targetUserId: target.id });
+      await store.loadAccounts();
       store.addToast(t("Friend request sent to {{name}}", { name: target.name }));
     } catch (e) {
       store.addToast(t("Error: {{error}}", { error: String(e) }));
@@ -268,6 +276,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
   async function handleUnblock(targetId: number, name: string) {
     try {
       await invoke("unblock_user", { userId: account!.UserID, targetUserId: targetId });
+      await store.loadAccounts();
       setBlockedUsers((prev) => prev.filter((u) => u.userId !== targetId));
       store.addToast(t("Unblocked {{name}}", { name }));
     } catch (e) {
@@ -280,6 +289,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
     setLoading("unblockall");
     try {
       const count = await invoke<number>("unblock_all_users", { userId: account!.UserID });
+      await store.loadAccounts();
       store.addToast(t("Unblocked {{count}} users", { count }));
       setBlockedUsers([]);
     } catch (e) {
@@ -318,6 +328,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
         userId: account!.UserID,
         avatarJson,
       });
+      await store.loadAccounts();
       if (invalidIds.length > 0) {
         store.setMissingAssets({
           userId: account!.UserID,
@@ -359,6 +370,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
         userId: account!.UserID,
         avatarJson,
       });
+      await store.loadAccounts();
       if (invalidIds.length > 0) {
         store.setMissingAssets({
           userId: account!.UserID,

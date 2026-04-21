@@ -20,7 +20,6 @@ async fn launch_account_for_cycle(
     };
 
     let (
-        cookie,
         is_teleport,
         use_old_join,
         auto_close_last_process,
@@ -28,10 +27,8 @@ async fn launch_account_for_cycle(
         auto_close_multi_conflicts,
         start_minimized,
     ) = {
-        let state = app.state::<AccountStore>();
         let settings = app.state::<SettingsStore>();
         (
-            get_cookie(&state, user_id)?,
             settings.get_bool("Developer", "IsTeleport"),
             settings.get_bool("Developer", "UseOldJoin"),
             settings.get_bool("General", "AutoCloseLastProcess"),
@@ -70,7 +67,12 @@ async fn launch_account_for_cycle(
     let mut ticket: Option<String> = None;
     let mut last_ticket_err = String::new();
     for attempt in 0..5_u64 {
-        match api::auth::get_auth_ticket(&cookie).await {
+        let state = app.state::<AccountStore>();
+        match run_with_session_retry(state.inner(), user_id, |cookie| async move {
+            api::auth::get_auth_ticket(&cookie).await
+        })
+        .await
+        {
             Ok(value) => {
                 ticket = Some(value);
                 break;
@@ -87,7 +89,14 @@ async fn launch_account_for_cycle(
     }
     let ticket = ticket
         .ok_or_else(|| format!("Failed to get auth ticket for launch: {}", last_ticket_err))?;
-    let private_join = resolve_private_join(&cookie, place_id, &resolved_launch).await?;
+    let private_join = {
+        let state = app.state::<AccountStore>();
+        run_with_session_retry(state.inner(), user_id, |cookie| {
+            let resolved_launch = resolved_launch.clone();
+            async move { resolve_private_join(&cookie, place_id, &resolved_launch).await }
+        })
+        .await?
+    };
 
     let pids_before = windows::get_roblox_pids();
 
