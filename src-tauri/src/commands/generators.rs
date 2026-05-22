@@ -42,6 +42,7 @@ struct GeneratorConfig {
     extra_delay_ms: i64,
     target_group: String,
     max_accounts: i64,
+    max_consecutive_failures: i64,
 }
 
 #[derive(Debug, Clone)]
@@ -239,6 +240,7 @@ async fn run_generator_session(
         Err(_) => return,
     };
     let client = generator_client();
+    let mut consecutive_failures: i64 = 0;
 
     loop {
         if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
@@ -263,6 +265,7 @@ async fn run_generator_session(
 
                 match add_generated_account(&app, &account, &cfg.target_group, &stop_flag).await {
                     Ok(Some((user_id, username))) => {
+                        consecutive_failures = 0;
                         let total = {
                             let mut total = 0;
                             set_generator_runtime(&runtime, |r| {
@@ -295,6 +298,21 @@ async fn run_generator_session(
                         break;
                     }
                     Err(e) => {
+                        consecutive_failures += 1;
+                        if cfg.max_consecutive_failures > 0
+                            && consecutive_failures >= cfg.max_consecutive_failures
+                        {
+                            set_generator_runtime(&runtime, |r| {
+                                r.active = false;
+                                r.phase = "error".to_string();
+                                r.last_error = Some(format!(
+                                    "Stopped after {} consecutive failures: {}",
+                                    consecutive_failures, e
+                                ));
+                                r.next_attempt_at_ms = None;
+                            });
+                            break;
+                        }
                         let wait = GENERATOR_TRANSIENT_BACKOFF_MS + cfg.extra_delay_ms;
                         set_generator_runtime(&runtime, |r| {
                             r.phase = "waiting".to_string();
@@ -426,6 +444,11 @@ async fn start_generator(
     let extra_delay_ms = extra_delay_seconds.clamp(0, 3600) * 1000;
     let target_group = target_group.trim().to_string();
     let max_accounts = max_accounts.max(0);
+    let max_consecutive_failures = app
+        .state::<SettingsStore>()
+        .get_int("Generator", "MaxConsecutiveFailures")
+        .unwrap_or(3)
+        .max(0);
 
     if let Some(existing) = GENERATOR_MANAGER.get_session() {
         existing
@@ -446,6 +469,7 @@ async fn start_generator(
         extra_delay_ms,
         target_group,
         max_accounts,
+        max_consecutive_failures,
     };
     let runtime = GeneratorRuntime {
         active: true,
@@ -611,6 +635,9 @@ async fn bloxgen_generate(client: &reqwest::Client, config: &GeneratorConfig) ->
                         user_id: data.id,
                     }));
                 }
+                return GenerateOutcome::Transient(
+                    "API returned success but no account data".to_string(),
+                );
             }
             let message = payload
                 .message

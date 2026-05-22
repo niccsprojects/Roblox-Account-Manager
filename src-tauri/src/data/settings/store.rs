@@ -280,6 +280,7 @@ impl SettingsStore {
             ("ExtraDelaySeconds", "1"),
             ("TargetGroup", "BloxGen"),
             ("MaxAccounts", "0"),
+            ("MaxConsecutiveFailures", "3"),
         ];
 
         let generator = ini.section("Generator");

@@ -172,6 +172,7 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
       setTestResult({ ok: false, message: t("An API key is required") });
       return;
     }
+    setLog([]);
     setBusy(true);
     try {
       await store.startGenerator({
