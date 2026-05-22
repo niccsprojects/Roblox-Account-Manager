@@ -5,7 +5,7 @@ import { usePrompt } from "../../hooks/usePrompt";
 import { Tooltip } from "../ui/Tooltip";
 import { tr, useTr } from "../../i18n/text";
 import { ENABLE_NEXUS } from "../../featureFlags";
-import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, File, FileText, Palette, Layers, Settings, TerminalSquare } from "lucide-react";
+import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare } from "lucide-react";
 
 export function Toolbar() {
   const t = useTr();
@@ -29,6 +29,12 @@ export function Toolbar() {
   function handleBrowserLogin() {
     setAddMenuOpen(false);
     store.openLoginBrowser();
+  }
+
+  function handleUserPassLogin() {
+    setAddMenuOpen(false);
+    store.setImportDialogTab("userpass");
+    store.setImportDialogOpen(true);
   }
 
   function handleImportCookie() {
@@ -164,6 +170,13 @@ export function Toolbar() {
               >
                 <Globe size={14} strokeWidth={1.5} className="theme-muted" />
                 {t("Browser Login")}
+              </button>
+              <button
+                onClick={handleUserPassLogin}
+                className="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[var(--panel-fg)] hover:bg-[var(--panel-soft)] text-left"
+              >
+                <KeyRound size={14} strokeWidth={1.5} className="theme-muted" />
+                {t("User:Pass Login")}
               </button>
               <div className="mx-3 my-0.5 border-t theme-border" />
               <button

@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+
 export type TabId = "servers" | "games" | "favorites" | "recent";
 
 export interface ServerData {
@@ -87,4 +89,100 @@ export function addRecentGame(game: RecentGame, maxCount: number) {
   const existing = loadRecentGames().filter((g) => g.placeId !== game.placeId);
   existing.unshift({ ...game, lastPlayed: Date.now() });
   saveRecentGames(existing.slice(0, maxCount));
+}
+
+async function resolveNameAndIcon(
+  placeId: number,
+  userId: number | null,
+  needName: boolean,
+  needIcon: boolean,
+  fallbackName: string,
+  fallbackIcon: string | null
+): Promise<{ name: string; iconUrl: string | null }> {
+  const [detailsRes, iconRes] = await Promise.allSettled([
+    needName
+      ? invoke<PlaceDetails[]>("get_place_details", { placeIds: [placeId], userId })
+      : Promise.resolve(null),
+    needIcon
+      ? invoke<string | null>("batched_get_game_icon", { placeId, userId })
+      : Promise.resolve(null),
+  ]);
+
+  let name = fallbackName;
+  let iconUrl = fallbackIcon;
+  if (
+    detailsRes.status === "fulfilled" &&
+    Array.isArray(detailsRes.value) &&
+    detailsRes.value[0]?.name
+  ) {
+    name = detailsRes.value[0].name;
+  }
+  if (iconRes.status === "fulfilled" && typeof iconRes.value === "string" && iconRes.value) {
+    iconUrl = iconRes.value;
+  }
+  return { name, iconUrl };
+}
+
+export async function recordRecentGame(
+  placeId: number,
+  userId: number | null,
+  maxCount: number,
+  opts?: { name?: string; iconUrl?: string | null }
+) {
+  if (!placeId || placeId <= 0) return;
+
+  const existing = loadRecentGames().find((g) => g.placeId === placeId);
+  const existingHasName = !!existing && !!existing.name && existing.name !== String(placeId);
+  const hasName = !!opts?.name && opts.name.trim().length > 0;
+  const optimisticName = hasName
+    ? (opts!.name as string)
+    : existingHasName
+      ? (existing!.name as string)
+      : String(placeId);
+  const optimisticIcon = opts?.iconUrl ?? existing?.iconUrl ?? null;
+  addRecentGame(
+    { placeId, name: optimisticName, iconUrl: optimisticIcon, lastPlayed: Date.now() },
+    maxCount
+  );
+
+  const needName = optimisticName === String(placeId);
+  const needIcon = !optimisticIcon;
+  if (!needName && !needIcon) return;
+
+  const { name, iconUrl } = await resolveNameAndIcon(
+    placeId,
+    userId,
+    needName,
+    needIcon,
+    optimisticName,
+    optimisticIcon
+  );
+  if (name === optimisticName && iconUrl === optimisticIcon) return;
+
+  const games = loadRecentGames();
+  const idx = games.findIndex((g) => g.placeId === placeId);
+  if (idx >= 0) {
+    games[idx] = { ...games[idx], name, iconUrl };
+    saveRecentGames(games);
+  }
+}
+
+export async function resolveRecentGame(
+  game: RecentGame,
+  userId: number | null
+): Promise<RecentGame | null> {
+  const needName = !game.name || game.name === String(game.placeId);
+  const needIcon = !game.iconUrl;
+  if (!needName && !needIcon) return null;
+
+  const { name, iconUrl } = await resolveNameAndIcon(
+    game.placeId,
+    userId,
+    needName,
+    needIcon,
+    game.name,
+    game.iconUrl
+  );
+  if (name === game.name && iconUrl === game.iconUrl) return null;
+  return { ...game, name, iconUrl };
 }

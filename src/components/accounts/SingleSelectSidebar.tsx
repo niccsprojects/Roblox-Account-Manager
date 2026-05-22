@@ -6,10 +6,9 @@ import { useJoinOnlineWarning } from "../../hooks/useJoinOnlineWarning";
 import { SidebarSection } from "./SidebarSection";
 import { ArgumentsForm } from "../dialogs/ArgumentsForm";
 import { Tooltip } from "../ui/Tooltip";
-import { Select } from "../ui/Select";
-import { loadRecentGames, type RecentGame } from "../server-list/types";
+import { RecentGamesPopover } from "../server-list/RecentGamesPopover";
 import { tr, useTr } from "../../i18n/text";
-import { User, Shuffle, Save, Settings } from "lucide-react";
+import { User, Shuffle, Save, Settings, History } from "lucide-react";
 
 function chipMaskName(name: string, previewLetters: number): string {
   if (previewLetters > 0 && previewLetters < name.length) {
@@ -30,8 +29,10 @@ export function SingleSelectSidebar() {
   const [robux, setRobux] = useState<number | null>(null);
   const [followUser, setFollowUser] = useState("");
   const [argsOpen, setArgsOpen] = useState(false);
-  const [recentGames, setRecentGames] = useState<RecentGame[]>([]);
+  const [recentsOpen, setRecentsOpen] = useState(false);
   const argsRef = useRef<HTMLButtonElement>(null);
+  const recentsRef = useRef<HTMLButtonElement>(null);
+  const maxRecent = parseInt(store.settings?.General?.MaxRecentGames || "8") || 8;
 
   useEffect(() => {
     setAlias(account.Alias);
@@ -48,7 +49,6 @@ export function SingleSelectSidebar() {
     if (savedPlace) store.setPlaceId(savedPlace);
     if (savedJob) store.setJobId(savedJob);
     if (savedData) store.setLaunchData(savedData);
-    setRecentGames(loadRecentGames().slice(0, 12));
   }, [account.UserID]);
 
   function handleSetAlias() {
@@ -123,10 +123,6 @@ export function SingleSelectSidebar() {
   const isJoining = store.joiningAccounts.has(account.UserID);
   const bottingActive = store.bottingStatus?.active === true;
   const alreadyInBotting = !!store.bottingStatus?.userIds?.includes(account.UserID);
-  const savedPlaceId = account.Fields?.SavedPlaceId ?? "";
-  const recentGameSelectValue = recentGames.some((g) => String(g.placeId) === store.placeId)
-    ? store.placeId
-    : "__none__";
   const presenceMeta =
     presenceType === 3
       ? { label: t("In Studio"), dot: "bg-violet-500", dotStyle: undefined as React.CSSProperties | undefined, text: "text-violet-400" }
@@ -221,27 +217,6 @@ export function SingleSelectSidebar() {
         </SidebarSection>
 
         <SidebarSection title={t("Launch")}>
-          {recentGames.length > 0 && (
-            <div className="mb-1.5">
-              <Select
-                value={recentGameSelectValue}
-                options={[
-                  { value: "__none__", label: "None" },
-                  ...recentGames.map((g) => ({ value: String(g.placeId), label: g.name })),
-                ]}
-                onChange={(e) => {
-                  if (e === "__none__") {
-                    store.setPlaceId(savedPlaceId);
-                    return;
-                  }
-                  const selected = recentGames.find((g) => String(g.placeId) === e);
-                  if (!selected) return;
-                  store.setPlaceId(String(selected.placeId));
-                }}
-                className="w-full text-xs"
-              />
-            </div>
-          )}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-1.5">
               <label className="theme-label text-[10px] w-10 shrink-0">{t("Place")}</label>
@@ -250,6 +225,23 @@ export function SingleSelectSidebar() {
                 onChange={(e) => store.setPlaceId(e.target.value)}
                 placeholder={t("Place ID")}
                 className="sidebar-input flex-1 font-mono text-xs"
+              />
+              <Tooltip content={t("Recent games")}>
+                <button
+                  ref={recentsRef}
+                  onClick={() => setRecentsOpen((v) => !v)}
+                  className="theme-muted p-1 rounded hover:text-[var(--panel-fg)]"
+                >
+                  <History size={14} strokeWidth={1.5} />
+                </button>
+              </Tooltip>
+              <RecentGamesPopover
+                open={recentsOpen}
+                onClose={() => setRecentsOpen(false)}
+                anchorRef={recentsRef}
+                userId={account.UserID}
+                maxRecent={maxRecent}
+                onSelect={(placeId) => store.setPlaceId(String(placeId))}
               />
             </div>
             <div className="flex items-center gap-1.5">

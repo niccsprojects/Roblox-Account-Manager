@@ -6,7 +6,7 @@ import { useJoinOnlineWarning } from "../../hooks/useJoinOnlineWarning";
 import { useModalClose } from "../../hooks/useModalClose";
 import { useTr } from "../../i18n/text";
 import type { TabId, GameEntry } from "./types";
-import { addRecentGame, loadFavorites, saveFavorites } from "./types";
+import { recordRecentGame, loadFavorites, saveFavorites } from "./types";
 import { ServersTab } from "./ServersTab";
 import { GamesTab } from "./GamesTab";
 import { FavoritesTab } from "./FavoritesTab";
@@ -55,26 +55,13 @@ export function ServerListDialog({ open, onClose }: ServerListDialogProps) {
       if (!(await confirmJoinOnline([userId]))) return;
       store.joinServer(userId);
     }
-    addRecentGame({
-      placeId: parseInt(localPlaceId) || 0,
-      name: localPlaceId,
-      iconUrl: null,
-      lastPlayed: Date.now(),
-    }, maxRecent);
   }
 
   function handleSelectGame(placeId: number, name?: string, iconUrl?: string | null) {
     setLocalPlaceId(String(placeId));
     store.setPlaceId(String(placeId));
     setActiveTab("servers");
-    if (name) {
-      addRecentGame({
-        placeId,
-        name,
-        iconUrl: iconUrl || null,
-        lastPlayed: Date.now(),
-      }, maxRecent);
-    }
+    recordRecentGame(placeId, userId, maxRecent, { name, iconUrl });
   }
 
   async function handleJoinGame(placeId: number) {
@@ -177,8 +164,9 @@ export function ServerListDialog({ open, onClose }: ServerListDialogProps) {
           )}
           {activeTab === "recent" && (
             <RecentTab
-              onSelectGame={(placeId) => handleSelectGame(placeId)}
+              onSelectGame={(placeId, name, iconUrl) => handleSelectGame(placeId, name, iconUrl)}
               maxRecent={maxRecent}
+              userId={userId}
             />
           )}
         </div>

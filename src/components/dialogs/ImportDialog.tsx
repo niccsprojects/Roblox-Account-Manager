@@ -7,7 +7,7 @@ import { usePrompt } from "../../hooks/usePrompt";
 import { SlidingTabBar } from "../ui/SlidingTabBar";
 import { useTr } from "../../i18n/text";
 
-type TabId = "cookie" | "legacy";
+type TabId = "cookie" | "userpass" | "legacy";
 
 interface ImportResult {
   text: string;
@@ -90,6 +90,38 @@ export function ImportDialog({
           existingIds.add(info.user_id);
           out.push({ text: t("Added {{name}}", { name: info.name }), ok: true });
         }
+      } catch (e) {
+        out.push({ text: t("Failed: {{error}}", { error: String(e) }), ok: false });
+      }
+      setResults([...out]);
+    }
+
+    await store.loadAccounts();
+    setProgress("");
+    setImporting(false);
+  }
+
+  async function handleImportUserPass() {
+    const lines = input.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    setImporting(true);
+    setResults([]);
+
+    const out: ImportResult[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      setProgress(t("Importing {{current}}/{{total}}...", { current: i + 1, total: lines.length }));
+      const line = lines[i];
+      const sep = line.indexOf(":");
+      const username = sep >= 0 ? line.slice(0, sep).trim() : "";
+      const password = sep >= 0 ? line.slice(sep + 1) : "";
+      if (!username || !password) {
+        out.push({ text: t("Skipped invalid line (use username:password)"), ok: false });
+        setResults([...out]);
+        continue;
+      }
+      try {
+        const info = await invoke<{ user_id: number; name: string }>("import_userpass", { username, password });
+        out.push({ text: t("Added {{name}}", { name: info.name }), ok: true });
       } catch (e) {
         out.push({ text: t("Failed: {{error}}", { error: String(e) }), ok: false });
       }
@@ -206,6 +238,7 @@ export function ImportDialog({
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "cookie", label: t("Import by Cookie") },
+    { id: "userpass", label: t("Import by User:Pass") },
     { id: "legacy", label: t("Import Old Account Data") },
   ];
 
@@ -215,7 +248,7 @@ export function ImportDialog({
       onClick={handleClose}
     >
       <div
-        className={`theme-modal-scope theme-panel theme-border bg-zinc-900 border border-zinc-800/80 rounded-2xl shadow-2xl w-[560px] ${tab === "cookie" ? "max-h-[420px]" : "max-h-[320px]"} flex flex-col overflow-hidden ${closing ? "animate-scale-out" : "animate-scale-in"}`}
+        className={`theme-modal-scope theme-panel theme-border bg-zinc-900 border border-zinc-800/80 rounded-2xl shadow-2xl w-[560px] ${tab === "legacy" ? "max-h-[320px]" : "max-h-[420px]"} flex flex-col overflow-hidden ${closing ? "animate-scale-out" : "animate-scale-in"}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-4 pb-0">
@@ -233,7 +266,7 @@ export function ImportDialog({
           />
         </div>
 
-        <div className={`px-5 pb-4 ${tab === "cookie" ? "flex-1 flex flex-col min-h-0" : "pt-2"}`}>
+        <div className={`px-5 pb-4 ${tab === "legacy" ? "pt-2" : "flex-1 flex flex-col min-h-0"}`}>
           {tab === "cookie" ? (
             <>
               <p className="text-[11px] text-zinc-500 mb-2">{t("Paste one .ROBLOSECURITY cookie per line")}</p>
@@ -248,6 +281,19 @@ export function ImportDialog({
                 className="flex-1 min-h-[100px] max-h-[140px] w-full p-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-xs text-zinc-300 font-mono placeholder-zinc-600 resize-none focus:outline-none focus:border-zinc-600 transition-colors disabled:opacity-50"
                 spellCheck={false}
               />
+            </>
+          ) : tab === "userpass" ? (
+            <>
+              <p className="text-[11px] text-zinc-500 mb-2">{t("Paste one username:password per line. A secure browser opens for each to finish sign-in.")}</p>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                disabled={importing}
+                placeholder={t("username:password")}
+                className="flex-1 min-h-[100px] max-h-[140px] w-full p-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-xs text-zinc-300 font-mono placeholder-zinc-600 resize-none focus:outline-none focus:border-zinc-600 transition-colors disabled:opacity-50"
+                spellCheck={false}
+              />
+              <p className="text-[11px] text-zinc-600 mt-2">{t("Complete any CAPTCHA or 2-step verification in the browser window. This finishes automatically.")}</p>
             </>
           ) : (
             <>
@@ -295,9 +341,9 @@ export function ImportDialog({
             </div>
           )}
 
-          <div className={`flex items-center mt-3 ${tab === "cookie" ? "justify-between" : "justify-start"}`}>
+          <div className={`flex items-center mt-3 ${tab === "legacy" ? "justify-start" : "justify-between"}`}>
             <span className="text-[11px] text-zinc-500">{progress}</span>
-            {tab === "cookie" ? (
+            {tab === "cookie" && (
               <button
                 onClick={handleImportCookie}
                 disabled={importing || !input.trim()}
@@ -305,7 +351,16 @@ export function ImportDialog({
               >
                 {importing ? t("Importing...") : t("Import")}
               </button>
-            ) : null}
+            )}
+            {tab === "userpass" && (
+              <button
+                onClick={handleImportUserPass}
+                disabled={importing || !input.trim()}
+                className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                {importing ? t("Signing in...") : t("Log in & Add")}
+              </button>
+            )}
           </div>
         </div>
       </div>

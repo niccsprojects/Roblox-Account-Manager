@@ -28,6 +28,7 @@ import {
   normalizeUpdaterFeatureChannel,
   getUpdaterSkipVersionKey,
 } from "./updaterChannels";
+import { recordRecentGame } from "./components/server-list/types";
 
 interface PresenceEntry {
   userId?: number;
@@ -222,8 +223,8 @@ export interface StoreValue {
   setAccountFieldsOpen: (open: boolean) => void;
   importDialogOpen: boolean;
   setImportDialogOpen: (open: boolean) => void;
-  importDialogTab: "cookie" | "legacy";
-  setImportDialogTab: (tab: "cookie" | "legacy") => void;
+  importDialogTab: "cookie" | "userpass" | "legacy";
+  setImportDialogTab: (tab: "cookie" | "userpass" | "legacy") => void;
   themeEditorOpen: boolean;
   setThemeEditorOpen: (open: boolean) => void;
   bottingDialogOpen: boolean;
@@ -326,7 +327,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [accountUtilsOpen, setAccountUtilsOpen] = useState(false);
   const [accountFieldsOpen, setAccountFieldsOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [importDialogTab, setImportDialogTab] = useState<"cookie" | "legacy">("cookie");
+  const [importDialogTab, setImportDialogTab] = useState<"cookie" | "userpass" | "legacy">("cookie");
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
   const [bottingDialogOpen, setBottingDialogOpen] = useState(false);
   const [bottingStatus, setBottingStatus] = useState<BottingStatus | null>(null);
@@ -787,6 +788,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         shuffleJob: shuffleJobId,
       });
       await loadAccounts();
+      void recordRecentGame(pid, userId, parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
       addToast(tr("Launching game..."));
     } catch (e) {
       setJoiningAccounts((prev) => {
@@ -842,6 +844,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         launchData,
       });
       await loadAccounts();
+      void recordRecentGame(pid, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
       addToast(tr("Launching {{count}} accounts...", { count: userIds.length }));
     } catch (e) {
       setJoiningAccounts(new Set());
@@ -1378,6 +1381,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  useEffect(() => {
+    const unlisten = listen<{ stage: string; downloaded: number; total: number }>(
+      "chromium-download-progress",
+      (e) => {
+        const { stage, downloaded, total } = e.payload;
+        if (stage === "downloading") {
+          const pct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
+          setActionStatusMessage(tr("Downloading browser ({{percent}}%)", { percent: pct }), "info", 4000);
+        } else if (stage === "extracting") {
+          setActionStatusMessage(tr("Preparing browser..."), "info", 4000);
+        } else if (stage === "ready") {
+          setActionStatusMessage(tr("Browser ready"), "success", 3000);
+        }
+      }
+    );
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [setActionStatusMessage]);
 
   useEffect(() => {
     if (needsPassword || !initialized) return;
