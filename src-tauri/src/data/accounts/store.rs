@@ -149,6 +149,9 @@ impl AccountStore {
             existing.username = account.username;
             existing.valid = account.valid;
             existing.last_use = account.last_use;
+            if !account.password.is_empty() {
+                existing.password = account.password;
+            }
         } else {
             accounts.push(account);
         }

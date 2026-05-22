@@ -1,7 +1,7 @@
 #![cfg_attr(debug_assertions, allow(dead_code))]
 
 mod api;
-mod browser;
+mod chromium;
 mod data;
 #[cfg(feature = "nexus")]
 mod nexus;
@@ -118,6 +118,7 @@ pub fn run() {
         .manage(script_store)
         .manage(image_cache)
         .manage(UpdaterRuntimeState::default())
+        .manage(chromium::ChromiumManager::new())
         .setup(|app| {
             let show = MenuItemBuilder::with_id("show", "Show").build(app)?;
             let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
@@ -293,10 +294,13 @@ pub fn run() {
             cmd_apply_fps_unlock,
             start_watcher,
             stop_watcher,
-            browser::open_login_browser,
-            browser::extract_browser_cookie,
-            browser::close_login_browser,
-            browser::open_account_browser,
+            chromium::commands::open_login_browser,
+            chromium::commands::extract_browser_cookie,
+            chromium::commands::close_login_browser,
+            chromium::commands::open_account_browser,
+            chromium::commands::import_userpass,
+            chromium::commands::is_browser_ready,
+            chromium::commands::ensure_browser,
             start_web_server,
             stop_web_server,
             get_web_server_status,
@@ -331,6 +335,7 @@ pub fn run() {
                 cleanup_multi_roblox_on_exit(app);
                 #[cfg(target_os = "macos")]
                 cleanup_multi_roblox_on_exit(app);
+                app.state::<chromium::ChromiumManager>().close_login_session();
             }
             _ => {}
         });

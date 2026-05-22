@@ -12,7 +12,7 @@ tauri-build = { version = "2", features = [] }
 
 [features]
 default = ["nexus", "webserver"]
-nexus = ["dep:futures-util", "dep:tokio-tungstenite"]
+nexus = []
 webserver = ["dep:axum"]
 
 [dependencies]
@@ -27,8 +27,8 @@ urlencoding = "2"
 cookie = "0.18"
 semver = "1"
 axum = { version = "0.8", optional = true }
-tokio-tungstenite = { version = "0.26", optional = true }
-futures-util = { version = "0.3", optional = true }
+tokio-tungstenite = { version = "0.26" }
+futures-util = { version = "0.3" }
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-window-state = "2"

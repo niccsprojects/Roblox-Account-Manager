@@ -22,8 +22,12 @@ pub fn add_account(
     security_token: String,
     username: String,
     user_id: i64,
+    password: Option<String>,
 ) -> Result<(), String> {
-    let account = Account::new(security_token, username, user_id);
+    let mut account = Account::new(security_token, username, user_id);
+    if let Some(password) = password {
+        account.password = password;
+    }
     state.add(account)
 }
 
