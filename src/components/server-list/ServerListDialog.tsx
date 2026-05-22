@@ -164,7 +164,7 @@ export function ServerListDialog({ open, onClose }: ServerListDialogProps) {
           )}
           {activeTab === "recent" && (
             <RecentTab
-              onSelectGame={(placeId) => handleSelectGame(placeId)}
+              onSelectGame={(placeId, name, iconUrl) => handleSelectGame(placeId, name, iconUrl)}
               maxRecent={maxRecent}
               userId={userId}
             />

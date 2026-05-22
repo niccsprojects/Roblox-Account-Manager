@@ -1,7 +1,7 @@
 import { RecentGamesList } from "./RecentGamesList";
 
 export interface RecentTabProps {
-  onSelectGame: (placeId: number) => void;
+  onSelectGame: (placeId: number, name?: string, iconUrl?: string | null) => void;
   maxRecent: number;
   userId: number | null;
 }

@@ -6,7 +6,7 @@ import { useTr } from "../../i18n/text";
 export interface RecentGamesListProps {
   userId: number | null;
   maxRecent: number;
-  onSelect: (placeId: number) => void;
+  onSelect: (placeId: number, name?: string, iconUrl?: string | null) => void;
 }
 
 export function RecentGamesList({ userId, maxRecent, onSelect }: RecentGamesListProps) {
@@ -86,7 +86,7 @@ export function RecentGamesList({ userId, maxRecent, onSelect }: RecentGamesList
             <div
               key={game.placeId}
               className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-800/40 transition-colors cursor-pointer"
-              onClick={() => onSelect(game.placeId)}
+              onClick={() => onSelect(game.placeId, game.name, game.iconUrl)}
             >
               <div className="w-9 h-9 rounded-md bg-zinc-800 shrink-0 overflow-hidden">
                 {game.iconUrl ? (
