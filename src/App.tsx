@@ -22,6 +22,7 @@ import { ThemeEditorDialog } from "./components/dialogs/ThemeEditorDialog";
 import { UpdateDialog } from "./components/dialogs/UpdateDialog";
 import { NexusDialog } from "./components/dialogs/NexusDialog";
 import { BottingDialog } from "./components/dialogs/BottingDialog";
+import { GeneratorDialog } from "./components/dialogs/GeneratorDialog";
 import { ScriptsDialog } from "./components/dialogs/ScriptsDialog";
 import { useTr } from "./i18n/text";
 import { ENABLE_NEXUS } from "./featureFlags";
@@ -43,6 +44,7 @@ function AppContent() {
     !!store.missingAssets ||
     store.themeEditorOpen ||
     store.bottingDialogOpen ||
+    store.generatorDialogOpen ||
     (ENABLE_NEXUS && store.nexusOpen) ||
     store.scriptsOpen ||
     store.updateDialogOpen ||
@@ -166,6 +168,11 @@ function AppContent() {
       <BottingDialog
         open={store.bottingDialogOpen}
         onClose={() => store.setBottingDialogOpen(false)}
+      />
+
+      <GeneratorDialog
+        open={store.generatorDialogOpen}
+        onClose={() => store.setGeneratorDialogOpen(false)}
       />
 
       {ENABLE_NEXUS && (

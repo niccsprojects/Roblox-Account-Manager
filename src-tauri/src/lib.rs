@@ -30,6 +30,7 @@ include!("commands/image_cache.rs");
 include!("commands/account_helpers.rs");
 include!("commands/launch_shared.rs");
 include!("commands/botting.rs");
+include!("commands/generators.rs");
 include!("commands/launch.rs");
 include!("commands/watcher.rs");
 include!("commands/services.rs");
@@ -284,6 +285,10 @@ pub fn run() {
             add_botting_accounts,
             set_botting_player_accounts,
             botting_account_action,
+            start_generator,
+            stop_generator,
+            get_generator_status,
+            generator_test_key,
             cmd_kill_roblox,
             focus_roblox_window,
             cmd_kill_all_roblox,
