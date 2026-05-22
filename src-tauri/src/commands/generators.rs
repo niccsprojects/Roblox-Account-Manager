@@ -632,8 +632,8 @@ async fn bloxgen_generate(client: &reqwest::Client, config: &GeneratorConfig) ->
             Some(ms) if ms > 0 => GenerateOutcome::Cooldown(ms),
             _ => GenerateOutcome::Transient(message),
         },
-        400 | 401 | 403 => GenerateOutcome::Fatal(message),
-        _ => GenerateOutcome::Transient(message),
+        404 | 500 | 502 | 503 | 504 => GenerateOutcome::Transient(message),
+        _ => GenerateOutcome::Fatal(message),
     }
 }
 

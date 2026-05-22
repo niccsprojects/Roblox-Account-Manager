@@ -34,6 +34,7 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
 
   const status = store.generatorStatus;
   const running = status?.active === true;
+  const [busy, setBusy] = useState(false);
 
   async function handleTestKey() {
     setTesting(true);
@@ -56,15 +57,17 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
   }
 
   async function handleToggle() {
-    if (running) {
-      await store.stopGenerator().catch(() => {});
-      return;
-    }
-    if (!apiKey.trim()) {
-      setTestResult({ ok: false, message: t("An API key is required") });
-      return;
-    }
+    if (busy) return;
+    setBusy(true);
     try {
+      if (running) {
+        await store.stopGenerator();
+        return;
+      }
+      if (!apiKey.trim()) {
+        setTestResult({ ok: false, message: t("An API key is required") });
+        return;
+      }
       await store.startGenerator({
         provider,
         endpoint,
@@ -75,6 +78,8 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
         maxAccounts: s.getNumber("Generator", "MaxAccounts", 0),
       });
     } catch {
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -198,13 +203,14 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
         </div>
         <button
           onClick={handleToggle}
-          className={`px-3 py-1 rounded text-[12px] font-medium transition-colors shrink-0 ${
+          disabled={busy}
+          className={`px-3 py-1 rounded text-[12px] font-medium transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
             running
               ? "bg-red-500/15 text-red-400 hover:bg-red-500/25"
               : "bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
           }`}
         >
-          {running ? t("Stop") : t("Start")}
+          {busy ? "..." : running ? t("Stop") : t("Start")}
         </button>
       </div>
       <button
