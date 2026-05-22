@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { AlertTriangle, Download, Info, X } from "lucide-react";
+import { AlertTriangle, Info, X } from "lucide-react";
 import { useStore } from "../../store";
 import { useModalClose } from "../../hooks/useModalClose";
 import { useTr } from "../../i18n/text";
@@ -631,17 +631,7 @@ export function UpdateDialog() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-sky-500/15 flex items-center justify-center shrink-0">
-              <Download size={18} strokeWidth={2} className="text-sky-400" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold text-[var(--panel-fg)]">{t("Update Available")}</h2>
-              <p className="text-xs theme-muted mt-0.5">
-                v{info.currentVersion} → v{info.version}
-              </p>
-            </div>
-          </div>
+          <h2 className="text-sm font-semibold text-[var(--panel-fg)]">{t("Update Available")}</h2>
           {phase !== "downloading" && phase !== "installing" && (
             <button onClick={handleClose} className="theme-muted hover:opacity-100 transition-opacity">
               <X size={16} strokeWidth={2} />
