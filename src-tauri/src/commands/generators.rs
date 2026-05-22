@@ -7,10 +7,10 @@ enum GeneratorProvider {
 }
 
 impl GeneratorProvider {
-    fn from_id(id: &str) -> Self {
+    fn from_id(id: &str) -> Result<Self, String> {
         match id.trim().to_ascii_lowercase().as_str() {
-            "bloxgen" => GeneratorProvider::BloxGen,
-            _ => GeneratorProvider::BloxGen,
+            "bloxgen" => Ok(GeneratorProvider::BloxGen),
+            other => Err(format!("Unknown generator provider: {}", other)),
         }
     }
 
@@ -191,7 +191,12 @@ async fn add_generated_account(
     app: &tauri::AppHandle,
     account: &GeneratedAccount,
     target_group: &str,
-) -> Result<(i64, String), String> {
+    stop_flag: &std::sync::atomic::AtomicBool,
+) -> Result<Option<(i64, String)>, String> {
+    if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+        return Ok(None);
+    }
+
     let cookie = account.cookie.clone();
     let (user_id, username) = match api::auth::validate_cookie(&cookie).await {
         Ok(info) => (info.user_id, info.name),
@@ -200,6 +205,10 @@ async fn add_generated_account(
             _ => return Err(format!("Generated cookie failed validation: {}", e)),
         },
     };
+
+    if stop_flag.load(std::sync::atomic::Ordering::Relaxed) {
+        return Ok(None);
+    }
 
     let group = if target_group.trim().is_empty() {
         "Default".to_string()
@@ -214,7 +223,7 @@ async fn add_generated_account(
     let state = app.state::<AccountStore>();
     state.add(model)?;
 
-    Ok((user_id, username))
+    Ok(Some((user_id, username)))
 }
 
 async fn run_generator_session(
@@ -252,8 +261,8 @@ async fn run_generator_session(
                 set_generator_runtime(&runtime, |r| r.phase = "adding".to_string());
                 emit_generator_status(&app);
 
-                match add_generated_account(&app, &account, &cfg.target_group).await {
-                    Ok((user_id, username)) => {
+                match add_generated_account(&app, &account, &cfg.target_group, &stop_flag).await {
+                    Ok(Some((user_id, username))) => {
                         let total = {
                             let mut total = 0;
                             set_generator_runtime(&runtime, |r| {
@@ -281,6 +290,9 @@ async fn run_generator_session(
                             });
                             break;
                         }
+                    }
+                    Ok(None) => {
+                        break;
                     }
                     Err(e) => {
                         let wait = GENERATOR_TRANSIENT_BACKOFF_MS + cfg.extra_delay_ms;
@@ -388,7 +400,7 @@ async fn start_generator(
     target_group: String,
     max_accounts: i64,
 ) -> Result<GeneratorStatusPayload, String> {
-    let provider = GeneratorProvider::from_id(&provider);
+    let provider = GeneratorProvider::from_id(&provider)?;
 
     let api_key = api_key.trim().to_string();
     if api_key.is_empty() {
@@ -503,7 +515,7 @@ async fn generator_test_key(
     endpoint: String,
     api_key: String,
 ) -> Result<f64, String> {
-    let provider = GeneratorProvider::from_id(&provider);
+    let provider = GeneratorProvider::from_id(&provider)?;
     let api_key = api_key.trim();
     if api_key.is_empty() {
         return Err("An API key is required".to_string());
@@ -618,7 +630,7 @@ async fn bloxgen_generate(client: &reqwest::Client, config: &GeneratorConfig) ->
     match status.as_u16() {
         429 => match parsed.as_ref().and_then(|p| p.time_remaining) {
             Some(ms) if ms > 0 => GenerateOutcome::Cooldown(ms),
-            _ => GenerateOutcome::Fatal(message),
+            _ => GenerateOutcome::Transient(message),
         },
         400 | 401 | 403 => GenerateOutcome::Fatal(message),
         _ => GenerateOutcome::Transient(message),
@@ -626,14 +638,11 @@ async fn bloxgen_generate(client: &reqwest::Client, config: &GeneratorConfig) ->
 }
 
 async fn bloxgen_test_key(endpoint: &str, api_key: &str) -> Result<f64, String> {
-    let url = format!(
-        "{}/api/balance?apiKey={}",
-        bloxgen_base(endpoint),
-        urlencoding::encode(api_key)
-    );
+    let url = format!("{}/api/balance", bloxgen_base(endpoint));
     let client = generator_client();
     let response = client
         .get(&url)
+        .header("x-api-key", api_key)
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
