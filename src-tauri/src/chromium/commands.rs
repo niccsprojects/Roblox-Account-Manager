@@ -61,7 +61,9 @@ pub async fn open_account_browser(
 
     let Some(port) = port else {
         let mut child = child;
-        let _ = child.wait();
+        if !matches!(child.try_wait(), Ok(Some(_))) {
+            chromium.track(user_id, child);
+        }
         return Ok(());
     };
 

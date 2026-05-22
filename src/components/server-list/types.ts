@@ -131,15 +131,21 @@ export async function recordRecentGame(
 ) {
   if (!placeId || placeId <= 0) return;
 
+  const existing = loadRecentGames().find((g) => g.placeId === placeId);
+  const existingHasName = !!existing && !!existing.name && existing.name !== String(placeId);
   const hasName = !!opts?.name && opts.name.trim().length > 0;
-  const optimisticName = hasName ? (opts!.name as string) : String(placeId);
-  const optimisticIcon = opts?.iconUrl ?? null;
+  const optimisticName = hasName
+    ? (opts!.name as string)
+    : existingHasName
+      ? (existing!.name as string)
+      : String(placeId);
+  const optimisticIcon = opts?.iconUrl ?? existing?.iconUrl ?? null;
   addRecentGame(
     { placeId, name: optimisticName, iconUrl: optimisticIcon, lastPlayed: Date.now() },
     maxCount
   );
 
-  const needName = !hasName;
+  const needName = optimisticName === String(placeId);
   const needIcon = !optimisticIcon;
   if (!needName && !needIcon) return;
 

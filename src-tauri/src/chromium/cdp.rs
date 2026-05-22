@@ -93,33 +93,41 @@ impl CdpClient {
             .await
             .map_err(|e| format!("Browser command failed: {}", e))?;
 
-        loop {
-            let frame = match self.socket.next().await {
-                Some(frame) => frame.map_err(|e| format!("Browser connection lost: {}", e))?,
-                None => return Err("Browser connection closed".into()),
-            };
+        let socket = &mut self.socket;
+        let recv = async {
+            loop {
+                let frame = match socket.next().await {
+                    Some(frame) => frame.map_err(|e| format!("Browser connection lost: {}", e))?,
+                    None => return Err("Browser connection closed".to_string()),
+                };
 
-            let text = match frame {
-                Message::Text(text) => text,
-                Message::Close(_) => return Err("Browser connection closed".into()),
-                _ => continue,
-            };
+                let text = match frame {
+                    Message::Text(text) => text,
+                    Message::Close(_) => return Err("Browser connection closed".to_string()),
+                    _ => continue,
+                };
 
-            let value: Value = match serde_json::from_str(&text) {
-                Ok(value) => value,
-                Err(_) => continue,
-            };
+                let value: Value = match serde_json::from_str(&text) {
+                    Ok(value) => value,
+                    Err(_) => continue,
+                };
 
-            if value.get("id").and_then(Value::as_i64) == Some(id) {
-                if let Some(error) = value.get("error") {
-                    let message = error
-                        .get("message")
-                        .and_then(Value::as_str)
-                        .unwrap_or("Browser command failed");
-                    return Err(message.to_string());
+                if value.get("id").and_then(Value::as_i64) == Some(id) {
+                    if let Some(error) = value.get("error") {
+                        let message = error
+                            .get("message")
+                            .and_then(Value::as_str)
+                            .unwrap_or("Browser command failed");
+                        return Err(message.to_string());
+                    }
+                    return Ok(value.get("result").cloned().unwrap_or(Value::Null));
                 }
-                return Ok(value.get("result").cloned().unwrap_or(Value::Null));
             }
+        };
+
+        match tokio::time::timeout(Duration::from_secs(20), recv).await {
+            Ok(result) => result,
+            Err(_) => Err("Browser stopped responding".to_string()),
         }
     }
 
