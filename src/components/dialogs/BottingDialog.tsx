@@ -559,12 +559,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b theme-border flex items-center justify-between">
-          <div>
-            <div className="text-[15px] font-semibold text-[var(--panel-fg)]">{t("Botting Mode")}</div>
-            <div className="text-[11px] theme-muted mt-0.5">
-              {t("Keep selected accounts rejoining to hold server population")}
-            </div>
-          </div>
+          <div className="text-[15px] font-semibold text-[var(--panel-fg)]">{t("Botting Mode")}</div>
           <div className="flex items-center gap-2">
             <div className="flex items-center rounded-lg border theme-border p-1 theme-soft">
               <button

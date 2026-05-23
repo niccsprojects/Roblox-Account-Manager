@@ -13,32 +13,32 @@ export function TabBar({
 }) {
   const t = useTr();
   const tabRefs = useRef<Map<TabId, HTMLButtonElement>>(new Map());
-  const barRef = useRef<HTMLDivElement>(null);
-  const [pillStyle, setPillStyle] = useState({ left: 0, width: 0 });
+  const [pillStyle, setPillStyle] = useState({ left: 0, top: 0, width: 0, height: 0 });
   const hasInitialized = useRef(false);
 
   useLayoutEffect(() => {
     const el = tabRefs.current.get(activeTab);
-    const bar = barRef.current;
-    if (!el || !bar) return;
-    const barRect = bar.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
+    if (!el) return;
     setPillStyle({
-      left: elRect.left - barRect.left,
-      width: elRect.width,
+      left: el.offsetLeft,
+      top: el.offsetTop,
+      width: el.offsetWidth,
+      height: el.offsetHeight,
     });
     hasInitialized.current = true;
   }, [activeTab, tabs.length]);
 
   return (
-    <div ref={barRef} className="relative flex gap-1 px-5 pb-0 shrink-0">
+    <div className="relative flex flex-wrap gap-1 px-5 pb-0 shrink-0">
       <div
-        className="absolute top-0 h-full rounded-lg bg-zinc-800 shadow-sm"
+        className="absolute rounded-lg bg-zinc-800 shadow-sm"
         style={{
           left: pillStyle.left,
+          top: pillStyle.top,
           width: pillStyle.width,
+          height: pillStyle.height,
           transition: hasInitialized.current
-            ? "left 180ms cubic-bezier(0.22, 1, 0.36, 1), width 150ms cubic-bezier(0.22, 1, 0.36, 1)"
+            ? "left 180ms cubic-bezier(0.22, 1, 0.36, 1), top 180ms cubic-bezier(0.22, 1, 0.36, 1), width 150ms cubic-bezier(0.22, 1, 0.36, 1), height 150ms cubic-bezier(0.22, 1, 0.36, 1)"
             : "none",
         }}
       />

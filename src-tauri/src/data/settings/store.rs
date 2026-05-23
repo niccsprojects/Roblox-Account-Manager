@@ -275,6 +275,34 @@ impl SettingsStore {
             }
         }
 
+        let generator_defaults: &[(&str, &str)] = &[
+            ("Provider", "bloxgen"),
+            ("ExtraDelaySeconds", "1"),
+            ("TargetGroup", "BloxGen"),
+            ("MaxAccounts", "0"),
+            ("MaxConsecutiveFailures", "3"),
+        ];
+
+        let generator = ini.section("Generator");
+        for (key, value) in generator_defaults {
+            if !generator.exists(key) {
+                generator.set(key, value, None);
+            }
+        }
+
+        let bloxgen_defaults: &[(&str, &str)] = &[
+            ("Endpoint", "https://core.bloxgen.net"),
+            ("ApiKey", ""),
+            ("AccountType", "alt"),
+        ];
+
+        let bloxgen = ini.section("BloxGen");
+        for (key, value) in bloxgen_defaults {
+            if !bloxgen.exists(key) {
+                bloxgen.set(key, value, None);
+            }
+        }
+
         ini.section("Prompts");
 
         drop(ini);

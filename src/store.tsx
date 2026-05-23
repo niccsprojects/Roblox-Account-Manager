@@ -99,6 +99,34 @@ export interface BottingStartConfig {
   playerGraceMinutes: number;
 }
 
+export interface GeneratorStatus {
+  active: boolean;
+  startedAtMs: number | null;
+  provider: string;
+  endpoint: string;
+  accountType: string;
+  extraDelaySeconds: number;
+  targetGroup: string;
+  maxAccounts: number;
+  phase: string;
+  nextAttemptAtMs: number | null;
+  totalGenerated: number;
+  lastUsername: string | null;
+  lastUserId: number | null;
+  lastError: string | null;
+  lastGeneratedAtMs: number | null;
+}
+
+export interface GeneratorStartConfig {
+  provider: string;
+  endpoint: string;
+  apiKey: string;
+  accountType: string;
+  extraDelaySeconds: number;
+  targetGroup: string;
+  maxAccounts: number;
+}
+
 export interface StoreValue {
   accounts: Account[];
   groups: ParsedGroup[];
@@ -172,6 +200,9 @@ export interface StoreValue {
     action: "disconnect" | "close" | "closeDisconnect" | "restartClient" | "restartLoop"
   ) => Promise<void>;
   refreshBottingStatus: () => Promise<void>;
+  startGenerator: (config: GeneratorStartConfig) => Promise<GeneratorStatus>;
+  stopGenerator: () => Promise<void>;
+  refreshGeneratorStatus: () => Promise<void>;
   refreshCookie: (userId: number) => Promise<boolean>;
   moveToGroup: (userIds: number[], group: string) => Promise<void>;
   sortGroupAlphabetically: (groupKey: string) => void;
@@ -230,6 +261,9 @@ export interface StoreValue {
   bottingDialogOpen: boolean;
   setBottingDialogOpen: (open: boolean) => void;
   bottingStatus: BottingStatus | null;
+  generatorDialogOpen: boolean;
+  setGeneratorDialogOpen: (open: boolean) => void;
+  generatorStatus: GeneratorStatus | null;
   missingAssets: { userId: number; username: string; assetIds: number[] } | null;
   setMissingAssets: (v: { userId: number; username: string; assetIds: number[] } | null) => void;
 
@@ -331,6 +365,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
   const [bottingDialogOpen, setBottingDialogOpen] = useState(false);
   const [bottingStatus, setBottingStatus] = useState<BottingStatus | null>(null);
+  const [generatorDialogOpen, setGeneratorDialogOpen] = useState(false);
+  const [generatorStatus, setGeneratorStatus] = useState<GeneratorStatus | null>(null);
   const [missingAssets, setMissingAssets] = useState<{ userId: number; username: string; assetIds: number[] } | null>(null);
   const [nexusOpen, setNexusOpen] = useState(false);
   const [scriptsOpen, setScriptsOpen] = useState(false);
@@ -1011,6 +1047,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function refreshGeneratorStatus() {
+    try {
+      const status = await invoke<GeneratorStatus>("get_generator_status");
+      setGeneratorStatus(status);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function startGenerator(config: GeneratorStartConfig) {
+    try {
+      const status = await invoke<GeneratorStatus>("start_generator", {
+        provider: config.provider,
+        endpoint: config.endpoint,
+        apiKey: config.apiKey,
+        accountType: config.accountType,
+        extraDelaySeconds: config.extraDelaySeconds,
+        targetGroup: config.targetGroup,
+        maxAccounts: config.maxAccounts,
+      });
+      setGeneratorStatus(status);
+      addToast(tr("Account generator started"));
+      return status;
+    } catch (e) {
+      setError(String(e));
+      throw e;
+    }
+  }
+
+  async function stopGenerator() {
+    try {
+      await invoke("stop_generator");
+      await refreshGeneratorStatus();
+      addToast(tr("Account generator stopped"));
+    } catch (e) {
+      setError(String(e));
+      throw e;
+    }
+  }
+
   const applyThemePreview = useCallback((nextTheme: ThemeData) => {
     const normalized = normalizeTheme(nextTheme);
     setThemeState(normalized);
@@ -1462,10 +1538,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (needsPassword || !initialized) return;
 
     refreshBottingStatus();
+    refreshGeneratorStatus();
     const unsubs: Array<() => void> = [];
     const listeners = [
       listen<BottingStatus>("botting-status", (e) => {
         setBottingStatus(e.payload);
+      }),
+      listen<GeneratorStatus>("generator-status", (e) => {
+        setGeneratorStatus(e.payload);
+      }),
+      listen("generator-account-added", () => {
+        loadAccounts();
+      }),
+      listen("generator-stopped", () => {
+        setGeneratorStatus((prev) => (prev ? { ...prev, active: false } : prev));
       }),
       listen("botting-stopped", () => {
         setBottingStatus((prev) =>
@@ -1848,6 +1934,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setBottingPlayerAccounts,
     bottingAccountAction,
     refreshBottingStatus,
+    startGenerator,
+    stopGenerator,
+    refreshGeneratorStatus,
     refreshCookie,
     moveToGroup,
     sortGroupAlphabetically,
@@ -1900,6 +1989,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     bottingDialogOpen,
     setBottingDialogOpen,
     bottingStatus,
+    generatorDialogOpen,
+    setGeneratorDialogOpen,
+    generatorStatus,
     missingAssets,
     setMissingAssets,
     nexusOpen,
