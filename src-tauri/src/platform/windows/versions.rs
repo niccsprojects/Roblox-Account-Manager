@@ -239,39 +239,36 @@ pub struct PkgManifestEntry {
 }
 
 fn parse_pkg_manifest(text: &str) -> Result<Vec<PkgManifestEntry>, String> {
-    let mut lines = text.lines().map(|l| l.trim());
+    let mut lines = text
+        .lines()
+        .map(|l| l.trim())
+        .filter(|l| !l.is_empty());
     let header = lines.next().ok_or("Empty manifest")?;
     if !header.eq_ignore_ascii_case("v0") {
         return Err(format!("Unexpected manifest header: {}", header));
     }
-    let rest: Vec<&str> = lines.filter(|l| !l.is_empty()).collect();
+    let rest: Vec<&str> = lines.collect();
     let mut packages = Vec::new();
     let mut i = 0;
-    while i < rest.len() {
-        let current = rest[i];
-        if current.to_ascii_lowercase().ends_with(".zip") {
-            let hash = if i > 0 {
-                let candidate = rest[i - 1];
-                if candidate
-                    .chars()
-                    .all(|c| c.is_ascii_hexdigit())
-                    && (candidate.len() == 32 || candidate.len() == 64)
-                {
-                    Some(candidate.to_string())
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-            packages.push(PkgManifestEntry {
-                filename: current.to_string(),
-                hash,
-            });
-            i += if i + 3 < rest.len() { 3 } else { 1 };
-        } else {
+    while i + 3 < rest.len() {
+        let filename = rest[i];
+        if !filename.to_ascii_lowercase().ends_with(".zip") {
             i += 1;
+            continue;
         }
+        let hash_candidate = rest[i + 1];
+        let hash = if hash_candidate.chars().all(|c| c.is_ascii_hexdigit())
+            && (hash_candidate.len() == 32 || hash_candidate.len() == 64)
+        {
+            Some(hash_candidate.to_string())
+        } else {
+            None
+        };
+        packages.push(PkgManifestEntry {
+            filename: filename.to_string(),
+            hash,
+        });
+        i += 4;
     }
     Ok(packages)
 }
