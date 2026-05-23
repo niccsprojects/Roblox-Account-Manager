@@ -5,7 +5,7 @@ import { TabBar } from "./TabBar";
 import { TabContent } from "./TabContent";
 import { useTr } from "../../i18n/text";
 import { ENABLE_WEBSERVER } from "../../featureFlags";
-import { Settings as SettingsIcon, Code, Gauge, Server, Eye, Sparkles, MoreHorizontal, X } from "lucide-react";
+import { Settings as SettingsIcon, Code, Gauge, Server, Eye, Sparkles, ShieldCheck, MoreHorizontal, X } from "lucide-react";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -20,12 +20,13 @@ export type TabId =
   | "webserver"
   | "watcher"
   | "generator"
+  | "isolation"
   | "optimization"
   | "miscellaneous";
 
 export const TAB_ORDER: TabId[] = ENABLE_WEBSERVER
-  ? ["general", "developer", "webserver", "watcher", "generator", "optimization", "miscellaneous"]
-  : ["general", "developer", "watcher", "generator", "optimization", "miscellaneous"];
+  ? ["general", "developer", "webserver", "watcher", "generator", "isolation", "optimization", "miscellaneous"]
+  : ["general", "developer", "watcher", "generator", "isolation", "optimization", "miscellaneous"];
 
 export interface TabDef {
   id: TabId;
@@ -100,6 +101,11 @@ export function SettingsDialog({
       id: "generator",
       label: "Generator",
       icon: <Sparkles size={15} strokeWidth={1.5} />,
+    },
+    {
+      id: "isolation",
+      label: "Isolation",
+      icon: <ShieldCheck size={15} strokeWidth={1.5} />,
     },
     {
       id: "optimization",

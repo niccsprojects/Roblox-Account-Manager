@@ -303,6 +303,26 @@ impl SettingsStore {
             }
         }
 
+        let isolation_defaults: &[(&str, &str)] = &[
+            ("Mode", "Off"),
+            ("SpoofMachineGuid", "false"),
+            ("SpoofMacAddress", "false"),
+            ("TargetAdapter", ""),
+            ("IncludeStudio", "false"),
+            ("PreserveFastFlags", "true"),
+            ("PreserveBasicSettings", "true"),
+            ("BackupMachineGuid", ""),
+            ("BackupNetworkAddress", ""),
+            ("BackupAdapterId", ""),
+        ];
+
+        let isolation = ini.section("Isolation");
+        for (key, value) in isolation_defaults {
+            if !isolation.exists(key) {
+                isolation.set(key, value, None);
+            }
+        }
+
         ini.section("Prompts");
 
         drop(ini);

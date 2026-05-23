@@ -23,6 +23,7 @@ import { UpdateDialog } from "./components/dialogs/UpdateDialog";
 import { NexusDialog } from "./components/dialogs/NexusDialog";
 import { BottingDialog } from "./components/dialogs/BottingDialog";
 import { GeneratorDialog } from "./components/dialogs/GeneratorDialog";
+import { IsolationProgressOverlay } from "./components/IsolationProgressOverlay";
 import { ScriptsDialog } from "./components/dialogs/ScriptsDialog";
 import { useTr } from "./i18n/text";
 import { ENABLE_NEXUS } from "./featureFlags";
@@ -174,6 +175,8 @@ function AppContent() {
         open={store.generatorDialogOpen}
         onClose={() => store.setGeneratorDialogOpen(false)}
       />
+
+      <IsolationProgressOverlay />
 
       {ENABLE_NEXUS && (
         <NexusDialog

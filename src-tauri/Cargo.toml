@@ -47,5 +47,6 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_JobObjects",
     "Win32_System_Registry",
     "Win32_System_Memory",
+    "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }

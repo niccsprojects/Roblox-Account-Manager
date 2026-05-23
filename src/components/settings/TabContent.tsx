@@ -8,6 +8,7 @@ import { OptimizationTab } from "./OptimizationTab";
 import { WebServerTab } from "./WebServerTab";
 import { WatcherTab } from "./WatcherTab";
 import { GeneratorTab } from "./GeneratorTab";
+import { IsolationTab } from "./IsolationTab";
 import { MiscellaneousTab } from "./MiscellaneousTab";
 import { useTr } from "../../i18n/text";
 
@@ -67,6 +68,7 @@ export function TabContent({
             {tab === "webserver" && <WebServerTab s={s} />}
             {tab === "watcher" && <WatcherTab s={s} />}
             {tab === "generator" && <GeneratorTab s={s} />}
+            {tab === "isolation" && <IsolationTab s={s} />}
             {tab === "optimization" && <OptimizationTab s={s} />}
             {tab === "miscellaneous" && (
               <MiscellaneousTab s={s} onRequestEncryptionSetup={onRequestEncryptionSetup} />

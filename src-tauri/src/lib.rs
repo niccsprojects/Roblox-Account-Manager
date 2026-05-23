@@ -33,6 +33,7 @@ include!("commands/botting.rs");
 include!("commands/generators.rs");
 include!("commands/launch.rs");
 include!("commands/diagnostics.rs");
+include!("commands/isolation.rs");
 include!("commands/watcher.rs");
 include!("commands/services.rs");
 include!("commands/updater.rs");
@@ -300,6 +301,11 @@ pub fn run() {
             cmd_apply_fps_unlock,
             kill_legacy_ram_processes,
             diagnose_mutex_holder,
+            isolation_get_status,
+            isolation_save,
+            isolation_list_adapters,
+            isolation_restore_network_identifiers,
+            isolation_dry_run,
             start_watcher,
             stop_watcher,
             chromium::commands::open_login_browser,

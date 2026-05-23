@@ -21,6 +21,10 @@ async fn launch_roblox(
     let auto_close_multi_conflicts = settings.get_bool("General", "AutoCloseRobloxForMultiRbx");
     let start_minimized = settings.get_bool("General", "StartRobloxMinimized");
 
+    if let Some(report) = run_pre_launch_isolation(&app, &settings)? {
+        let _ = app.emit("isolation-report", &report);
+    }
+
     let multi_rbx = settings.get_bool("General", "EnableMultiRbx");
     if multi_rbx {
         ensure_multi_roblox_enabled(auto_close_multi_conflicts)?;
@@ -315,6 +319,10 @@ async fn launch_multiple(
     let start_minimized = settings.get_bool("General", "StartRobloxMinimized");
     let tracker = windows::tracker();
     tracker.reset_launch_cancelled();
+
+    if let Some(report) = run_pre_launch_isolation(&app, &settings)? {
+        let _ = app.emit("isolation-report", &report);
+    }
 
     let accounts = state.get_all()?;
 

@@ -89,6 +89,17 @@ pub fn kill_all_roblox() -> u32 {
     killed
 }
 
+pub fn kill_all_roblox_related() -> u32 {
+    let pids = find_roblox_pids_all();
+    let mut killed = 0u32;
+    for pid in pids {
+        if kill_process(pid).is_ok() {
+            killed += 1;
+        }
+    }
+    killed
+}
+
 pub fn kill_all_roblox_except(keep_pids: &[u32]) -> u32 {
     let pids = get_roblox_pids();
     let mut killed = 0u32;
