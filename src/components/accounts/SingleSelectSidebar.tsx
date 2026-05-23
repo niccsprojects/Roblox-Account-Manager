@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useStore } from "../../store";
 import { useConfirm, usePrompt } from "../../hooks/usePrompt";
 import { useJoinOnlineWarning } from "../../hooks/useJoinOnlineWarning";
 import { SidebarSection } from "./SidebarSection";
 import { ArgumentsForm } from "../dialogs/ArgumentsForm";
 import { Tooltip } from "../ui/Tooltip";
+import { Select } from "../ui/Select";
 import { RecentGamesPopover } from "../server-list/RecentGamesPopover";
 import { tr, useTr } from "../../i18n/text";
-import { User, Shuffle, Save, Settings, History } from "lucide-react";
+import { User, Shuffle, Save, Settings, History, Package } from "lucide-react";
 
 function chipMaskName(name: string, previewLetters: number): string {
   if (previewLetters > 0 && previewLetters < name.length) {
@@ -30,6 +32,9 @@ export function SingleSelectSidebar() {
   const [followUser, setFollowUser] = useState("");
   const [argsOpen, setArgsOpen] = useState(false);
   const [recentsOpen, setRecentsOpen] = useState(false);
+  const [installedVersions, setInstalledVersions] = useState<
+    { channel: string; versionHash: string; displayVersion: string | null; userLabel: string | null }[]
+  >([]);
   const argsRef = useRef<HTMLButtonElement>(null);
   const recentsRef = useRef<HTMLButtonElement>(null);
   const maxRecent = parseInt(store.settings?.General?.MaxRecentGames || "8") || 8;
@@ -49,7 +54,42 @@ export function SingleSelectSidebar() {
     if (savedPlace) store.setPlaceId(savedPlace);
     if (savedJob) store.setJobId(savedJob);
     if (savedData) store.setLaunchData(savedData);
+
+    invoke<typeof installedVersions>("versions_list_installed")
+      .then((list) => setInstalledVersions(list))
+      .catch(() => {});
   }, [account.UserID]);
+
+  useEffect(() => {
+    const unlisten = listen<{ stage: string }>("version-install-progress", (e) => {
+      if (e.payload.stage === "ready") {
+        invoke<typeof installedVersions>("versions_list_installed")
+          .then((list) => setInstalledVersions(list))
+          .catch(() => {});
+      }
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  async function handleVersionOverrideChange(versionId: string) {
+    try {
+      await invoke("versions_set_account_override", {
+        userId: account.UserID,
+        versionId: versionId || null,
+      });
+      const fields = { ...account.Fields };
+      if (versionId) {
+        fields.RobloxVersion = versionId;
+      } else {
+        delete fields.RobloxVersion;
+      }
+      store.updateAccount({ ...account, Fields: fields });
+    } catch (e) {
+      store.addToast(tr("Failed to set version: {{error}}", { error: String(e) }));
+    }
+  }
 
   function handleSetAlias() {
     store.updateAccount({ ...account, Alias: alias.slice(0, 30) });
@@ -330,6 +370,32 @@ export function SingleSelectSidebar() {
             </button>
           )}
         </SidebarSection>
+
+        {installedVersions.length > 0 && (
+          <SidebarSection title={t("Roblox Version")}>
+            <Select
+              value={account.Fields?.RobloxVersion ?? ""}
+              options={[
+                { value: "", label: t("Default") },
+                ...installedVersions.map((v) => ({
+                  value: `${v.channel}:${v.versionHash}`,
+                  label:
+                    v.userLabel ??
+                    `${v.channel} · ${v.displayVersion ?? v.versionHash.slice(8, 16)}`,
+                })),
+              ]}
+              onChange={handleVersionOverrideChange}
+              className="w-full"
+            />
+            <button
+              onClick={() => store.setVersionsDialogOpen(true)}
+              className="flex items-center gap-1 mt-1 text-[11px] text-sky-400 hover:text-sky-300"
+            >
+              <Package size={11} strokeWidth={1.5} />
+              {t("Manage versions...")}
+            </button>
+          </SidebarSection>
+        )}
 
         <SidebarSection title={t("Follow")}>
           <div className="flex gap-1.5">

@@ -5,7 +5,7 @@ import { usePrompt } from "../../hooks/usePrompt";
 import { Tooltip } from "../ui/Tooltip";
 import { tr, useTr } from "../../i18n/text";
 import { ENABLE_NEXUS } from "../../featureFlags";
-import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare, Sparkles } from "lucide-react";
+import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare, Sparkles, Package } from "lucide-react";
 
 export function Toolbar() {
   const t = useTr();
@@ -52,6 +52,11 @@ export function Toolbar() {
   function handleOpenGenerator() {
     setAddMenuOpen(false);
     store.setGeneratorDialogOpen(true);
+  }
+
+  function handleOpenVersions() {
+    setAddMenuOpen(false);
+    store.setVersionsDialogOpen(true);
   }
 
   async function handleQuickAdd() {
@@ -205,6 +210,13 @@ export function Toolbar() {
               >
                 <Sparkles size={14} strokeWidth={1.5} className="theme-muted" />
                 {t("Account Generator")}
+              </button>
+              <button
+                onClick={handleOpenVersions}
+                className="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[var(--panel-fg)] hover:bg-[var(--panel-soft)] text-left"
+              >
+                <Package size={14} strokeWidth={1.5} className="theme-muted" />
+                {t("Roblox Versions")}
               </button>
             </div>
           )}

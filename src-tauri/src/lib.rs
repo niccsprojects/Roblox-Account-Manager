@@ -15,6 +15,7 @@ use data::settings::{
     get_settings_path, get_theme_path, get_theme_presets_path, SettingsStore, ThemePresetStore,
     ThemeStore,
 };
+use data::versions::{get_versions_catalog_path, VersionsCatalogStore};
 use std::collections::{HashMap, HashSet};
 #[cfg(target_os = "windows")]
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -34,6 +35,7 @@ include!("commands/generators.rs");
 include!("commands/launch.rs");
 include!("commands/diagnostics.rs");
 include!("commands/isolation.rs");
+include!("commands/versions.rs");
 include!("commands/watcher.rs");
 include!("commands/services.rs");
 include!("commands/updater.rs");
@@ -97,6 +99,7 @@ pub fn run() {
     let theme_store = ThemeStore::new(get_theme_path());
     let theme_preset_store = ThemePresetStore::new(get_theme_presets_path());
     let script_store = ScriptStore::new(get_scripts_path());
+    let versions_catalog = VersionsCatalogStore::new(get_versions_catalog_path());
     let image_cache = ImageCache::new();
 
     tauri::Builder::default()
@@ -119,6 +122,7 @@ pub fn run() {
         .manage(theme_store)
         .manage(theme_preset_store)
         .manage(script_store)
+        .manage(versions_catalog)
         .manage(image_cache)
         .manage(UpdaterRuntimeState::default())
         .manage(chromium::ChromiumManager::new())
@@ -306,6 +310,14 @@ pub fn run() {
             isolation_list_adapters,
             isolation_restore_network_identifiers,
             isolation_dry_run,
+            versions_list_installed,
+            versions_list_remote,
+            versions_install,
+            versions_uninstall,
+            versions_set_default,
+            versions_set_account_override,
+            versions_set_label,
+            versions_open_folder,
             start_watcher,
             stop_watcher,
             chromium::commands::open_login_browser,

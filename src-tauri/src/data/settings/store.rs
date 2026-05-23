@@ -303,6 +303,21 @@ impl SettingsStore {
             }
         }
 
+        let versions_defaults: &[(&str, &str)] = &[
+            ("DefaultVersion", ""),
+            ("MaxParallelDownloads", "4"),
+            ("CatalogCacheMinutes", "10"),
+            ("PreferOldJoinForVersioned", "true"),
+            ("ShowPreReleaseVersions", "false"),
+        ];
+
+        let versions = ini.section("Versions");
+        for (key, value) in versions_defaults {
+            if !versions.exists(key) {
+                versions.set(key, value, None);
+            }
+        }
+
         let isolation_defaults: &[(&str, &str)] = &[
             ("Mode", "Off"),
             ("SpoofMachineGuid", "false"),

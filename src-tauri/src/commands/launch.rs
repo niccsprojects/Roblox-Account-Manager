@@ -4,6 +4,7 @@ async fn launch_roblox(
     app: tauri::AppHandle,
     state: tauri::State<'_, AccountStore>,
     settings: tauri::State<'_, SettingsStore>,
+    versions: tauri::State<'_, data::versions::VersionsCatalogStore>,
     user_id: i64,
     place_id: i64,
     job_id: String,
@@ -16,10 +17,43 @@ async fn launch_roblox(
     use platform::windows;
 
     let is_teleport = settings.get_bool("Developer", "IsTeleport");
-    let use_old_join = settings.get_bool("Developer", "UseOldJoin");
+    let configured_old_join = settings.get_bool("Developer", "UseOldJoin");
     let auto_close_last_process = settings.get_bool("General", "AutoCloseLastProcess");
     let auto_close_multi_conflicts = settings.get_bool("General", "AutoCloseRobloxForMultiRbx");
     let start_minimized = settings.get_bool("General", "StartRobloxMinimized");
+
+    let account_snapshot_for_version = state.get_all()?;
+    let account_version_override = account_snapshot_for_version
+        .iter()
+        .find(|a| a.user_id == user_id)
+        .and_then(|a| a.fields.get("RobloxVersion").cloned())
+        .filter(|v| !v.trim().is_empty());
+
+    let (resolved_base_path, resolved_version_id) =
+        windows::resolve_roblox_install_path(account_version_override.as_deref(), &settings, &versions)?;
+    let isolation_will_wipe_install = settings
+        .get_string("Isolation", "Mode")
+        .eq_ignore_ascii_case("Full")
+        && resolved_version_id.is_none();
+    let use_old_join = if isolation_will_wipe_install {
+        false
+    } else {
+        configured_old_join || resolved_version_id.is_some()
+    };
+
+    let running_versions = windows::tracker().running_version_ids();
+    if !running_versions.is_empty() {
+        let conflict = if let Some(target) = &resolved_version_id {
+            running_versions.iter().any(|v| v != target)
+        } else {
+            !running_versions.is_empty()
+        };
+        if conflict {
+            return Err(
+                "A Roblox client is already running on a different version. Close it before launching this account on a different Roblox version. Concurrent multi-version support is planned for a future update.".into(),
+            );
+        }
+    }
 
     if let Some(report) = run_pre_launch_isolation(&app, &settings)? {
         let _ = app.emit("isolation-report", &report);
@@ -81,7 +115,8 @@ async fn launch_roblox(
     let pids_before = windows::get_roblox_pids();
 
     if use_old_join {
-        windows::launch_old_join(
+        windows::launch_old_join_from(
+            &resolved_base_path,
             &ticket,
             private_join.place_id,
             &actual_job,
@@ -110,7 +145,17 @@ async fn launch_roblox(
 
     if let Some(pid) = wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(12)).await
     {
-        tracker.track(user_id, pid, browser_tracker_id.clone());
+        tracker.track_with_version(
+            user_id,
+            pid,
+            browser_tracker_id.clone(),
+            resolved_version_id.clone(),
+        );
+        if let Some(version_id) = resolved_version_id.as_deref() {
+            if let Some((channel, hash)) = version_id.split_once(':') {
+                versions.touch_launched(channel, hash);
+            }
+        }
         apply_windows_post_launch_profile(Some(&app), &settings, LaunchClientProfile::Normal, pid)
             .await;
 
@@ -301,6 +346,7 @@ async fn launch_multiple(
     app: tauri::AppHandle,
     state: tauri::State<'_, AccountStore>,
     settings: tauri::State<'_, SettingsStore>,
+    versions: tauri::State<'_, data::versions::VersionsCatalogStore>,
     user_ids: Vec<i64>,
     place_id: i64,
     job_id: String,
@@ -313,7 +359,7 @@ async fn launch_multiple(
     let delay = if multi_rbx { delay.max(12) } else { delay };
     let async_join = settings.get_bool("General", "AsyncJoin");
     let is_teleport = settings.get_bool("Developer", "IsTeleport");
-    let use_old_join = settings.get_bool("Developer", "UseOldJoin");
+    let configured_old_join = settings.get_bool("Developer", "UseOldJoin");
     let auto_close_last_process = settings.get_bool("General", "AutoCloseLastProcess");
     let auto_close_multi_conflicts = settings.get_bool("General", "AutoCloseRobloxForMultiRbx");
     let start_minimized = settings.get_bool("General", "StartRobloxMinimized");
@@ -340,6 +386,50 @@ async fn launch_multiple(
             .and_then(|a| a.fields.get("SavedJobId"))
             .map(|v| v.clone())
             .unwrap_or_else(|| job_id.clone());
+        let acct_version_override = account
+            .and_then(|a| a.fields.get("RobloxVersion").cloned())
+            .filter(|v| !v.trim().is_empty());
+
+        let (acct_base_path, acct_version_id) = match windows::resolve_roblox_install_path(
+            acct_version_override.as_deref(),
+            &settings,
+            &versions,
+        ) {
+            Ok(value) => value,
+            Err(_) => {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                continue;
+            }
+        };
+        let acct_isolation_wipes_install = settings
+            .get_string("Isolation", "Mode")
+            .eq_ignore_ascii_case("Full")
+            && acct_version_id.is_none();
+        let acct_use_old_join = if acct_isolation_wipes_install {
+            false
+        } else {
+            configured_old_join || acct_version_id.is_some()
+        };
+
+        let running_versions = tracker.running_version_ids();
+        if !running_versions.is_empty() {
+            let conflict = match &acct_version_id {
+                Some(target) => running_versions.iter().any(|v| v != target),
+                None => !running_versions.is_empty(),
+            };
+            if conflict {
+                let _ = app.emit(
+                    "launch-progress",
+                    serde_json::json!({
+                        "userId": uid,
+                        "index": i,
+                        "total": user_ids.len(),
+                        "error": "version-conflict",
+                    }),
+                );
+                continue;
+            }
+        }
 
         let _ = app.emit(
             "launch-progress",
@@ -396,8 +486,9 @@ async fn launch_multiple(
 
         let pids_before = windows::get_roblox_pids();
 
-        let launch_result = if use_old_join {
-            windows::launch_old_join(
+        let launch_result = if acct_use_old_join {
+            windows::launch_old_join_from(
+                &acct_base_path,
                 &ticket,
                 private_join.place_id,
                 &resolved_launch.job_id,
@@ -431,7 +522,12 @@ async fn launch_multiple(
 
         if let Some(pid) = wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(12)).await
         {
-            tracker.track(uid, pid, browser_tracker_id);
+            tracker.track_with_version(uid, pid, browser_tracker_id, acct_version_id.clone());
+            if let Some(version_id) = acct_version_id.as_deref() {
+                if let Some((channel, hash)) = version_id.split_once(':') {
+                    versions.touch_launched(channel, hash);
+                }
+            }
             apply_windows_post_launch_profile(
                 Some(&app),
                 &settings,

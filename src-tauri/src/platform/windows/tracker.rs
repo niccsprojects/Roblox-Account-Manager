@@ -5,6 +5,8 @@ pub struct TrackedProcess {
     pub pid: u32,
     pub user_id: i64,
     pub browser_tracker_id: String,
+    #[serde(default)]
+    pub version_id: Option<String>,
 }
 
 pub struct ProcessTracker {
@@ -31,6 +33,16 @@ impl ProcessTracker {
     }
 
     pub fn track(&self, user_id: i64, pid: u32, browser_tracker_id: String) {
+        self.track_with_version(user_id, pid, browser_tracker_id, None);
+    }
+
+    pub fn track_with_version(
+        &self,
+        user_id: i64,
+        pid: u32,
+        browser_tracker_id: String,
+        version_id: Option<String>,
+    ) {
         if let Ok(mut instances) = self.instances.lock() {
             if let Some(previous) = instances.insert(
                 user_id,
@@ -38,11 +50,24 @@ impl ProcessTracker {
                     pid,
                     user_id,
                     browser_tracker_id,
+                    version_id,
                 },
             ) {
                 self.clear_job_handle_for_pid(previous.pid);
             }
         }
+    }
+
+    pub fn running_version_ids(&self) -> std::collections::HashSet<String> {
+        let mut set = std::collections::HashSet::new();
+        if let Ok(instances) = self.instances.lock() {
+            for tracked in instances.values() {
+                if let Some(v) = &tracked.version_id {
+                    set.insert(v.clone());
+                }
+            }
+        }
+        set
     }
 
     pub fn untrack(&self, user_id: i64) {
