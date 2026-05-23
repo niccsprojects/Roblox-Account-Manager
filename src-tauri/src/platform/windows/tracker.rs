@@ -58,13 +58,11 @@ impl ProcessTracker {
         }
     }
 
-    pub fn running_version_ids(&self) -> std::collections::HashSet<String> {
+    pub fn running_version_keys(&self) -> std::collections::HashSet<Option<String>> {
         let mut set = std::collections::HashSet::new();
         if let Ok(instances) = self.instances.lock() {
             for tracked in instances.values() {
-                if let Some(v) = &tracked.version_id {
-                    set.insert(v.clone());
-                }
+                set.insert(tracked.version_id.clone());
             }
         }
         set

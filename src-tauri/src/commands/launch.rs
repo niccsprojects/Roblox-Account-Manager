@@ -41,18 +41,11 @@ async fn launch_roblox(
         configured_old_join || resolved_version_id.is_some()
     };
 
-    let running_versions = windows::tracker().running_version_ids();
-    if !running_versions.is_empty() {
-        let conflict = if let Some(target) = &resolved_version_id {
-            running_versions.iter().any(|v| v != target)
-        } else {
-            !running_versions.is_empty()
-        };
-        if conflict {
-            return Err(
-                "A Roblox client is already running on a different version. Close it before launching this account on a different Roblox version. Concurrent multi-version support is planned for a future update.".into(),
-            );
-        }
+    let running_keys = windows::tracker().running_version_keys();
+    if running_keys.iter().any(|k| k != &resolved_version_id) {
+        return Err(
+            "A Roblox client is already running on a different version. Close it before launching this account on a different Roblox version. Concurrent multi-version support is planned for a future update.".into(),
+        );
     }
 
     if let Some(report) = run_pre_launch_isolation(&app, &settings)? {
@@ -421,24 +414,18 @@ async fn launch_multiple(
             configured_old_join || acct_version_id.is_some()
         };
 
-        let running_versions = tracker.running_version_ids();
-        if !running_versions.is_empty() {
-            let conflict = match &acct_version_id {
-                Some(target) => running_versions.iter().any(|v| v != target),
-                None => !running_versions.is_empty(),
-            };
-            if conflict {
-                let _ = app.emit(
-                    "launch-progress",
-                    serde_json::json!({
-                        "userId": uid,
-                        "index": i,
-                        "total": user_ids.len(),
-                        "error": "version-conflict",
-                    }),
-                );
-                continue;
-            }
+        let running_keys = tracker.running_version_keys();
+        if running_keys.iter().any(|k| k != &acct_version_id) {
+            let _ = app.emit(
+                "launch-progress",
+                serde_json::json!({
+                    "userId": uid,
+                    "index": i,
+                    "total": user_ids.len(),
+                    "error": "version-conflict",
+                }),
+            );
+            continue;
         }
 
         let _ = app.emit(
