@@ -32,6 +32,7 @@ include!("commands/launch_shared.rs");
 include!("commands/botting.rs");
 include!("commands/generators.rs");
 include!("commands/launch.rs");
+include!("commands/diagnostics.rs");
 include!("commands/watcher.rs");
 include!("commands/services.rs");
 include!("commands/updater.rs");
@@ -297,6 +298,8 @@ pub fn run() {
             cmd_disable_multi_roblox,
             cmd_get_roblox_path,
             cmd_apply_fps_unlock,
+            kill_legacy_ram_processes,
+            diagnose_mutex_holder,
             start_watcher,
             stop_watcher,
             chromium::commands::open_login_browser,
