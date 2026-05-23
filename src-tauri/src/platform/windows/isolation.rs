@@ -624,16 +624,42 @@ fn write_machine_guid_directly(value: &str) -> bool {
     }
 }
 
+fn is_valid_machine_guid(value: &str) -> bool {
+    if value.len() != 36 {
+        return false;
+    }
+    let parts: Vec<&str> = value.split('-').collect();
+    let expected_lens = [8usize, 4, 4, 4, 12];
+    if parts.len() != expected_lens.len() {
+        return false;
+    }
+    parts
+        .iter()
+        .zip(expected_lens.iter())
+        .all(|(p, n)| p.len() == *n && p.chars().all(|c| c.is_ascii_hexdigit()))
+}
+
+fn is_valid_mac_hex(value: &str) -> bool {
+    value.len() == 12 && value.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+fn is_valid_adapter_subkey(value: &str) -> bool {
+    value.len() == 4 && value.chars().all(|c| c.is_ascii_digit())
+}
+
 fn build_spoof_script(
     opts: &IsolationOptions,
     new_machine_guid: Option<&str>,
     adapter_subkey: Option<&str>,
     new_mac: Option<&str>,
-) -> String {
+) -> Result<String, String> {
     let mut script = String::new();
     script.push_str("$ErrorActionPreference = 'Stop'\n");
 
     if let (true, Some(guid)) = (opts.spoof_machine_guid, new_machine_guid) {
+        if !is_valid_machine_guid(guid) {
+            return Err("Refusing to run spoof script: generated MachineGuid is not a valid GUID".into());
+        }
         script.push_str(&format!(
             "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Cryptography' -Name 'MachineGuid' -Value '{}'\n",
             guid
@@ -641,6 +667,12 @@ fn build_spoof_script(
     }
 
     if let (true, Some(subkey), Some(mac)) = (opts.spoof_mac, adapter_subkey, new_mac) {
+        if !is_valid_adapter_subkey(subkey) {
+            return Err("Refusing to run spoof script: adapter subkey is not a 4-digit identifier".into());
+        }
+        if !is_valid_mac_hex(mac) {
+            return Err("Refusing to run spoof script: generated MAC is not 12 hex characters".into());
+        }
         let class_path = format!(
             "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{}\\{}",
             NETWORK_ADAPTER_CLASS_GUID, subkey
@@ -665,14 +697,22 @@ fn build_spoof_script(
         script.push_str("}\n");
     }
 
-    script
+    Ok(script)
 }
 
-fn build_restore_script(machine_guid: Option<&str>, adapter_subkey: Option<&str>) -> String {
+fn build_restore_script(
+    machine_guid: Option<&str>,
+    adapter_subkey: Option<&str>,
+) -> Result<String, String> {
     let mut script = String::new();
     script.push_str("$ErrorActionPreference = 'Stop'\n");
 
     if let Some(guid) = machine_guid {
+        if !is_valid_machine_guid(guid) {
+            return Err(
+                "Refusing to run restore script: stored MachineGuid backup is not a valid GUID".into(),
+            );
+        }
         script.push_str(&format!(
             "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Cryptography' -Name 'MachineGuid' -Value '{}'\n",
             guid
@@ -680,6 +720,11 @@ fn build_restore_script(machine_guid: Option<&str>, adapter_subkey: Option<&str>
     }
 
     if let Some(subkey) = adapter_subkey {
+        if !is_valid_adapter_subkey(subkey) {
+            return Err(
+                "Refusing to run restore script: stored adapter subkey is not a 4-digit identifier".into(),
+            );
+        }
         let class_path = format!(
             "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{}\\{}",
             NETWORK_ADAPTER_CLASS_GUID, subkey
@@ -702,7 +747,7 @@ fn build_restore_script(machine_guid: Option<&str>, adapter_subkey: Option<&str>
         script.push_str("}\n");
     }
 
-    script
+    Ok(script)
 }
 
 fn run_elevated_powershell(script: &str) -> Result<(), String> {
@@ -981,7 +1026,7 @@ pub fn apply_pre_launch(
             new_guid.as_deref(),
             adapter_subkey.as_deref(),
             new_mac.as_deref(),
-        );
+        )?;
 
         if script.trim().is_empty() {
             emit_isolation_progress(app, "finished", "Done", &report, true);
@@ -1040,7 +1085,7 @@ pub fn restore_network_identifiers(
     if machine_guid.is_none() && adapter_subkey.is_none() {
         return Err("No backup values to restore".into());
     }
-    let script = build_restore_script(machine_guid, adapter_subkey);
+    let script = build_restore_script(machine_guid, adapter_subkey)?;
     if script.trim().is_empty() {
         return Err("No backup values to restore".into());
     }
