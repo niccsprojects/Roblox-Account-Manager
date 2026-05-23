@@ -541,43 +541,46 @@ fn restore_basic_settings(content: &[u8]) {
     let _ = std::fs::write(&path, content);
 }
 
-fn new_random_mac() -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    let mut bytes = [0u8; 6];
-    let mut seed = now as u64;
-    for byte in bytes.iter_mut() {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        *byte = (seed >> 33) as u8;
+fn fill_secure_random(buf: &mut [u8]) -> Result<(), String> {
+    use windows_sys::Win32::Security::Cryptography::{
+        BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+    };
+    let status = unsafe {
+        BCryptGenRandom(
+            std::ptr::null_mut(),
+            buf.as_mut_ptr(),
+            buf.len() as u32,
+            BCRYPT_USE_SYSTEM_PREFERRED_RNG,
+        )
+    };
+    if status == 0 {
+        Ok(())
+    } else {
+        Err(format!("BCryptGenRandom failed with NTSTATUS 0x{:08X}", status))
     }
+}
+
+fn new_random_mac() -> Result<String, String> {
+    let mut bytes = [0u8; 6];
+    fill_secure_random(&mut bytes)?;
     bytes[0] = (bytes[0] & 0xFE) | 0x02;
-    bytes
+    Ok(bytes
         .iter()
         .map(|b| format!("{:02X}", b))
         .collect::<Vec<_>>()
-        .join("")
+        .join(""))
 }
 
-fn new_random_machine_guid() -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
+fn new_random_machine_guid() -> Result<String, String> {
     let mut bytes = [0u8; 16];
-    let mut seed = now as u64;
-    for byte in bytes.iter_mut() {
-        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        *byte = (seed >> 33) as u8;
-    }
+    fill_secure_random(&mut bytes)?;
     bytes[6] = (bytes[6] & 0x0F) | 0x40;
     bytes[8] = (bytes[8] & 0x3F) | 0x80;
-    format!(
+    Ok(format!(
         "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
         bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
         bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
-    )
+    ))
 }
 
 fn write_machine_guid_directly(value: &str) -> bool {
@@ -963,12 +966,12 @@ pub fn apply_pre_launch(
 
     if opts.spoof_machine_guid || opts.spoof_mac {
         let new_mac = if opts.spoof_mac {
-            Some(new_random_mac())
+            Some(new_random_mac()?)
         } else {
             None
         };
         let new_guid = if opts.spoof_machine_guid {
-            Some(new_random_machine_guid())
+            Some(new_random_machine_guid()?)
         } else {
             None
         };

@@ -383,7 +383,8 @@ pub async fn install_version(
 
     let target = install_target_dir(&channel, &version_hash)?;
     if target.exists() {
-        let _ = std::fs::remove_dir_all(&target);
+        std::fs::remove_dir_all(&target)
+            .map_err(|e| format!("Could not remove existing version directory: {}", e))?;
     }
     ensure_dir(&target)?;
 
