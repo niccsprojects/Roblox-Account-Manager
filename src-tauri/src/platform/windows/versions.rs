@@ -232,23 +232,69 @@ pub async fn fetch_remote_catalog() -> Result<RemoteCatalog, String> {
     })
 }
 
-fn parse_pkg_manifest(text: &str) -> Result<Vec<String>, String> {
-    let mut lines = text.lines();
-    let header = lines.next().ok_or("Empty manifest")?.trim();
+#[derive(Debug, Clone)]
+pub struct PkgManifestEntry {
+    pub filename: String,
+    pub hash: Option<String>,
+}
+
+fn parse_pkg_manifest(text: &str) -> Result<Vec<PkgManifestEntry>, String> {
+    let mut lines = text.lines().map(|l| l.trim());
+    let header = lines.next().ok_or("Empty manifest")?;
     if !header.eq_ignore_ascii_case("v0") {
         return Err(format!("Unexpected manifest header: {}", header));
     }
+    let rest: Vec<&str> = lines.filter(|l| !l.is_empty()).collect();
     let mut packages = Vec::new();
-    for line in lines {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        if trimmed.to_ascii_lowercase().ends_with(".zip") {
-            packages.push(trimmed.to_string());
+    let mut i = 0;
+    while i < rest.len() {
+        let current = rest[i];
+        if current.to_ascii_lowercase().ends_with(".zip") {
+            let hash = if i > 0 {
+                let candidate = rest[i - 1];
+                if candidate
+                    .chars()
+                    .all(|c| c.is_ascii_hexdigit())
+                    && (candidate.len() == 32 || candidate.len() == 64)
+                {
+                    Some(candidate.to_string())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            packages.push(PkgManifestEntry {
+                filename: current.to_string(),
+                hash,
+            });
+            i += if i + 3 < rest.len() { 3 } else { 1 };
+        } else {
+            i += 1;
         }
     }
     Ok(packages)
+}
+
+fn verify_hash(bytes: &[u8], expected: &str) -> bool {
+    use md5::Digest;
+    match expected.len() {
+        32 => {
+            let mut hasher = md5::Md5::new();
+            hasher.update(bytes);
+            let computed = hasher.finalize();
+            let hex: String = computed.iter().map(|b| format!("{:02x}", b)).collect();
+            hex.eq_ignore_ascii_case(expected)
+        }
+        64 => {
+            let mut hasher = sha2::Sha256::new();
+            hasher.update(bytes);
+            let computed = hasher.finalize();
+            let hex: String = computed.iter().map(|b| format!("{:02x}", b)).collect();
+            hex.eq_ignore_ascii_case(expected)
+        }
+        _ => true,
+    }
 }
 
 fn ensure_dir(dir: &std::path::Path) -> Result<(), String> {
@@ -387,28 +433,43 @@ pub async fn install_version(
         .clamp(1, 8) as usize;
 
     let mut downloaded: u64 = 0;
-    let mut futures: FuturesUnordered<BoxFuture<'static, (String, Result<Vec<u8>, String>)>> =
-        FuturesUnordered::new();
+    let mut futures: FuturesUnordered<
+        BoxFuture<'static, (PkgManifestEntry, Result<Vec<u8>, String>)>,
+    > = FuturesUnordered::new();
     let mut iter = packages.iter().cloned();
-    let spawn_one = |pkg: String, client: reqwest::Client, base: String, version_hash: String| {
-        async move {
-            let url = format!("{}{}-{}", base, version_hash, pkg);
-            let bytes = fetch_bytes(&client, &url).await;
-            (pkg, bytes)
-        }
-        .boxed()
-    };
+    let spawn_one =
+        |entry: PkgManifestEntry, client: reqwest::Client, base: String, version_hash: String| {
+            async move {
+                let url = format!("{}{}-{}", base, version_hash, entry.filename);
+                let bytes = fetch_bytes(&client, &url).await;
+                (entry, bytes)
+            }
+            .boxed()
+        };
 
     for _ in 0..max_parallel.min(packages.len()) {
-        if let Some(pkg) = iter.next() {
-            futures.push(spawn_one(pkg, client.clone(), base.clone(), version_hash.clone()));
+        if let Some(entry) = iter.next() {
+            futures.push(spawn_one(
+                entry,
+                client.clone(),
+                base.clone(),
+                version_hash.clone(),
+            ));
         }
     }
 
     let mut package_bytes: Vec<(String, Vec<u8>)> = Vec::with_capacity(packages.len());
 
-    while let Some((pkg, bytes_result)) = futures.next().await {
+    while let Some((entry, bytes_result)) = futures.next().await {
         let bytes = bytes_result?;
+        if let Some(expected) = entry.hash.as_deref() {
+            if !verify_hash(&bytes, expected) {
+                return Err(format!(
+                    "Package {} failed integrity check (expected hash {})",
+                    entry.filename, expected
+                ));
+            }
+        }
         downloaded += 1;
         emit_progress(
             &app,
@@ -417,16 +478,16 @@ pub async fn install_version(
                 channel: channel.clone(),
                 version_hash: version_hash.clone(),
                 stage: "downloading".into(),
-                package: Some(pkg.clone()),
+                package: Some(entry.filename.clone()),
                 current: downloaded,
                 total,
                 message: None,
             },
         );
-        package_bytes.push((pkg, bytes));
-        if let Some(next_pkg) = iter.next() {
+        package_bytes.push((entry.filename, bytes));
+        if let Some(next_entry) = iter.next() {
             futures.push(spawn_one(
-                next_pkg,
+                next_entry,
                 client.clone(),
                 base.clone(),
                 version_hash.clone(),

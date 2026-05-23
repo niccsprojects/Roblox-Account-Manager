@@ -359,17 +359,8 @@ fn programfiles_roblox_paths() -> Vec<PathBuf> {
     out
 }
 
-fn ram_managed_versions_root() -> Option<PathBuf> {
-    let local = std::env::var_os("LOCALAPPDATA")?;
-    Some(
-        PathBuf::from(local)
-            .join("Roblox Account Manager")
-            .join("RobloxVersions"),
-    )
-}
-
 fn is_under_ram_managed(path: &Path) -> bool {
-    if let Some(root) = ram_managed_versions_root() {
+    if let Some(root) = crate::data::versions::ram_managed_versions_root() {
         path.starts_with(&root)
     } else {
         false
@@ -483,6 +474,10 @@ fn backup_fast_flags() -> Vec<(String, Vec<u8>)> {
     backups
 }
 
+fn pending_fast_flags_path() -> Option<PathBuf> {
+    Some(ram_isolation_backup_dir()?.join("PendingFastFlags.json"))
+}
+
 fn restore_fast_flags(backups: &[(String, Vec<u8>)]) {
     let Some(backup_dir) = ram_isolation_backup_dir() else {
         return;
@@ -492,6 +487,43 @@ fn restore_fast_flags(backups: &[(String, Vec<u8>)]) {
         let path = backup_dir.join(format!("{}-ClientAppSettings.json", name));
         let _ = std::fs::write(&path, content);
     }
+    if let Some(pending) = pending_fast_flags_path() {
+        if let Some((_, content)) = backups.last() {
+            let _ = std::fs::write(&pending, content);
+        }
+    }
+}
+
+pub fn apply_pending_fast_flags_to(version_dir: &Path) -> bool {
+    let Some(pending) = pending_fast_flags_path() else {
+        return false;
+    };
+    if !pending.exists() {
+        return false;
+    }
+    let Ok(content) = std::fs::read(&pending) else {
+        return false;
+    };
+    let target = version_dir
+        .join("ClientSettings")
+        .join("ClientAppSettings.json");
+    if let Some(parent) = target.parent() {
+        if std::fs::create_dir_all(parent).is_err() {
+            return false;
+        }
+    }
+    if std::fs::write(&target, content).is_ok() {
+        let _ = std::fs::remove_file(&pending);
+        true
+    } else {
+        false
+    }
+}
+
+pub fn has_pending_fast_flags() -> bool {
+    pending_fast_flags_path()
+        .map(|p| p.exists())
+        .unwrap_or(false)
 }
 
 fn backup_basic_settings() -> Option<Vec<u8>> {
@@ -703,15 +735,31 @@ fn run_elevated_powershell(script: &str) -> Result<(), String> {
         return Err("UAC prompt was denied or PowerShell could not be launched".into());
     }
 
+    let mut exit_status: Result<(), String> = Ok(());
     if !sei.hProcess.is_null() {
         unsafe {
             let _ = WaitForSingleObject(sei.hProcess, 60_000);
+            let mut exit_code: u32 = 0;
+            let got = windows_sys::Win32::System::Threading::GetExitCodeProcess(
+                sei.hProcess,
+                &mut exit_code,
+            );
             CloseHandle(sei.hProcess);
+            if got == 0 {
+                exit_status = Err("Could not read elevated PowerShell exit code".into());
+            } else if exit_code != 0 {
+                exit_status = Err(format!(
+                    "Elevated PowerShell exited with code {}",
+                    exit_code
+                ));
+            }
         }
+    } else {
+        exit_status = Err("Elevated PowerShell did not return a process handle".into());
     }
 
     let _ = std::fs::remove_file(&script_path);
-    Ok(())
+    exit_status
 }
 
 fn select_adapter<'a>(

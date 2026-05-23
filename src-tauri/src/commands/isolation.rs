@@ -63,6 +63,38 @@ pub(crate) fn run_pre_launch_isolation(
     Ok(Some(report))
 }
 
+#[cfg(target_os = "windows")]
+pub(crate) async fn apply_pending_fast_flags_when_ready(timeout: std::time::Duration) {
+    let Some(local) = std::env::var_os("LOCALAPPDATA") else {
+        return;
+    };
+    let versions_root = std::path::PathBuf::from(local).join("Roblox").join("Versions");
+    let deadline = std::time::Instant::now() + timeout;
+    while std::time::Instant::now() < deadline {
+        if !platform::windows::has_pending_fast_flags() {
+            return;
+        }
+        if let Ok(entries) = std::fs::read_dir(&versions_root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                if !path.join("RobloxPlayerBeta.exe").exists() {
+                    continue;
+                }
+                if platform::windows::apply_pending_fast_flags_to(&path) {
+                    return;
+                }
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) async fn apply_pending_fast_flags_when_ready(_timeout: std::time::Duration) {}
+
 #[tauri::command]
 fn isolation_get_status(
     settings: tauri::State<'_, SettingsStore>,

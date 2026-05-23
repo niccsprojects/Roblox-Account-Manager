@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { ShieldCheck, ShieldAlert, Loader2, CheckCircle2 } from "lucide-react";
 import { useTr } from "../i18n/text";
@@ -26,28 +26,30 @@ export function IsolationProgressOverlay() {
   const t = useTr();
   const [progress, setProgress] = useState<IsolationProgress | null>(null);
   const [visible, setVisible] = useState(false);
-  const [hideTimer, setHideTimer] = useState<number | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const unlisten = listen<IsolationProgress>("isolation-progress", (e) => {
       const next = e.payload;
       setProgress(next);
       setVisible(true);
-      if (hideTimer !== null) {
-        window.clearTimeout(hideTimer);
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
       }
       if (next.finished) {
-        const id = window.setTimeout(() => {
+        hideTimerRef.current = window.setTimeout(() => {
           setVisible(false);
+          hideTimerRef.current = null;
         }, HIDE_AFTER_MS);
-        setHideTimer(id);
-      } else {
-        setHideTimer(null);
       }
     });
     return () => {
       unlisten.then((fn) => fn());
-      if (hideTimer !== null) window.clearTimeout(hideTimer);
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
     };
   }, []);
 

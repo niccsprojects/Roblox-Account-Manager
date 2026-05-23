@@ -35,6 +35,8 @@ tauri-plugin-window-state = "2"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 zip = "0.6.6"
+md-5 = "0.10"
+sha2 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [

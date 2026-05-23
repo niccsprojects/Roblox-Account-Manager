@@ -57,6 +57,11 @@ async fn launch_roblox(
 
     if let Some(report) = run_pre_launch_isolation(&app, &settings)? {
         let _ = app.emit("isolation-report", &report);
+        if windows::has_pending_fast_flags() {
+            tokio::spawn(apply_pending_fast_flags_when_ready(
+                std::time::Duration::from_secs(240),
+            ));
+        }
     }
 
     let multi_rbx = settings.get_bool("General", "EnableMultiRbx");
@@ -368,6 +373,11 @@ async fn launch_multiple(
 
     if let Some(report) = run_pre_launch_isolation(&app, &settings)? {
         let _ = app.emit("isolation-report", &report);
+        if windows::has_pending_fast_flags() {
+            tokio::spawn(apply_pending_fast_flags_when_ready(
+                std::time::Duration::from_secs(240),
+            ));
+        }
     }
 
     let accounts = state.get_all()?;
