@@ -401,6 +401,19 @@ fn extract_package_into(
     Ok(())
 }
 
+struct StagingGuard {
+    path: PathBuf,
+    committed: bool,
+}
+
+impl Drop for StagingGuard {
+    fn drop(&mut self) {
+        if !self.committed && self.path.exists() {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+}
+
 pub async fn install_version(
     app: tauri::AppHandle,
     install_id: String,
@@ -411,11 +424,30 @@ pub async fn install_version(
     use crate::data::versions::VersionEntry;
 
     let target = install_target_dir(&channel, &version_hash)?;
-    if target.exists() {
-        std::fs::remove_dir_all(&target)
-            .map_err(|e| format!("Could not remove existing version directory: {}", e))?;
+    let staging_name = format!(
+        "{}.staging-{}",
+        target
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("install"),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+    let staging = target.with_file_name(staging_name);
+    if let Some(parent) = staging.parent() {
+        ensure_dir(parent)?;
     }
-    ensure_dir(&target)?;
+    if staging.exists() {
+        std::fs::remove_dir_all(&staging)
+            .map_err(|e| format!("Could not clear stale staging directory: {}", e))?;
+    }
+    ensure_dir(&staging)?;
+    let mut guard = StagingGuard {
+        path: staging.clone(),
+        committed: false,
+    };
 
     let client = http_client_versioned().await;
 
@@ -536,7 +568,7 @@ pub async fn install_version(
         },
     );
 
-    let target_for_extract = target.clone();
+    let staging_for_extract = staging.clone();
     let install_id_for_extract = install_id.clone();
     let channel_for_extract = channel.clone();
     let version_for_extract = version_hash.clone();
@@ -545,7 +577,7 @@ pub async fn install_version(
         let mut count = 0u64;
         for (pkg, bytes) in &package_bytes {
             let subdir = extract_root_for(pkg).unwrap_or("");
-            extract_package_into(bytes, &target_for_extract, subdir)?;
+            extract_package_into(bytes, &staging_for_extract, subdir)?;
             count += 1;
             let _ = app_for_extract.emit(
                 "version-install-progress",
@@ -567,14 +599,22 @@ pub async fn install_version(
     .map_err(|e| format!("Extraction task panicked: {}", e))?;
     extracted?;
 
-    let app_settings_path = target.join("AppSettings.xml");
+    let app_settings_path = staging.join("AppSettings.xml");
     std::fs::write(&app_settings_path, APP_SETTINGS_XML)
         .map_err(|e| format!("Could not write AppSettings.xml: {}", e))?;
 
-    let exe_path = target.join("RobloxPlayerBeta.exe");
+    let exe_path = staging.join("RobloxPlayerBeta.exe");
     if !exe_path.exists() {
         return Err("Install completed but RobloxPlayerBeta.exe is missing".into());
     }
+
+    if target.exists() {
+        std::fs::remove_dir_all(&target)
+            .map_err(|e| format!("Could not remove existing version directory: {}", e))?;
+    }
+    std::fs::rename(&staging, &target)
+        .map_err(|e| format!("Could not move staged install into place: {}", e))?;
+    guard.committed = true;
 
     let install_size = folder_size(&target);
 
