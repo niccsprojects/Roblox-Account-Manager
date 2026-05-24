@@ -50,7 +50,7 @@ fn persist_isolation_backups(
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn run_pre_launch_isolation(
+pub(crate) async fn run_pre_launch_isolation(
     app: &tauri::AppHandle,
     settings: &SettingsStore,
 ) -> Result<Option<platform::windows::IsolationReport>, String> {
@@ -58,7 +58,13 @@ pub(crate) fn run_pre_launch_isolation(
     if !opts.does_anything() {
         return Ok(None);
     }
-    let report = platform::windows::apply_pre_launch(app, &opts)?;
+    let app_owned = app.clone();
+    let opts_owned = opts;
+    let report = tauri::async_runtime::spawn_blocking(move || {
+        platform::windows::apply_pre_launch(&app_owned, &opts_owned)
+    })
+    .await
+    .map_err(|e| format!("Isolation task panicked: {}", e))??;
     persist_isolation_backups(settings, &report);
     Ok(Some(report))
 }

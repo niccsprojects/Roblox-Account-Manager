@@ -50,7 +50,7 @@ async fn launch_roblox(
         );
     }
 
-    if let Some(report) = run_pre_launch_isolation(&app, &settings)? {
+    if let Some(report) = run_pre_launch_isolation(&app, &settings).await? {
         let _ = app.emit("isolation-report", &report);
         if windows::has_pending_fast_flags() {
             tokio::spawn(apply_pending_fast_flags_when_ready(
@@ -366,7 +366,7 @@ async fn launch_multiple(
     let tracker = windows::tracker();
     tracker.reset_launch_cancelled();
 
-    if let Some(report) = run_pre_launch_isolation(&app, &settings)? {
+    if let Some(report) = run_pre_launch_isolation(&app, &settings).await? {
         let _ = app.emit("isolation-report", &report);
         if windows::has_pending_fast_flags() {
             tokio::spawn(apply_pending_fast_flags_when_ready(
