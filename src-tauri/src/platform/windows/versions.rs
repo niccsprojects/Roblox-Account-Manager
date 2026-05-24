@@ -298,7 +298,36 @@ fn ensure_dir(dir: &std::path::Path) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("mkdir failed: {}", e))
 }
 
+fn is_valid_channel_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+        && value != "."
+        && value != ".."
+}
+
+fn is_valid_version_hash(value: &str) -> bool {
+    value.len() >= 9
+        && value.len() <= 96
+        && value.starts_with("version-")
+        && value[8..].chars().all(|c| c.is_ascii_hexdigit())
+}
+
 fn install_target_dir(channel: &str, version_hash: &str) -> Result<PathBuf, String> {
+    if !is_valid_channel_name(channel) {
+        return Err(format!(
+            "Invalid channel name: must be alphanumeric, underscore, hyphen, or dot (got {:?})",
+            channel
+        ));
+    }
+    if !is_valid_version_hash(version_hash) {
+        return Err(format!(
+            "Invalid version hash: must look like 'version-<hex>' (got {:?})",
+            version_hash
+        ));
+    }
     let root = versions_root_dir().ok_or_else(|| "Could not resolve LOCALAPPDATA".to_string())?;
     Ok(root.join(channel).join(version_hash))
 }
