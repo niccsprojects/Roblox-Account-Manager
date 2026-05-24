@@ -205,7 +205,7 @@ fn isolation_list_adapters() -> Result<Vec<serde_json::Value>, String> {
 }
 
 #[tauri::command]
-fn isolation_restore_network_identifiers(
+async fn isolation_restore_network_identifiers(
     settings: tauri::State<'_, SettingsStore>,
 ) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -228,10 +228,14 @@ fn isolation_restore_network_identifiers(
             return Err("No backup values stored; nothing to restore".into());
         }
 
-        platform::windows::restore_network_identifiers(
-            guid_opt.as_deref(),
-            adapter_opt.as_deref(),
-        )?;
+        tauri::async_runtime::spawn_blocking(move || {
+            platform::windows::restore_network_identifiers(
+                guid_opt.as_deref(),
+                adapter_opt.as_deref(),
+            )
+        })
+        .await
+        .map_err(|e| format!("Restore task panicked: {}", e))??;
 
         let _ = settings.set("Isolation", "BackupMachineGuid", "");
         let _ = settings.set("Isolation", "BackupNetworkAddress", "");
