@@ -666,22 +666,38 @@ pub fn resolve_roblox_install_path(
     catalog: &crate::data::versions::VersionsCatalogStore,
 ) -> Result<(String, Option<String>), String> {
     if let Some(version_id) = account_version.filter(|v| !v.trim().is_empty()) {
-        if let Some(entry) = catalog.find(version_id) {
-            let path = std::path::Path::new(&entry.install_path);
-            if path.join("RobloxPlayerBeta.exe").exists() {
-                return Ok((entry.install_path.clone(), Some(entry.version_id())));
-            }
+        let entry = catalog.find(version_id).ok_or_else(|| {
+            format!(
+                "Account is set to Roblox version '{}' but it is not in the installed catalog. Reinstall it from Settings > Versions or clear the per-account override.",
+                version_id
+            )
+        })?;
+        let path = std::path::Path::new(&entry.install_path);
+        if !path.join("RobloxPlayerBeta.exe").exists() {
+            return Err(format!(
+                "Account is set to Roblox version '{}' but RobloxPlayerBeta.exe is missing at {}. Reinstall it from Settings > Versions or clear the per-account override.",
+                version_id, entry.install_path
+            ));
         }
+        return Ok((entry.install_path.clone(), Some(entry.version_id())));
     }
 
     let default = settings.get_string("Versions", "DefaultVersion");
     if !default.trim().is_empty() {
-        if let Some(entry) = catalog.find(&default) {
-            let path = std::path::Path::new(&entry.install_path);
-            if path.join("RobloxPlayerBeta.exe").exists() {
-                return Ok((entry.install_path.clone(), Some(entry.version_id())));
-            }
+        let entry = catalog.find(&default).ok_or_else(|| {
+            format!(
+                "Default Roblox version '{}' is not in the installed catalog. Reinstall it from Settings > Versions or change the default.",
+                default
+            )
+        })?;
+        let path = std::path::Path::new(&entry.install_path);
+        if !path.join("RobloxPlayerBeta.exe").exists() {
+            return Err(format!(
+                "Default Roblox version '{}' is missing RobloxPlayerBeta.exe at {}. Reinstall it from Settings > Versions or change the default.",
+                default, entry.install_path
+            ));
         }
+        return Ok((entry.install_path.clone(), Some(entry.version_id())));
     }
 
     get_roblox_path().map(|p| (p, None))
