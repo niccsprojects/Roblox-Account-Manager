@@ -41,7 +41,9 @@ async fn launch_roblox(
         configured_old_join || resolved_version_id.is_some()
     };
 
-    let running_keys = windows::tracker().running_version_keys();
+    let tracker_check = windows::tracker();
+    let _ = tracker_check.cleanup_dead_processes();
+    let running_keys = tracker_check.running_version_keys();
     if running_keys.iter().any(|k| k != &resolved_version_id) {
         return Err(
             "A Roblox client is already running on a different version. Close it before launching this account on a different Roblox version. Concurrent multi-version support is planned for a future update.".into(),
@@ -372,6 +374,7 @@ async fn launch_multiple(
             ));
         }
     }
+    let _ = tracker.cleanup_dead_processes();
 
     let accounts = state.get_all()?;
 
