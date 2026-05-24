@@ -374,7 +374,6 @@ async fn launch_multiple(
             ));
         }
     }
-    let _ = tracker.cleanup_dead_processes();
 
     let accounts = state.get_all()?;
 
@@ -417,6 +416,7 @@ async fn launch_multiple(
             configured_old_join || acct_version_id.is_some()
         };
 
+        let _ = tracker.cleanup_dead_processes();
         let running_keys = tracker.running_version_keys();
         if running_keys.iter().any(|k| k != &acct_version_id) {
             let _ = app.emit(
