@@ -899,7 +899,7 @@ pub fn apply_pre_launch(
         );
         let _ = kill_all_roblox_related();
         std::thread::sleep(std::time::Duration::from_millis(600));
-        let still_running = get_roblox_pids();
+        let still_running = find_roblox_pids_all();
         if !still_running.is_empty() {
             report.skipped_reason = Some(
                 "Another Roblox client is still running. Isolation skipped to avoid corrupting its state.".into(),
