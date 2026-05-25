@@ -28,7 +28,6 @@ import {
   normalizeUpdaterFeatureChannel,
   getUpdaterSkipVersionKey,
 } from "./updaterChannels";
-import { recordRecentGame } from "./components/server-list/types";
 
 interface PresenceEntry {
   userId?: number;
@@ -97,34 +96,6 @@ export interface BottingStartConfig {
   intervalMinutes: number;
   launchDelaySeconds: number;
   playerGraceMinutes: number;
-}
-
-export interface GeneratorStatus {
-  active: boolean;
-  startedAtMs: number | null;
-  provider: string;
-  endpoint: string;
-  accountType: string;
-  extraDelaySeconds: number;
-  targetGroup: string;
-  maxAccounts: number;
-  phase: string;
-  nextAttemptAtMs: number | null;
-  totalGenerated: number;
-  lastUsername: string | null;
-  lastUserId: number | null;
-  lastError: string | null;
-  lastGeneratedAtMs: number | null;
-}
-
-export interface GeneratorStartConfig {
-  provider: string;
-  endpoint: string;
-  apiKey: string;
-  accountType: string;
-  extraDelaySeconds: number;
-  targetGroup: string;
-  maxAccounts: number;
 }
 
 export interface StoreValue {
@@ -200,9 +171,6 @@ export interface StoreValue {
     action: "disconnect" | "close" | "closeDisconnect" | "restartClient" | "restartLoop"
   ) => Promise<void>;
   refreshBottingStatus: () => Promise<void>;
-  startGenerator: (config: GeneratorStartConfig) => Promise<GeneratorStatus>;
-  stopGenerator: () => Promise<void>;
-  refreshGeneratorStatus: () => Promise<void>;
   refreshCookie: (userId: number) => Promise<boolean>;
   moveToGroup: (userIds: number[], group: string) => Promise<void>;
   sortGroupAlphabetically: (groupKey: string) => void;
@@ -254,16 +222,13 @@ export interface StoreValue {
   setAccountFieldsOpen: (open: boolean) => void;
   importDialogOpen: boolean;
   setImportDialogOpen: (open: boolean) => void;
-  importDialogTab: "cookie" | "userpass" | "legacy";
-  setImportDialogTab: (tab: "cookie" | "userpass" | "legacy") => void;
+  importDialogTab: "cookie" | "legacy";
+  setImportDialogTab: (tab: "cookie" | "legacy") => void;
   themeEditorOpen: boolean;
   setThemeEditorOpen: (open: boolean) => void;
   bottingDialogOpen: boolean;
   setBottingDialogOpen: (open: boolean) => void;
   bottingStatus: BottingStatus | null;
-  generatorDialogOpen: boolean;
-  setGeneratorDialogOpen: (open: boolean) => void;
-  generatorStatus: GeneratorStatus | null;
   missingAssets: { userId: number; username: string; assetIds: number[] } | null;
   setMissingAssets: (v: { userId: number; username: string; assetIds: number[] } | null) => void;
 
@@ -361,12 +326,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [accountUtilsOpen, setAccountUtilsOpen] = useState(false);
   const [accountFieldsOpen, setAccountFieldsOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [importDialogTab, setImportDialogTab] = useState<"cookie" | "userpass" | "legacy">("cookie");
+  const [importDialogTab, setImportDialogTab] = useState<"cookie" | "legacy">("cookie");
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
   const [bottingDialogOpen, setBottingDialogOpen] = useState(false);
   const [bottingStatus, setBottingStatus] = useState<BottingStatus | null>(null);
-  const [generatorDialogOpen, setGeneratorDialogOpen] = useState(false);
-  const [generatorStatus, setGeneratorStatus] = useState<GeneratorStatus | null>(null);
   const [missingAssets, setMissingAssets] = useState<{ userId: number; username: string; assetIds: number[] } | null>(null);
   const [nexusOpen, setNexusOpen] = useState(false);
   const [scriptsOpen, setScriptsOpen] = useState(false);
@@ -684,9 +647,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   async function refreshCookie(userId: number): Promise<boolean> {
-    const ok = await invoke<boolean>("refresh_cookie", { userId });
-    await loadAccounts();
-    return ok;
+    return await invoke<boolean>("refresh_cookie", { userId });
   }
 
   async function moveToGroup(userIds: number[], group: string) {
@@ -823,8 +784,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         linkCode,
         shuffleJob: shuffleJobId,
       });
-      await loadAccounts();
-      void recordRecentGame(pid, userId, parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
       addToast(tr("Launching game..."));
     } catch (e) {
       setJoiningAccounts((prev) => {
@@ -879,8 +838,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         jobId,
         launchData,
       });
-      await loadAccounts();
-      void recordRecentGame(pid, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
       addToast(tr("Launching {{count}} accounts...", { count: userIds.length }));
     } catch (e) {
       setJoiningAccounts(new Set());
@@ -1041,46 +998,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         action,
       });
       setBottingStatus(status);
-    } catch (e) {
-      setError(String(e));
-      throw e;
-    }
-  }
-
-  async function refreshGeneratorStatus() {
-    try {
-      const status = await invoke<GeneratorStatus>("get_generator_status");
-      setGeneratorStatus(status);
-    } catch (e) {
-      setError(String(e));
-    }
-  }
-
-  async function startGenerator(config: GeneratorStartConfig) {
-    try {
-      const status = await invoke<GeneratorStatus>("start_generator", {
-        provider: config.provider,
-        endpoint: config.endpoint,
-        apiKey: config.apiKey,
-        accountType: config.accountType,
-        extraDelaySeconds: config.extraDelaySeconds,
-        targetGroup: config.targetGroup,
-        maxAccounts: config.maxAccounts,
-      });
-      setGeneratorStatus(status);
-      addToast(tr("Account generator started"));
-      return status;
-    } catch (e) {
-      setError(String(e));
-      throw e;
-    }
-  }
-
-  async function stopGenerator() {
-    try {
-      await invoke("stop_generator");
-      await refreshGeneratorStatus();
-      addToast(tr("Account generator stopped"));
     } catch (e) {
       setError(String(e));
       throw e;
@@ -1459,26 +1376,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const unlisten = listen<{ stage: string; downloaded: number; total: number }>(
-      "chromium-download-progress",
-      (e) => {
-        const { stage, downloaded, total } = e.payload;
-        if (stage === "downloading") {
-          const pct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
-          setActionStatusMessage(tr("Downloading browser ({{percent}}%)", { percent: pct }), "info", 4000);
-        } else if (stage === "extracting") {
-          setActionStatusMessage(tr("Preparing browser..."), "info", 4000);
-        } else if (stage === "ready") {
-          setActionStatusMessage(tr("Browser ready"), "success", 3000);
-        }
-      }
-    );
-    return () => {
-      unlisten.then((fn) => fn());
-    };
-  }, [setActionStatusMessage]);
-
-  useEffect(() => {
     if (needsPassword || !initialized) return;
 
     const unsubs: Array<() => void> = [];
@@ -1538,20 +1435,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (needsPassword || !initialized) return;
 
     refreshBottingStatus();
-    refreshGeneratorStatus();
     const unsubs: Array<() => void> = [];
     const listeners = [
       listen<BottingStatus>("botting-status", (e) => {
         setBottingStatus(e.payload);
-      }),
-      listen<GeneratorStatus>("generator-status", (e) => {
-        setGeneratorStatus(e.payload);
-      }),
-      listen("generator-account-added", () => {
-        loadAccounts();
-      }),
-      listen("generator-stopped", () => {
-        setGeneratorStatus((prev) => (prev ? { ...prev, active: false } : prev));
       }),
       listen("botting-stopped", () => {
         setBottingStatus((prev) =>
@@ -1732,6 +1619,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const listeners = [
       listen<{ userId: number }>("roblox-process-died", (e) => {
         addToast(tr("Watcher: process closed for {{userId}}", { userId: e.payload.userId }));
+        // Re-focus a surviving instance so it regains keyboard input.
+        // When a Roblox process exits, Windows reclaims the foreground and
+        // the remaining instances stop receiving keyboard events. Explicitly
+        // focusing one of them restores normal input routing.
+        const surviving = [...launchedByProgram].find(id => id !== e.payload.userId);
+        if (surviving !== undefined) {
+          invoke("focus_roblox_window", { userId: surviving }).catch(() => {});
+        }
       }),
       listen<{ userId: number; memoryMb: number }>("roblox-low-memory", (e) => {
         addToast(tr("Watcher: low memory {{memoryMb}}MB ({{userId}})", { memoryMb: e.payload.memoryMb, userId: e.payload.userId }));
@@ -1797,8 +1692,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         currentVersion: string;
         date: string;
         body: string;
-        releaseChannel: UpdaterReleaseChannel;
-        featureChannel: UpdaterFeatureChannel;
       } | null>("check_for_updates_with_channels", {
         releaseChannel,
         featureChannel,
@@ -1809,11 +1702,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const resolvedReleaseChannel = normalizeUpdaterReleaseChannel(update.releaseChannel);
-      const resolvedFeatureChannel = normalizeUpdaterFeatureChannel(update.featureChannel);
-      const skipped = localStorage.getItem(
-        getUpdaterSkipVersionKey(resolvedReleaseChannel, resolvedFeatureChannel)
-      );
+      const skipped = localStorage.getItem(getUpdaterSkipVersionKey(releaseChannel, featureChannel));
       if (!manual && skipped === update.version) return;
 
       setUpdateInfo({
@@ -1821,8 +1710,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         currentVersion: update.currentVersion,
         date: update.date ?? "",
         body: update.body ?? "",
-        releaseChannel: resolvedReleaseChannel,
-        featureChannel: resolvedFeatureChannel,
+        releaseChannel,
+        featureChannel,
       });
       setUpdateDialogOpen(true);
     } catch (e) {
@@ -1934,9 +1823,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setBottingPlayerAccounts,
     bottingAccountAction,
     refreshBottingStatus,
-    startGenerator,
-    stopGenerator,
-    refreshGeneratorStatus,
     refreshCookie,
     moveToGroup,
     sortGroupAlphabetically,
@@ -1989,9 +1875,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     bottingDialogOpen,
     setBottingDialogOpen,
     bottingStatus,
-    generatorDialogOpen,
-    setGeneratorDialogOpen,
-    generatorStatus,
     missingAssets,
     setMissingAssets,
     nexusOpen,
