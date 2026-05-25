@@ -56,7 +56,31 @@ pub fn minimize_window(hwnd: HWND) -> bool {
 pub fn focus_window(hwnd: HWND) -> bool {
     unsafe {
         let _ = ShowWindow(hwnd, SW_RESTORE);
-        SetForegroundWindow(hwnd) != 0
+
+        // Windows blocks SetForegroundWindow from threads that don't own the
+        // foreground lock (e.g. after another instance exits and the OS
+        // reclaims focus). Without AttachThreadInput the call silently fails:
+        // the window appears focused but never receives keyboard input.
+        //
+        // Fix: borrow input-queue ownership from whichever thread currently
+        // holds the foreground, make our call, then immediately detach.
+        let fg_hwnd = GetForegroundWindow();
+        let fg_thread = GetWindowThreadProcessId(fg_hwnd, std::ptr::null_mut());
+        let target_thread = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
+
+        let attached = fg_thread != 0
+            && target_thread != 0
+            && fg_thread != target_thread
+            && AttachThreadInput(fg_thread, target_thread, 1) != 0;
+
+        SetForegroundWindow(hwnd);
+        BringWindowToTop(hwnd);
+
+        if attached {
+            AttachThreadInput(fg_thread, target_thread, 0);
+        }
+
+        GetForegroundWindow() == hwnd
     }
 }
 
