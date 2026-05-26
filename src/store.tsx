@@ -1623,10 +1623,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // When a Roblox process exits, Windows reclaims the foreground and
         // the remaining instances stop receiving keyboard events. Explicitly
         // focusing one of them restores normal input routing.
-        const surviving = [...launchedByProgram].find(id => id !== e.payload.userId);
-        if (surviving !== undefined) {
-          invoke("focus_roblox_window", { userId: surviving }).catch(() => {});
-        }
+        setLaunchedByProgram((current) => {
+          const surviving = [...current].find(id => id !== e.payload.userId);
+          if (surviving !== undefined) {
+            invoke("focus_roblox_window", { userId: surviving }).catch(() => {});
+          }
+          return current;
+        });
       }),
       listen<{ userId: number; memoryMb: number }>("roblox-low-memory", (e) => {
         addToast(tr("Watcher: low memory {{memoryMb}}MB ({{userId}})", { memoryMb: e.payload.memoryMb, userId: e.payload.userId }));
