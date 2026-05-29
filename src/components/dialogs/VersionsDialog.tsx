@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { X, Download, Trash2, FolderOpen, Star, StarOff, Pencil, RefreshCw } from "lucide-react";
@@ -112,23 +112,31 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
     }
   }
 
-  async function refreshRemote() {
+  const autoFetchedRemoteRef = useRef(false);
+
+  async function refreshRemote(isManual = false) {
+    if (isManual) {
+      autoFetchedRemoteRef.current = false;
+    }
     setRemoteLoading(true);
     try {
       const catalog = await invoke<RemoteCatalog>("versions_list_remote");
       setRemote(catalog);
+      autoFetchedRemoteRef.current = true;
     } catch (e) {
       store.addToast(String(e));
+      autoFetchedRemoteRef.current = true;
     } finally {
       setRemoteLoading(false);
     }
   }
 
   useEffect(() => {
-    if (tab === "browse" && !remote && !remoteLoading) {
-      void refreshRemote();
-    }
-  }, [tab, remote, remoteLoading]);
+    if (tab !== "browse") return;
+    if (autoFetchedRemoteRef.current) return;
+    if (remoteLoading) return;
+    void refreshRemote();
+  }, [tab, remoteLoading]);
 
   async function startInstall(channel: string, versionHash: string, label?: string) {
     const trimmedHash = versionHash.trim();
@@ -414,7 +422,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                   {t("Versions exposed by weao.gg/api/versions")}
                 </div>
                 <button
-                  onClick={refreshRemote}
+                  onClick={() => refreshRemote(true)}
                   disabled={remoteLoading}
                   className="flex items-center gap-1.5 text-[11px] text-sky-400 hover:text-sky-300 disabled:opacity-60"
                 >
