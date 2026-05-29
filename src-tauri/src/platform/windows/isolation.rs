@@ -801,13 +801,19 @@ fn build_restore_script(
 }
 
 fn run_elevated_powershell(script: &str) -> Result<(), String> {
-    let temp = temp_dir().ok_or("TEMP directory not found")?;
-    let _ = std::fs::create_dir_all(&temp);
+    let script_dir = ram_isolation_backup_dir()
+        .ok_or("Could not resolve LOCALAPPDATA for isolation scripts")?
+        .join("Scripts");
+    std::fs::create_dir_all(&script_dir)
+        .map_err(|e| format!("Failed to create isolation script dir: {}", e))?;
+    let mut seed = [0u8; 16];
+    fill_secure_random(&mut seed)?;
+    let token: String = seed.iter().map(|b| format!("{:02x}", b)).collect();
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let script_path = temp.join(format!("ram_isolation_{}.ps1", stamp));
+    let script_path = script_dir.join(format!("ram_isolation_{}_{}.ps1", stamp, token));
     std::fs::write(&script_path, script)
         .map_err(|e| format!("Failed to write isolation script: {}", e))?;
 
