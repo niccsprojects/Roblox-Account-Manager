@@ -127,7 +127,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
     if (tab === "browse" && !remote && !remoteLoading) {
       void refreshRemote();
     }
-  }, [tab]);
+  }, [tab, remote, remoteLoading]);
 
   async function startInstall(channel: string, versionHash: string, label?: string) {
     const trimmedHash = versionHash.trim();
