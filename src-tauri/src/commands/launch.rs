@@ -121,7 +121,7 @@ async fn launch_roblox(
         std::time::Duration::from_secs(pid_wait_secs + 30),
     );
 
-    if use_old_join {
+    let spawn_result = if use_old_join {
         windows::launch_old_join_from(
             &resolved_base_path,
             &ticket,
@@ -133,7 +133,7 @@ async fn launch_roblox(
             &private_join.access_code,
             &private_join.link_code,
             is_teleport,
-        )?;
+        )
     } else {
         let url = windows::build_launch_url(
             &ticket,
@@ -147,7 +147,11 @@ async fn launch_roblox(
             &private_join.link_code,
             is_teleport,
         );
-        windows::launch_url(&url)?;
+        windows::launch_url(&url)
+    };
+    if let Err(err) = spawn_result {
+        tracker.clear_pending_launch(pending_id);
+        return Err(err);
     }
 
     if let Some(pid) =
