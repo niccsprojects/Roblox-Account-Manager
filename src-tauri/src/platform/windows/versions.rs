@@ -419,14 +419,23 @@ fn extract_package_into(
 }
 
 struct StagingGuard {
-    path: PathBuf,
+    staging: PathBuf,
+    promoted_target: Option<PathBuf>,
     committed: bool,
 }
 
 impl Drop for StagingGuard {
     fn drop(&mut self) {
-        if !self.committed && self.path.exists() {
-            let _ = std::fs::remove_dir_all(&self.path);
+        if self.committed {
+            return;
+        }
+        if self.staging.exists() {
+            let _ = std::fs::remove_dir_all(&self.staging);
+        }
+        if let Some(target) = &self.promoted_target {
+            if target.exists() {
+                let _ = std::fs::remove_dir_all(target);
+            }
         }
     }
 }
@@ -462,7 +471,8 @@ pub async fn install_version(
     }
     ensure_dir(&staging)?;
     let mut guard = StagingGuard {
-        path: staging.clone(),
+        staging: staging.clone(),
+        promoted_target: None,
         committed: false,
     };
 
@@ -639,7 +649,7 @@ pub async fn install_version(
     }
     std::fs::rename(&staging, &target)
         .map_err(|e| format!("Could not move staged install into place: {}", e))?;
-    guard.committed = true;
+    guard.promoted_target = Some(target.clone());
 
     let install_size = folder_size(&target);
 
@@ -657,6 +667,7 @@ pub async fn install_version(
 
     let store = app.state::<crate::data::versions::VersionsCatalogStore>();
     store.upsert(entry.clone())?;
+    guard.committed = true;
 
     emit_progress(
         &app,
