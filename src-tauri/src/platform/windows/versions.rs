@@ -420,7 +420,6 @@ fn extract_package_into(
 
 struct StagingGuard {
     staging: PathBuf,
-    promoted_target: Option<PathBuf>,
     committed: bool,
 }
 
@@ -431,11 +430,6 @@ impl Drop for StagingGuard {
         }
         if self.staging.exists() {
             let _ = std::fs::remove_dir_all(&self.staging);
-        }
-        if let Some(target) = &self.promoted_target {
-            if target.exists() {
-                let _ = std::fs::remove_dir_all(target);
-            }
         }
     }
 }
@@ -472,7 +466,6 @@ pub async fn install_version(
     ensure_dir(&staging)?;
     let mut guard = StagingGuard {
         staging: staging.clone(),
-        promoted_target: None,
         committed: false,
     };
 
@@ -518,120 +511,75 @@ pub async fn install_version(
         .unwrap_or(4)
         .clamp(1, 8) as usize;
 
-    let mut downloaded: u64 = 0;
-    let mut futures: FuturesUnordered<
-        BoxFuture<'static, (PkgManifestEntry, Result<Vec<u8>, String>)>,
-    > = FuturesUnordered::new();
+    let mut completed: u64 = 0;
+    let mut pipeline: FuturesUnordered<BoxFuture<'static, Result<String, String>>> =
+        FuturesUnordered::new();
     let mut iter = packages.iter().cloned();
-    let spawn_one =
-        |entry: PkgManifestEntry, client: reqwest::Client, base: String, version_hash: String| {
-            async move {
-                let url = format!("{}{}-{}", base, version_hash, entry.filename);
-                let bytes = fetch_bytes(&client, &url).await;
-                (entry, bytes)
+    let spawn_one = |entry: PkgManifestEntry,
+                     client: reqwest::Client,
+                     base: String,
+                     version_hash: String,
+                     staging: PathBuf| {
+        async move {
+            let url = format!("{}{}-{}", base, version_hash, entry.filename);
+            let bytes = fetch_bytes(&client, &url).await?;
+            if let Some(expected) = entry.hash.as_deref() {
+                if !verify_hash(&bytes, expected) {
+                    return Err(format!(
+                        "Package {} failed integrity check (expected hash {})",
+                        entry.filename, expected
+                    ));
+                }
             }
-            .boxed()
-        };
+            let filename = entry.filename.clone();
+            tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+                let subdir = extract_root_for(&filename).unwrap_or("");
+                extract_package_into(&bytes, &staging, subdir)?;
+                Ok(filename)
+            })
+            .await
+            .map_err(|e| format!("Extraction task panicked: {}", e))?
+        }
+        .boxed()
+    };
 
     for _ in 0..max_parallel.min(packages.len()) {
         if let Some(entry) = iter.next() {
-            futures.push(spawn_one(
+            pipeline.push(spawn_one(
                 entry,
                 client.clone(),
                 base.clone(),
                 version_hash.clone(),
+                staging.clone(),
             ));
         }
     }
 
-    let mut package_bytes: Vec<(String, Vec<u8>)> = Vec::with_capacity(packages.len());
-
-    while let Some((entry, bytes_result)) = futures.next().await {
-        let bytes = bytes_result?;
-        if let Some(expected) = entry.hash.as_deref() {
-            if !verify_hash(&bytes, expected) {
-                return Err(format!(
-                    "Package {} failed integrity check (expected hash {})",
-                    entry.filename, expected
-                ));
-            }
-        }
-        downloaded += 1;
+    while let Some(result) = pipeline.next().await {
+        let pkg = result?;
+        completed += 1;
         emit_progress(
             &app,
             &VersionInstallProgress {
                 install_id: install_id.clone(),
                 channel: channel.clone(),
                 version_hash: version_hash.clone(),
-                stage: "downloading".into(),
-                package: Some(entry.filename.clone()),
-                current: downloaded,
+                stage: "installing".into(),
+                package: Some(pkg),
+                current: completed,
                 total,
                 message: None,
             },
         );
-        package_bytes.push((entry.filename, bytes));
         if let Some(next_entry) = iter.next() {
-            futures.push(spawn_one(
+            pipeline.push(spawn_one(
                 next_entry,
                 client.clone(),
                 base.clone(),
                 version_hash.clone(),
+                staging.clone(),
             ));
         }
-    }
-
-    emit_progress(
-        &app,
-        &VersionInstallProgress {
-            install_id: install_id.clone(),
-            channel: channel.clone(),
-            version_hash: version_hash.clone(),
-            stage: "extracting".into(),
-            package: None,
-            current: 0,
-            total,
-            message: None,
-        },
-    );
-
-    let extraction_total = package_bytes.len() as u64;
-    let mut extract_futures: FuturesUnordered<
-        BoxFuture<'static, Result<String, String>>,
-    > = FuturesUnordered::new();
-    for (pkg, bytes) in package_bytes {
-        let staging_cloned = staging.clone();
-        extract_futures.push(
-            async move {
-                tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
-                    let subdir = extract_root_for(&pkg).unwrap_or("");
-                    extract_package_into(&bytes, &staging_cloned, subdir)?;
-                    Ok(pkg)
-                })
-                .await
-                .map_err(|e| format!("Extraction task panicked: {}", e))?
-            }
-            .boxed(),
-        );
-    }
-
-    let mut extracted_count = 0u64;
-    while let Some(result) = extract_futures.next().await {
-        let pkg = result?;
-        extracted_count += 1;
-        let _ = app.emit(
-            "version-install-progress",
-            VersionInstallProgress {
-                install_id: install_id.clone(),
-                channel: channel.clone(),
-                version_hash: version_hash.clone(),
-                stage: "extracting".into(),
-                package: Some(pkg),
-                current: extracted_count,
-                total: extraction_total,
-                message: None,
-            },
-        );
     }
 
     let app_settings_path = staging.join("AppSettings.xml");
@@ -649,7 +597,7 @@ pub async fn install_version(
     }
     std::fs::rename(&staging, &target)
         .map_err(|e| format!("Could not move staged install into place: {}", e))?;
-    guard.promoted_target = Some(target.clone());
+    guard.committed = true;
 
     let install_size = folder_size(&target);
 
@@ -666,8 +614,13 @@ pub async fn install_version(
     };
 
     let store = app.state::<crate::data::versions::VersionsCatalogStore>();
-    store.upsert(entry.clone())?;
-    guard.committed = true;
+    store.upsert(entry.clone()).map_err(|e| {
+        format!(
+            "Files installed at {} but catalog write failed: {}. Re-run install to register.",
+            target.display(),
+            e
+        )
+    })?;
 
     emit_progress(
         &app,
