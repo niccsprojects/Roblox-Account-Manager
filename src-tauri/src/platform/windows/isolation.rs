@@ -1072,6 +1072,25 @@ pub fn apply_pre_launch(
             None
         };
 
+        let will_rotate_guid = opts.spoof_machine_guid && new_guid.is_some();
+        let will_rotate_mac =
+            opts.spoof_mac && adapter_subkey.is_some() && new_mac.is_some();
+
+        if !will_rotate_guid && !will_rotate_mac {
+            if opts.spoof_mac && adapter_subkey.is_none() {
+                emit_isolation_progress(
+                    app,
+                    "spoof-skipped",
+                    "MAC rotation skipped: no eligible network adapter found",
+                    &report,
+                    true,
+                );
+            } else {
+                emit_isolation_progress(app, "finished", "Done (no spoof performed)", &report, true);
+            }
+            return Ok(report);
+        }
+
         let script = build_spoof_script(
             opts,
             new_guid.as_deref(),
@@ -1083,12 +1102,7 @@ pub fn apply_pre_launch(
             partial: report.clone(),
         })?;
 
-        if script.trim().is_empty() {
-            emit_isolation_progress(app, "finished", "Done", &report, true);
-            return Ok(report);
-        }
-
-        let elevation_msg = match (opts.spoof_machine_guid, opts.spoof_mac) {
+        let elevation_msg = match (will_rotate_guid, will_rotate_mac) {
             (true, true) => "Waiting for UAC consent (MachineGuid + MAC rotation)",
             (true, false) => "Waiting for UAC consent (MachineGuid rotation)",
             (false, true) => "Waiting for UAC consent (MAC rotation)",
@@ -1111,10 +1125,10 @@ pub fn apply_pre_launch(
             });
         }
 
-        if new_guid.is_some() {
+        if will_rotate_guid {
             report.machine_guid_rotated = true;
         }
-        if new_mac.is_some() {
+        if will_rotate_mac {
             report.mac_rotated = true;
         }
         emit_isolation_progress(
