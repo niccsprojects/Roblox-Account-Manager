@@ -70,13 +70,22 @@ fn versions_uninstall(
     channel: String,
     version_hash: String,
 ) -> Result<(), String> {
+    let version_id = format!("{}:{}", channel, version_hash);
     #[cfg(target_os = "windows")]
     {
+        let tracker = platform::windows::tracker();
+        let _ = tracker.cleanup_dead_processes();
+        if tracker
+            .running_version_keys()
+            .contains(&Some(version_id.clone()))
+        {
+            return Err(
+                "Cannot uninstall: this Roblox version is currently running. Close all accounts using it first.".into(),
+            );
+        }
         platform::windows::uninstall_version(&channel, &version_hash)?;
     }
     catalog.remove(&channel, &version_hash)?;
-
-    let version_id = format!("{}:{}", channel, version_hash);
     let default = settings.get_string("Versions", "DefaultVersion");
     if default == version_id {
         let _ = settings.set("Versions", "DefaultVersion", "");
