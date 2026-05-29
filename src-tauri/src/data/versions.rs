@@ -61,7 +61,12 @@ impl VersionsCatalogStore {
         if let Some(parent) = self.file_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        std::fs::write(&self.file_path, json).map_err(|e| e.to_string())
+        let tmp_path = self.file_path.with_extension("json.tmp");
+        std::fs::write(&tmp_path, json).map_err(|e| e.to_string())?;
+        if self.file_path.exists() {
+            std::fs::remove_file(&self.file_path).map_err(|e| e.to_string())?;
+        }
+        std::fs::rename(&tmp_path, &self.file_path).map_err(|e| e.to_string())
     }
 
     pub fn list(&self) -> Vec<VersionEntry> {
