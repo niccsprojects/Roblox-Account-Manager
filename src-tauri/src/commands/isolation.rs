@@ -85,6 +85,7 @@ pub(crate) async fn apply_pending_fast_flags_when_ready(timeout: std::time::Dura
         if !platform::windows::has_pending_fast_flags() {
             return;
         }
+        let mut best: Option<(std::path::PathBuf, std::time::SystemTime)> = None;
         if let Ok(entries) = std::fs::read_dir(&versions_root) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -94,9 +95,17 @@ pub(crate) async fn apply_pending_fast_flags_when_ready(timeout: std::time::Dura
                 if !path.join("RobloxPlayerBeta.exe").exists() {
                     continue;
                 }
-                if platform::windows::apply_pending_fast_flags_to(&path) {
-                    return;
+                let mtime = std::fs::metadata(&path)
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::UNIX_EPOCH);
+                if best.as_ref().map(|(_, t)| mtime > *t).unwrap_or(true) {
+                    best = Some((path, mtime));
                 }
+            }
+        }
+        if let Some((path, _)) = best {
+            if platform::windows::apply_pending_fast_flags_to(&path) {
+                return;
             }
         }
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
