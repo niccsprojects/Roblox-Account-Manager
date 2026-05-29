@@ -80,6 +80,8 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
   useEffect(() => {
     if (!open) return;
     autoFetchedRemoteRef.current = false;
+    setActiveInstalls(new Set());
+    setProgressById({});
     void refreshInstalled();
     void invoke<Record<string, Record<string, string>>>("get_all_settings").then((s) => {
       setDefaultVersion(s?.Versions?.DefaultVersion ?? "");
