@@ -302,6 +302,10 @@ impl ProcessTracker {
             self.clear_job_handle_for_pid(pid);
         }
 
+        if let Ok(mut pending) = self.pending_launches.lock() {
+            Self::prune_pending_locked(&mut pending);
+        }
+
         dead_user_ids
     }
 }

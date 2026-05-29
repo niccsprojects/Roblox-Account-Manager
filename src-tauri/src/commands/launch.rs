@@ -154,9 +154,12 @@ async fn launch_roblox(
         return Err(err);
     }
 
-    if let Some(pid) =
-        wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(pid_wait_secs)).await
-    {
+    let detected_pid =
+        wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(pid_wait_secs)).await;
+    if detected_pid.is_none() && !isolation_will_wipe_install {
+        tracker.clear_pending_launch(pending_id);
+    }
+    if let Some(pid) = detected_pid {
         tracker.clear_pending_launch(pending_id);
         tracker.track_with_version(
             user_id,
@@ -551,12 +554,15 @@ async fn launch_multiple(
             continue;
         }
 
-        if let Some(pid) = wait_for_new_roblox_pid(
+        let acct_detected_pid = wait_for_new_roblox_pid(
             &pids_before,
             std::time::Duration::from_secs(acct_pid_wait_secs),
         )
-        .await
-        {
+        .await;
+        if acct_detected_pid.is_none() && !acct_isolation_wipes_install {
+            tracker.clear_pending_launch(acct_pending_id);
+        }
+        if let Some(pid) = acct_detected_pid {
             tracker.clear_pending_launch(acct_pending_id);
             tracker.track_with_version(uid, pid, browser_tracker_id, acct_version_id.clone());
             if let Some(version_id) = acct_version_id.as_deref() {
