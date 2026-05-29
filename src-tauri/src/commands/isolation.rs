@@ -29,22 +29,18 @@ fn persist_isolation_backups(
     settings: &SettingsStore,
     report: &platform::windows::IsolationReport,
 ) {
-    if report.machine_guid_rotated {
-        if let Some(guid) = report.captured_machine_guid.as_deref() {
-            let existing = settings.get_string("Isolation", "BackupMachineGuid");
-            if existing.trim().is_empty() {
-                let _ = settings.set("Isolation", "BackupMachineGuid", guid);
-            }
+    if let Some(guid) = report.captured_machine_guid.as_deref() {
+        let existing = settings.get_string("Isolation", "BackupMachineGuid");
+        if existing.trim().is_empty() {
+            let _ = settings.set("Isolation", "BackupMachineGuid", guid);
         }
     }
-    if report.mac_rotated {
-        if let Some(subkey) = report.captured_adapter_subkey.as_deref() {
-            let existing_subkey = settings.get_string("Isolation", "BackupAdapterId");
-            if existing_subkey.trim().is_empty() {
-                let _ = settings.set("Isolation", "BackupAdapterId", subkey);
-                let value = report.captured_network_address.clone().unwrap_or_default();
-                let _ = settings.set("Isolation", "BackupNetworkAddress", &value);
-            }
+    if let Some(subkey) = report.captured_adapter_subkey.as_deref() {
+        let existing_subkey = settings.get_string("Isolation", "BackupAdapterId");
+        if existing_subkey.trim().is_empty() {
+            let _ = settings.set("Isolation", "BackupAdapterId", subkey);
+            let value = report.captured_network_address.clone().unwrap_or_default();
+            let _ = settings.set("Isolation", "BackupNetworkAddress", &value);
         }
     }
 }
@@ -60,13 +56,22 @@ pub(crate) async fn run_pre_launch_isolation(
     }
     let app_owned = app.clone();
     let opts_owned = opts;
-    let report = tauri::async_runtime::spawn_blocking(move || {
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
         platform::windows::apply_pre_launch(&app_owned, &opts_owned)
     })
     .await
-    .map_err(|e| format!("Isolation task panicked: {}", e))??;
-    persist_isolation_backups(settings, &report);
-    Ok(Some(report))
+    .map_err(|e| format!("Isolation task panicked: {}", e))?;
+
+    match outcome {
+        Ok(report) => {
+            persist_isolation_backups(settings, &report);
+            Ok(Some(report))
+        }
+        Err(failure) => {
+            persist_isolation_backups(settings, &failure.partial);
+            Err(failure.message)
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]

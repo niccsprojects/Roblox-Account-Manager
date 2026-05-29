@@ -90,6 +90,30 @@ pub struct IsolationDryRunReport {
     pub registry_keys: Vec<String>,
 }
 
+#[derive(Debug)]
+pub struct IsolationFailure {
+    pub message: String,
+    pub partial: IsolationReport,
+}
+
+impl From<&str> for IsolationFailure {
+    fn from(message: &str) -> Self {
+        Self {
+            message: message.to_string(),
+            partial: IsolationReport::default(),
+        }
+    }
+}
+
+impl From<String> for IsolationFailure {
+    fn from(message: String) -> Self {
+        Self {
+            message,
+            partial: IsolationReport::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct IsolationProgress {
@@ -889,7 +913,7 @@ pub fn dry_run(opts: &IsolationOptions) -> Result<IsolationDryRunReport, String>
 pub fn apply_pre_launch(
     app: &tauri::AppHandle,
     opts: &IsolationOptions,
-) -> Result<IsolationReport, String> {
+) -> Result<IsolationReport, IsolationFailure> {
     let mut report = IsolationReport::default();
 
     if !opts.does_anything() {
@@ -1024,12 +1048,18 @@ pub fn apply_pre_launch(
 
     if opts.spoof_machine_guid || opts.spoof_mac {
         let new_mac = if opts.spoof_mac {
-            Some(new_random_mac()?)
+            Some(new_random_mac().map_err(|e| IsolationFailure {
+                message: e,
+                partial: report.clone(),
+            })?)
         } else {
             None
         };
         let new_guid = if opts.spoof_machine_guid {
-            Some(new_random_machine_guid()?)
+            Some(new_random_machine_guid().map_err(|e| IsolationFailure {
+                message: e,
+                partial: report.clone(),
+            })?)
         } else {
             None
         };
@@ -1039,7 +1069,11 @@ pub fn apply_pre_launch(
             new_guid.as_deref(),
             adapter_subkey.as_deref(),
             new_mac.as_deref(),
-        )?;
+        )
+        .map_err(|e| IsolationFailure {
+            message: e,
+            partial: report.clone(),
+        })?;
 
         if script.trim().is_empty() {
             emit_isolation_progress(app, "finished", "Done", &report, true);
@@ -1063,7 +1097,10 @@ pub fn apply_pre_launch(
                 &report,
                 true,
             );
-            return Err(err);
+            return Err(IsolationFailure {
+                message: err,
+                partial: report,
+            });
         }
 
         if new_guid.is_some() {
