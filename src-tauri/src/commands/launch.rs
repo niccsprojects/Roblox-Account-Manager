@@ -401,7 +401,17 @@ async fn launch_multiple(
             &versions,
         ) {
             Ok(value) => value,
-            Err(_) => {
+            Err(err) => {
+                let _ = app.emit(
+                    "launch-progress",
+                    serde_json::json!({
+                        "userId": uid,
+                        "index": i,
+                        "total": user_ids.len(),
+                        "error": "version-resolve-failed",
+                        "message": err,
+                    }),
+                );
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 continue;
             }
