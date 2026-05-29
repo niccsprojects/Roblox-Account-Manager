@@ -146,12 +146,35 @@ impl VersionsCatalogStore {
     }
 }
 
-pub fn get_versions_catalog_path() -> PathBuf {
+fn legacy_versions_catalog_path() -> PathBuf {
     std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
         .join("RAMVersions.json")
+}
+
+pub fn get_versions_catalog_path() -> PathBuf {
+    let modern = std::env::var_os("LOCALAPPDATA").map(|local| {
+        PathBuf::from(local)
+            .join("Roblox Account Manager")
+            .join("RAMVersions.json")
+    });
+    let Some(modern) = modern else {
+        return legacy_versions_catalog_path();
+    };
+
+    if !modern.exists() {
+        let legacy = legacy_versions_catalog_path();
+        if legacy.exists() {
+            if let Some(parent) = modern.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::copy(&legacy, &modern);
+        }
+    }
+
+    modern
 }
 
 pub fn ram_managed_versions_root() -> Option<PathBuf> {
