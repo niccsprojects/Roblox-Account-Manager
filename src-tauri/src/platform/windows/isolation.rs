@@ -488,7 +488,13 @@ fn restore_fast_flags(backups: &[(String, Vec<u8>)]) {
         let _ = std::fs::write(&path, content);
     }
     if let Some(pending) = pending_fast_flags_path() {
-        if let Some((_, content)) = backups.last() {
+        let latest = backups.iter().max_by_key(|(name, _)| {
+            localappdata_roblox()
+                .map(|root| root.join("Versions").join(name))
+                .and_then(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok())
+                .unwrap_or(UNIX_EPOCH)
+        });
+        if let Some((_, content)) = latest {
             let _ = std::fs::write(&pending, content);
         }
     }
@@ -786,7 +792,14 @@ fn run_elevated_powershell(script: &str) -> Result<(), String> {
     let mut exit_status: Result<(), String> = Ok(());
     if !sei.hProcess.is_null() {
         unsafe {
-            let _ = WaitForSingleObject(sei.hProcess, 60_000);
+            let wait_rc = WaitForSingleObject(sei.hProcess, 60_000);
+            if wait_rc != WAIT_OBJECT_0 && wait_rc != WAIT_ABANDONED_0 {
+                CloseHandle(sei.hProcess);
+                let _ = std::fs::remove_file(&script_path);
+                return Err(
+                    "Elevated PowerShell did not finish within 60s. Accept the UAC prompt sooner or close the running script.".into(),
+                );
+            }
             let mut exit_code: u32 = 0;
             let got = windows_sys::Win32::System::Threading::GetExitCodeProcess(
                 sei.hProcess,
