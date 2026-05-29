@@ -217,6 +217,7 @@ async fn isolation_restore_network_identifiers(
     {
         let backup_guid = settings.get_string("Isolation", "BackupMachineGuid");
         let backup_adapter = settings.get_string("Isolation", "BackupAdapterId");
+        let backup_mac = settings.get_string("Isolation", "BackupNetworkAddress");
 
         let guid_opt = if backup_guid.trim().is_empty() {
             None
@@ -228,6 +229,11 @@ async fn isolation_restore_network_identifiers(
         } else {
             Some(backup_adapter.clone())
         };
+        let mac_opt = if backup_mac.trim().is_empty() {
+            None
+        } else {
+            Some(backup_mac.clone())
+        };
 
         if guid_opt.is_none() && adapter_opt.is_none() {
             return Err("No backup values stored; nothing to restore".into());
@@ -237,6 +243,7 @@ async fn isolation_restore_network_identifiers(
             platform::windows::restore_network_identifiers(
                 guid_opt.as_deref(),
                 adapter_opt.as_deref(),
+                mac_opt.as_deref(),
             )
         })
         .await

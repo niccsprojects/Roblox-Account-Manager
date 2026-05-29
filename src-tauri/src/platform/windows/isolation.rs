@@ -741,6 +741,7 @@ fn build_spoof_script(
 fn build_restore_script(
     machine_guid: Option<&str>,
     adapter_subkey: Option<&str>,
+    network_address: Option<&str>,
 ) -> Result<String, String> {
     let mut script = String::new();
     script.push_str("$ErrorActionPreference = 'Stop'\n");
@@ -767,10 +768,21 @@ fn build_restore_script(
             "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{}\\{}",
             NETWORK_ADAPTER_CLASS_GUID, subkey
         );
-        script.push_str(&format!(
-            "try {{ Remove-ItemProperty -Path '{}' -Name 'NetworkAddress' -ErrorAction Stop }} catch {{}}\n",
-            class_path
-        ));
+        let prior_mac = network_address
+            .map(|m| m.trim())
+            .filter(|m| !m.is_empty())
+            .filter(|m| is_valid_mac_hex(m));
+        if let Some(mac) = prior_mac {
+            script.push_str(&format!(
+                "Set-ItemProperty -Path '{}' -Name 'NetworkAddress' -Value '{}'\n",
+                class_path, mac
+            ));
+        } else {
+            script.push_str(&format!(
+                "try {{ Remove-ItemProperty -Path '{}' -Name 'NetworkAddress' -ErrorAction Stop }} catch {{}}\n",
+                class_path
+            ));
+        }
         script.push_str(&format!(
             "$desc = (Get-ItemProperty -Path '{}').DriverDesc\n",
             class_path
@@ -906,10 +918,20 @@ pub fn dry_run(opts: &IsolationOptions) -> Result<IsolationDryRunReport, String>
         registry_keys.push(format!("HKLM\\{}\\{}", MACHINE_GUID_KEY, MACHINE_GUID_VALUE));
     }
     if opts.spoof_mac {
-        registry_keys.push(format!(
-            "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{}\\<adapter>\\NetworkAddress",
-            NETWORK_ADAPTER_CLASS_GUID
-        ));
+        let adapters = list_network_adapters().unwrap_or_default();
+        match select_adapter(&adapters, &opts.target_adapter) {
+            Some(adapter) => {
+                registry_keys.push(format!(
+                    "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Class\\{}\\{}\\NetworkAddress ({})",
+                    NETWORK_ADAPTER_CLASS_GUID, adapter.subkey, adapter.description
+                ));
+            }
+            None => {
+                registry_keys.push(
+                    "MAC rotation requested but no eligible network adapter found (skipped)".into(),
+                );
+            }
+        }
     }
 
     Ok(IsolationDryRunReport {
@@ -1153,11 +1175,12 @@ pub fn apply_pre_launch(
 pub fn restore_network_identifiers(
     machine_guid: Option<&str>,
     adapter_subkey: Option<&str>,
+    network_address: Option<&str>,
 ) -> Result<(), String> {
     if machine_guid.is_none() && adapter_subkey.is_none() {
         return Err("No backup values to restore".into());
     }
-    let script = build_restore_script(machine_guid, adapter_subkey)?;
+    let script = build_restore_script(machine_guid, adapter_subkey, network_address)?;
     if script.trim().is_empty() {
         return Err("No backup values to restore".into());
     }
