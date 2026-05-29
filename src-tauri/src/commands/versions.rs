@@ -13,6 +13,7 @@ async fn versions_list_remote() -> Result<serde_json::Value, String> {
         Ok(serde_json::json!({
             "current": catalog.current,
             "past": catalog.past,
+            "pastError": catalog.past_error,
         }))
     }
     #[cfg(not(target_os = "windows"))]

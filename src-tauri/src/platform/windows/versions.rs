@@ -87,6 +87,8 @@ pub struct RemoteVersionEntry {
 pub struct RemoteCatalog {
     pub current: Vec<RemoteVersionEntry>,
     pub past: Vec<RemoteVersionEntry>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub past_error: Option<String>,
 }
 
 fn channel_base_url(channel: &str) -> String {
@@ -152,11 +154,25 @@ async fn fetch_bytes(client: &reqwest::Client, url: &str) -> Result<Vec<u8>, Str
 pub async fn fetch_remote_catalog() -> Result<RemoteCatalog, String> {
     let client = http_client_versioned().await;
     let current_raw = fetch_text(&client, WEAO_CURRENT_URL).await?;
-    let past_raw = fetch_text(&client, WEAO_PAST_URL).await.unwrap_or_default();
+    let (past_raw, mut past_error): (String, Option<String>) =
+        match fetch_text(&client, WEAO_PAST_URL).await {
+            Ok(text) => (text, None),
+            Err(err) => (String::new(), Some(err)),
+        };
 
     let current: serde_json::Value =
         serde_json::from_str(&current_raw).map_err(|e| format!("Parse error: {}", e))?;
-    let past: serde_json::Value = serde_json::from_str(&past_raw).unwrap_or(serde_json::json!({}));
+    let past: serde_json::Value = if past_raw.is_empty() {
+        serde_json::json!({})
+    } else {
+        match serde_json::from_str(&past_raw) {
+            Ok(value) => value,
+            Err(err) => {
+                past_error = Some(format!("Parse error: {}", err));
+                serde_json::json!({})
+            }
+        }
+    };
 
     let mut current_out = Vec::new();
     if let Some(v) = current.get("Windows").and_then(|v| v.as_str()) {
@@ -229,6 +245,7 @@ pub async fn fetch_remote_catalog() -> Result<RemoteCatalog, String> {
     Ok(RemoteCatalog {
         current: current_out,
         past: past_out,
+        past_error,
     })
 }
 

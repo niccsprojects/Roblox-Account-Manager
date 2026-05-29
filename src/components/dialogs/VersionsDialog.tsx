@@ -29,6 +29,7 @@ interface RemoteVersionEntry {
 interface RemoteCatalog {
   current: RemoteVersionEntry[];
   past: RemoteVersionEntry[];
+  pastError?: string | null;
 }
 
 interface InstallProgress {
@@ -446,6 +447,11 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                   <div className="text-[10px] uppercase tracking-widest text-zinc-600 font-medium pt-2">
                     {t("Previous")}
                   </div>
+                  {remote.pastError && (
+                    <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-300">
+                      {t("Could not load previous versions: {{error}}", { error: remote.pastError })}
+                    </div>
+                  )}
                   {remote.past
                     .filter((v) => v.binaryType.startsWith("Windows"))
                     .map((entry) => (
