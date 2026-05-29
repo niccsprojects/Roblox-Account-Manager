@@ -591,13 +591,37 @@ pub async fn install_version(
         return Err("Install completed but RobloxPlayerBeta.exe is missing".into());
     }
 
-    if target.exists() {
-        std::fs::remove_dir_all(&target)
-            .map_err(|e| format!("Could not remove existing version directory: {}", e))?;
+    let backup_target = if target.exists() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let candidate = target.with_file_name(format!(
+            "{}.old-{}",
+            target.file_name().and_then(|n| n.to_str()).unwrap_or("version"),
+            stamp
+        ));
+        std::fs::rename(&target, &candidate).map_err(|e| {
+            format!(
+                "Could not set aside existing version directory: {}",
+                e
+            )
+        })?;
+        Some(candidate)
+    } else {
+        None
+    };
+
+    if let Err(e) = std::fs::rename(&staging, &target) {
+        if let Some(backup) = &backup_target {
+            let _ = std::fs::rename(backup, &target);
+        }
+        return Err(format!("Could not move staged install into place: {}", e));
     }
-    std::fs::rename(&staging, &target)
-        .map_err(|e| format!("Could not move staged install into place: {}", e))?;
     guard.committed = true;
+    if let Some(backup) = backup_target {
+        let _ = std::fs::remove_dir_all(&backup);
+    }
 
     let install_size = folder_size(&target);
 
