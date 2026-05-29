@@ -79,6 +79,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
 
   useEffect(() => {
     if (!open) return;
+    autoFetchedRemoteRef.current = false;
     void refreshInstalled();
     void invoke<Record<string, Record<string, string>>>("get_all_settings").then((s) => {
       setDefaultVersion(s?.Versions?.DefaultVersion ?? "");
@@ -234,7 +235,10 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
     const p = progressById[installId];
     if (!p) return null;
     const pct =
-      p.total > 0 && (p.stage === "downloading" || p.stage === "extracting")
+      p.total > 0 &&
+      (p.stage === "downloading" ||
+        p.stage === "extracting" ||
+        p.stage === "installing")
         ? Math.round((p.current / p.total) * 100)
         : 0;
     return (
