@@ -475,7 +475,13 @@ fn wipe_full_versions(
     }
 }
 
-fn backup_fast_flags() -> Vec<(String, Vec<u8>)> {
+pub struct FastFlagBackup {
+    pub name: String,
+    pub content: Vec<u8>,
+    pub modified: std::time::SystemTime,
+}
+
+fn backup_fast_flags() -> Vec<FastFlagBackup> {
     let mut backups = Vec::new();
     let Some(local) = localappdata_roblox() else {
         return backups;
@@ -491,8 +497,15 @@ fn backup_fast_flags() -> Vec<(String, Vec<u8>)> {
         }
         let settings_path = path.join("ClientSettings").join("ClientAppSettings.json");
         if let Ok(data) = std::fs::read(&settings_path) {
-            let key = entry.file_name().to_string_lossy().into_owned();
-            backups.push((key, data));
+            let modified = std::fs::metadata(&settings_path)
+                .and_then(|m| m.modified())
+                .unwrap_or(UNIX_EPOCH);
+            let name = entry.file_name().to_string_lossy().into_owned();
+            backups.push(FastFlagBackup {
+                name,
+                content: data,
+                modified,
+            });
         }
     }
     backups
@@ -502,24 +515,19 @@ fn pending_fast_flags_path() -> Option<PathBuf> {
     Some(ram_isolation_backup_dir()?.join("PendingFastFlags.json"))
 }
 
-fn restore_fast_flags(backups: &[(String, Vec<u8>)]) {
+fn restore_fast_flags(backups: &[FastFlagBackup]) {
     let Some(backup_dir) = ram_isolation_backup_dir() else {
         return;
     };
     let _ = std::fs::create_dir_all(&backup_dir);
-    for (name, content) in backups {
-        let path = backup_dir.join(format!("{}-ClientAppSettings.json", name));
-        let _ = std::fs::write(&path, content);
+    for backup in backups {
+        let path = backup_dir.join(format!("{}-ClientAppSettings.json", backup.name));
+        let _ = std::fs::write(&path, &backup.content);
     }
     if let Some(pending) = pending_fast_flags_path() {
-        let latest = backups.iter().max_by_key(|(name, _)| {
-            localappdata_roblox()
-                .map(|root| root.join("Versions").join(name))
-                .and_then(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok())
-                .unwrap_or(UNIX_EPOCH)
-        });
-        if let Some((_, content)) = latest {
-            let _ = std::fs::write(&pending, content);
+        let latest = backups.iter().max_by_key(|b| b.modified);
+        if let Some(b) = latest {
+            let _ = std::fs::write(&pending, &b.content);
         }
     }
 }
