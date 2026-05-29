@@ -1,7 +1,33 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+#[cfg(target_os = "windows")]
+fn atomic_replace(src: &Path, dst: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH};
+
+    let src_wide: Vec<u16> = src.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let dst_wide: Vec<u16> = dst.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let ok = unsafe {
+        MoveFileExW(
+            src_wide.as_ptr(),
+            dst_wide.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if ok == 0 {
+        let err = std::io::Error::last_os_error();
+        return Err(format!("MoveFileExW failed: {}", err));
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn atomic_replace(src: &Path, dst: &Path) -> Result<(), String> {
+    std::fs::rename(src, dst).map_err(|e| e.to_string())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,10 +89,7 @@ impl VersionsCatalogStore {
         }
         let tmp_path = self.file_path.with_extension("json.tmp");
         std::fs::write(&tmp_path, json).map_err(|e| e.to_string())?;
-        if self.file_path.exists() {
-            std::fs::remove_file(&self.file_path).map_err(|e| e.to_string())?;
-        }
-        std::fs::rename(&tmp_path, &self.file_path).map_err(|e| e.to_string())
+        atomic_replace(&tmp_path, &self.file_path)
     }
 
     pub fn list(&self) -> Vec<VersionEntry> {
