@@ -114,6 +114,13 @@ async fn launch_roblox(
 
     let pids_before = windows::get_roblox_pids();
 
+    let pid_wait_secs = if isolation_will_wipe_install { 180 } else { 12 };
+    let pending_id = tracker.add_pending_launch(
+        user_id,
+        resolved_version_id.clone(),
+        std::time::Duration::from_secs(pid_wait_secs + 30),
+    );
+
     if use_old_join {
         windows::launch_old_join_from(
             &resolved_base_path,
@@ -143,8 +150,10 @@ async fn launch_roblox(
         windows::launch_url(&url)?;
     }
 
-    if let Some(pid) = wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(12)).await
+    if let Some(pid) =
+        wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(pid_wait_secs)).await
     {
+        tracker.clear_pending_launch(pending_id);
         tracker.track_with_version(
             user_id,
             pid,
@@ -496,6 +505,13 @@ async fn launch_multiple(
 
         let pids_before = windows::get_roblox_pids();
 
+        let acct_pid_wait_secs = if acct_isolation_wipes_install { 180 } else { 12 };
+        let acct_pending_id = tracker.add_pending_launch(
+            uid,
+            acct_version_id.clone(),
+            std::time::Duration::from_secs(acct_pid_wait_secs + 30),
+        );
+
         let launch_result = if acct_use_old_join {
             windows::launch_old_join_from(
                 &acct_base_path,
@@ -526,12 +542,18 @@ async fn launch_multiple(
         };
 
         if launch_result.is_err() {
+            tracker.clear_pending_launch(acct_pending_id);
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
             continue;
         }
 
-        if let Some(pid) = wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(12)).await
+        if let Some(pid) = wait_for_new_roblox_pid(
+            &pids_before,
+            std::time::Duration::from_secs(acct_pid_wait_secs),
+        )
+        .await
         {
+            tracker.clear_pending_launch(acct_pending_id);
             tracker.track_with_version(uid, pid, browser_tracker_id, acct_version_id.clone());
             if let Some(version_id) = acct_version_id.as_deref() {
                 if let Some((channel, hash)) = version_id.split_once(':') {

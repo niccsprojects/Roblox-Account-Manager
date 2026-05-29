@@ -9,8 +9,18 @@ pub struct TrackedProcess {
     pub version_id: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PendingLaunch {
+    pub id: u64,
+    pub user_id: i64,
+    pub version_id: Option<String>,
+    pub deadline: std::time::Instant,
+}
+
 pub struct ProcessTracker {
     instances: Mutex<HashMap<i64, TrackedProcess>>,
+    pending_launches: Mutex<Vec<PendingLaunch>>,
+    next_pending_id: AtomicU64,
     job_handles: Mutex<HashMap<u32, SendHandle>>,
     watcher_active: AtomicBool,
     watcher_session: AtomicU64,
@@ -23,6 +33,8 @@ impl ProcessTracker {
     pub fn new() -> Self {
         Self {
             instances: Mutex::new(HashMap::new()),
+            pending_launches: Mutex::new(Vec::new()),
+            next_pending_id: AtomicU64::new(1),
             job_handles: Mutex::new(HashMap::new()),
             watcher_active: AtomicBool::new(false),
             watcher_session: AtomicU64::new(0),
@@ -30,6 +42,38 @@ impl ProcessTracker {
             launcher_cancelled: AtomicBool::new(false),
             next_account: AtomicBool::new(false),
         }
+    }
+
+    pub fn add_pending_launch(
+        &self,
+        user_id: i64,
+        version_id: Option<String>,
+        timeout: Duration,
+    ) -> u64 {
+        let id = self
+            .next_pending_id
+            .fetch_add(1, Ordering::Relaxed);
+        if let Ok(mut pending) = self.pending_launches.lock() {
+            pending.retain(|p| p.deadline > std::time::Instant::now());
+            pending.push(PendingLaunch {
+                id,
+                user_id,
+                version_id,
+                deadline: std::time::Instant::now() + timeout,
+            });
+        }
+        id
+    }
+
+    pub fn clear_pending_launch(&self, id: u64) {
+        if let Ok(mut pending) = self.pending_launches.lock() {
+            pending.retain(|p| p.id != id);
+        }
+    }
+
+    fn prune_pending_locked(pending: &mut Vec<PendingLaunch>) {
+        let now = std::time::Instant::now();
+        pending.retain(|p| p.deadline > now);
     }
 
     pub fn track(&self, user_id: i64, pid: u32, browser_tracker_id: String) {
@@ -63,6 +107,12 @@ impl ProcessTracker {
         if let Ok(instances) = self.instances.lock() {
             for tracked in instances.values() {
                 set.insert(tracked.version_id.clone());
+            }
+        }
+        if let Ok(mut pending) = self.pending_launches.lock() {
+            Self::prune_pending_locked(&mut pending);
+            for p in pending.iter() {
+                set.insert(p.version_id.clone());
             }
         }
         set
