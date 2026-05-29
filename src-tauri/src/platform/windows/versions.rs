@@ -568,36 +568,44 @@ pub async fn install_version(
         },
     );
 
-    let staging_for_extract = staging.clone();
-    let install_id_for_extract = install_id.clone();
-    let channel_for_extract = channel.clone();
-    let version_for_extract = version_hash.clone();
-    let app_for_extract = app.clone();
-    let extracted = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
-        let mut count = 0u64;
-        for (pkg, bytes) in &package_bytes {
-            let subdir = extract_root_for(pkg).unwrap_or("");
-            extract_package_into(bytes, &staging_for_extract, subdir)?;
-            count += 1;
-            let _ = app_for_extract.emit(
-                "version-install-progress",
-                VersionInstallProgress {
-                    install_id: install_id_for_extract.clone(),
-                    channel: channel_for_extract.clone(),
-                    version_hash: version_for_extract.clone(),
-                    stage: "extracting".into(),
-                    package: Some(pkg.clone()),
-                    current: count,
-                    total: package_bytes.len() as u64,
-                    message: None,
-                },
-            );
-        }
-        Ok(())
-    })
-    .await
-    .map_err(|e| format!("Extraction task panicked: {}", e))?;
-    extracted?;
+    let extraction_total = package_bytes.len() as u64;
+    let mut extract_futures: FuturesUnordered<
+        BoxFuture<'static, Result<String, String>>,
+    > = FuturesUnordered::new();
+    for (pkg, bytes) in package_bytes {
+        let staging_cloned = staging.clone();
+        extract_futures.push(
+            async move {
+                tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+                    let subdir = extract_root_for(&pkg).unwrap_or("");
+                    extract_package_into(&bytes, &staging_cloned, subdir)?;
+                    Ok(pkg)
+                })
+                .await
+                .map_err(|e| format!("Extraction task panicked: {}", e))?
+            }
+            .boxed(),
+        );
+    }
+
+    let mut extracted_count = 0u64;
+    while let Some(result) = extract_futures.next().await {
+        let pkg = result?;
+        extracted_count += 1;
+        let _ = app.emit(
+            "version-install-progress",
+            VersionInstallProgress {
+                install_id: install_id.clone(),
+                channel: channel.clone(),
+                version_hash: version_hash.clone(),
+                stage: "extracting".into(),
+                package: Some(pkg),
+                current: extracted_count,
+                total: extraction_total,
+                message: None,
+            },
+        );
+    }
 
     let app_settings_path = staging.join("AppSettings.xml");
     std::fs::write(&app_settings_path, APP_SETTINGS_XML)
