@@ -61,7 +61,7 @@ async fn launch_roblox(
 
     let multi_rbx = settings.get_bool("General", "EnableMultiRbx");
     if multi_rbx {
-        ensure_multi_roblox_enabled(auto_close_multi_conflicts)?;
+        ensure_multi_roblox_enabled(auto_close_multi_conflicts).await?;
     } else {
         let _ = windows::disable_multi_roblox();
     }
@@ -453,7 +453,7 @@ async fn launch_multiple(
         let resolved_launch = resolve_launch_job(&acct_job, false, "");
 
         if multi_rbx {
-            ensure_multi_roblox_enabled(auto_close_multi_conflicts)?;
+            ensure_multi_roblox_enabled(auto_close_multi_conflicts).await?;
         } else {
             let _ = windows::disable_multi_roblox();
         }

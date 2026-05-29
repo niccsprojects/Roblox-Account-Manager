@@ -466,7 +466,7 @@ pub(crate) async fn apply_windows_post_launch_profile(
 }
 
 #[cfg(target_os = "windows")]
-fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), String> {
+async fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), String> {
     let enabled = platform::windows::enable_multi_roblox()?;
     if enabled {
         return Ok(());
@@ -479,7 +479,7 @@ fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), String>
         if auto_close_conflicts {
             let killed = platform::windows::kill_all_roblox();
             if killed > 0 {
-                std::thread::sleep(std::time::Duration::from_millis(700));
+                tokio::time::sleep(std::time::Duration::from_millis(700)).await;
             }
             let _ = platform::windows::tracker().cleanup_dead_processes();
             let enabled_after = platform::windows::enable_multi_roblox()?;
@@ -499,7 +499,7 @@ fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), String>
     }
 
     platform::windows::release_multi_roblox_handle();
-    std::thread::sleep(std::time::Duration::from_millis(150));
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
     let enabled_retry = platform::windows::enable_multi_roblox()?;
     if enabled_retry {
         return Ok(());
