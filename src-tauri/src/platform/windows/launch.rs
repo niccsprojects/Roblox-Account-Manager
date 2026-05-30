@@ -89,7 +89,34 @@ pub fn launch_old_join(
     is_teleport: bool,
 ) -> Result<(), String> {
     let version_folder = get_roblox_path()?;
-    let exe = std::path::Path::new(&version_folder).join("RobloxPlayerBeta.exe");
+    launch_old_join_from(
+        &version_folder,
+        ticket,
+        place_id,
+        job_id,
+        launch_data,
+        follow_user,
+        join_vip,
+        access_code,
+        link_code,
+        is_teleport,
+    )
+}
+
+pub fn launch_old_join_from(
+    base_path: &str,
+    ticket: &str,
+    place_id: i64,
+    job_id: &str,
+    launch_data: &str,
+    follow_user: bool,
+    join_vip: bool,
+    access_code: &str,
+    link_code: &str,
+    is_teleport: bool,
+) -> Result<(), String> {
+    let version_folder = base_path;
+    let exe = std::path::Path::new(version_folder).join("RobloxPlayerBeta.exe");
     if !exe.exists() {
         return Err("RobloxPlayerBeta.exe not found in Roblox version folder".into());
     }

@@ -135,6 +135,8 @@ Make sure you click "Open Details" before screenshotting. Please make sure your 
 | :--- | :---: | ---: |
 | Add Accounts | Add accounts via quick username/cookie input, browser login, cookie import, or old AccountData import | Use `Add` in the toolbar |
 | Multi Roblox | Run multiple Roblox clients at once (manually enabled) | Settings -> `General` -> `Multi Roblox` |
+| Pre-launch Isolation | Wipe Roblox cache, registry, prefetch, and install Versions before each launch with optional MachineGuid + MAC rotation behind a single UAC prompt (Windows-only) | Settings -> `Isolation` |
+| Roblox Version Manager | Install older Roblox builds side-by-side and pick which version each account launches with, with per-account override and global default (Windows-only) | Toolbar -> `Add` -> `Roblox Versions` |
 | Single + Multi Launch | Launch one or many selected accounts using Place/Job/Launch Data | Use the sidebar `Launch` section |
 | Saved Launch Fields | Save Place/Job/Launch Data per account or across selected accounts | Click the save icon in launch fields |
 | Recent Games Picker | Reuse recent places quickly, including a `None` option that resets to saved Place ID | Use the dropdown above `Place` in launch |
@@ -156,6 +158,7 @@ Make sure you click "Open Details" before screenshotting. Please make sure your 
 | Nexus Account Control | WebSocket-based account control panel with command routing and `Nexus.lua` export | Toolbar -> `Nexus` |
 | Script Manager | Trusted JavaScript scripts with Rust command invoke, HTTP/WebSocket, modals, custom UI elements, and live logs | Toolbar -> `Scripts` |
 | Developer Mode Tools | Enable advanced options like auth tickets, app links, and raw field editing | Settings -> `Developer` |
+| Launch Diagnostics | Identify what is holding the Roblox singleton mutex and close a conflicting legacy Roblox Account Manager from inside the app | Settings -> `Developer` -> `Launch Diagnostics` |
 | Account Organization | Grouping, drag-drop reorder/move, alphabetical group sort, and numeric prefix ordering | Use list drag + right-click menu |
 | Advanced Selection | Ctrl/Shift/range selection plus Windows-style drag marquee selection | Select directly in the account list |
 | Themes + Localization | Built-in theme editor and localized UI (English/German, Crowdin-backed) | Toolbar theme button + language setting |

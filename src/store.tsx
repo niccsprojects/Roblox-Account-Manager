@@ -264,6 +264,8 @@ export interface StoreValue {
   generatorDialogOpen: boolean;
   setGeneratorDialogOpen: (open: boolean) => void;
   generatorStatus: GeneratorStatus | null;
+  versionsDialogOpen: boolean;
+  setVersionsDialogOpen: (open: boolean) => void;
   missingAssets: { userId: number; username: string; assetIds: number[] } | null;
   setMissingAssets: (v: { userId: number; username: string; assetIds: number[] } | null) => void;
 
@@ -367,6 +369,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [bottingStatus, setBottingStatus] = useState<BottingStatus | null>(null);
   const [generatorDialogOpen, setGeneratorDialogOpen] = useState(false);
   const [generatorStatus, setGeneratorStatus] = useState<GeneratorStatus | null>(null);
+  const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
   const [missingAssets, setMissingAssets] = useState<{ userId: number; username: string; assetIds: number[] } | null>(null);
   const [nexusOpen, setNexusOpen] = useState(false);
   const [scriptsOpen, setScriptsOpen] = useState(false);
@@ -1992,6 +1995,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     generatorDialogOpen,
     setGeneratorDialogOpen,
     generatorStatus,
+    versionsDialogOpen,
+    setVersionsDialogOpen,
     missingAssets,
     setMissingAssets,
     nexusOpen,

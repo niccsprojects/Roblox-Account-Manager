@@ -46,6 +46,31 @@ pub fn enable_multi_roblox() -> Result<bool, String> {
     Ok(true)
 }
 
+pub fn release_multi_roblox_handle() {
+    if let Ok(mut handle) = MULTI_ROBLOX_HANDLE.lock() {
+        if let Some(SendHandle(h)) = handle.take() {
+            unsafe {
+                ReleaseMutex(h);
+                CloseHandle(h);
+            }
+        }
+    }
+    if let Ok(mut cookie_handle) = COOKIES_LOCK_HANDLE.lock() {
+        if let Some(SendHandle(h)) = cookie_handle.take() {
+            unsafe {
+                CloseHandle(h);
+            }
+        }
+    }
+}
+
+pub fn this_process_holds_multi_roblox() -> bool {
+    MULTI_ROBLOX_HANDLE
+        .lock()
+        .map(|g| g.is_some())
+        .unwrap_or(false)
+}
+
 pub fn disable_multi_roblox() -> Result<(), String> {
     let mut cookie_handle = COOKIES_LOCK_HANDLE.lock().map_err(|e| e.to_string())?;
     if let Some(SendHandle(h)) = cookie_handle.take() {

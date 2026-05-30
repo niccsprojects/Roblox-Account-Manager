@@ -1,4 +1,4 @@
-pub fn get_roblox_pids() -> Vec<u32> {
+fn find_pids_for_exes(exe_names: &[&str]) -> Vec<u32> {
     let mut pids = Vec::new();
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -17,8 +17,11 @@ pub fn get_roblox_pids() -> Vec<u32> {
                     .position(|&c| c == 0)
                     .unwrap_or(entry.szExeFile.len());
                 let name = String::from_utf16_lossy(&entry.szExeFile[..name_len]);
-                if name.eq_ignore_ascii_case("RobloxPlayerBeta.exe") {
-                    pids.push(entry.th32ProcessID);
+                for needle in exe_names {
+                    if name.eq_ignore_ascii_case(needle) {
+                        pids.push(entry.th32ProcessID);
+                        break;
+                    }
                 }
                 if Process32NextW(snapshot, &mut entry) == 0 {
                     break;
@@ -28,6 +31,36 @@ pub fn get_roblox_pids() -> Vec<u32> {
         CloseHandle(snapshot);
     }
     pids
+}
+
+pub fn get_roblox_pids() -> Vec<u32> {
+    find_pids_for_exes(&["RobloxPlayerBeta.exe"])
+}
+
+pub fn find_roblox_pids_all() -> Vec<u32> {
+    find_pids_for_exes(&[
+        "RobloxPlayerBeta.exe",
+        "RobloxPlayerLauncher.exe",
+        "RobloxCrashHandler.exe",
+    ])
+}
+
+pub fn find_legacy_ram_pids() -> Vec<u32> {
+    let current = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+        .unwrap_or_default();
+    let candidates = ["Roblox Account Manager.exe", "RBX Alt Manager.exe"];
+    let pids = find_pids_for_exes(&candidates);
+
+    if current.eq_ignore_ascii_case("Roblox Account Manager.exe")
+        || current.eq_ignore_ascii_case("RBX Alt Manager.exe")
+    {
+        let self_pid = unsafe { windows_sys::Win32::System::Threading::GetCurrentProcessId() };
+        pids.into_iter().filter(|p| *p != self_pid).collect()
+    } else {
+        pids
+    }
 }
 
 pub fn kill_process(pid: u32) -> Result<(), String> {
@@ -47,6 +80,17 @@ pub fn kill_process(pid: u32) -> Result<(), String> {
 
 pub fn kill_all_roblox() -> u32 {
     let pids = get_roblox_pids();
+    let mut killed = 0u32;
+    for pid in pids {
+        if kill_process(pid).is_ok() {
+            killed += 1;
+        }
+    }
+    killed
+}
+
+pub fn kill_all_roblox_related() -> u32 {
+    let pids = find_roblox_pids_all();
     let mut killed = 0u32;
     for pid in pids {
         if kill_process(pid).is_ok() {

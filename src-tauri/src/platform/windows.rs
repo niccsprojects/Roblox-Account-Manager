@@ -42,3 +42,5 @@ include!("windows/client_settings.rs");
 include!("windows/optimization.rs");
 include!("windows/windowing.rs");
 include!("windows/tracker.rs");
+include!("windows/isolation.rs");
+include!("windows/versions.rs");

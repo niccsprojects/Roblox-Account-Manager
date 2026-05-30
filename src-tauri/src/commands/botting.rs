@@ -41,7 +41,7 @@ async fn launch_account_for_cycle(
     let resolved_launch = resolve_launch_job(job_id, false, "");
 
     if multi_rbx {
-        ensure_multi_roblox_enabled(auto_close_multi_conflicts)?;
+        ensure_multi_roblox_enabled(auto_close_multi_conflicts).await?;
     } else {
         let _ = windows::disable_multi_roblox();
     }

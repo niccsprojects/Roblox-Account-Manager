@@ -35,6 +35,8 @@ tauri-plugin-window-state = "2"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 zip = "0.6.6"
+md-5 = "0.10"
+sha2 = "0.10"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
@@ -47,5 +49,6 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_JobObjects",
     "Win32_System_Registry",
     "Win32_System_Memory",
+    "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }

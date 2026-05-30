@@ -466,25 +466,48 @@ pub(crate) async fn apply_windows_post_launch_profile(
 }
 
 #[cfg(target_os = "windows")]
-fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), String> {
+async fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), String> {
     let enabled = platform::windows::enable_multi_roblox()?;
     if enabled {
         return Ok(());
     }
 
-    if auto_close_conflicts {
-        let killed = platform::windows::kill_all_roblox();
-        if killed > 0 {
-            std::thread::sleep(std::time::Duration::from_millis(700));
+    let roblox_pids = platform::windows::get_roblox_pids();
+    let legacy_pids = platform::windows::find_legacy_ram_pids();
+
+    if !roblox_pids.is_empty() {
+        if auto_close_conflicts {
+            let killed = platform::windows::kill_all_roblox();
+            if killed > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+            }
+            let _ = platform::windows::tracker().cleanup_dead_processes();
+            let enabled_after = platform::windows::enable_multi_roblox()?;
+            if enabled_after {
+                return Ok(());
+            }
         }
-        let _ = platform::windows::tracker().cleanup_dead_processes();
-        let enabled_after = platform::windows::enable_multi_roblox()?;
-        if enabled_after {
-            return Ok(());
-        }
+        return Err(
+            "A Roblox client is already running. Close it or enable Auto-close Roblox for Multi-Roblox in settings.".into(),
+        );
     }
 
-    Err("Failed to enable Multi Roblox. Close all Roblox processes and try again.".into())
+    if !legacy_pids.is_empty() {
+        return Err(
+            "The legacy Roblox Account Manager is running and holds the Roblox singleton mutex. Close it before launching from this app.".into(),
+        );
+    }
+
+    platform::windows::release_multi_roblox_handle();
+    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+    let enabled_retry = platform::windows::enable_multi_roblox()?;
+    if enabled_retry {
+        return Ok(());
+    }
+
+    Err(
+        "Could not acquire the Roblox singleton mutex. Another program may be holding it. Close any Roblox-related tools and try again.".into(),
+    )
 }
 
 #[cfg(target_os = "windows")]

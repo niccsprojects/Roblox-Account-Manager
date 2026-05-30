@@ -303,6 +303,41 @@ impl SettingsStore {
             }
         }
 
+        let versions_defaults: &[(&str, &str)] = &[
+            ("DefaultVersion", ""),
+            ("MaxParallelDownloads", "4"),
+            ("CatalogCacheMinutes", "10"),
+            ("PreferOldJoinForVersioned", "true"),
+            ("ShowPreReleaseVersions", "false"),
+        ];
+
+        let versions = ini.section("Versions");
+        for (key, value) in versions_defaults {
+            if !versions.exists(key) {
+                versions.set(key, value, None);
+            }
+        }
+
+        let isolation_defaults: &[(&str, &str)] = &[
+            ("Mode", "Off"),
+            ("SpoofMachineGuid", "false"),
+            ("SpoofMacAddress", "false"),
+            ("TargetAdapter", ""),
+            ("IncludeStudio", "false"),
+            ("PreserveFastFlags", "true"),
+            ("PreserveBasicSettings", "true"),
+            ("BackupMachineGuid", ""),
+            ("BackupNetworkAddress", ""),
+            ("BackupAdapterId", ""),
+        ];
+
+        let isolation = ini.section("Isolation");
+        for (key, value) in isolation_defaults {
+            if !isolation.exists(key) {
+                isolation.set(key, value, None);
+            }
+        }
+
         ini.section("Prompts");
 
         drop(ini);
