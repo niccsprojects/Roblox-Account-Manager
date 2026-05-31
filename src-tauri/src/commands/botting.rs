@@ -53,7 +53,7 @@ async fn launch_account_for_cycle(
 
     let tracker = windows::tracker();
     if auto_close_last_process && tracker.get_pid(user_id).is_some() {
-        let closed = tracker.kill_for_user_graceful(user_id, 4500);
+        let closed = tracker.kill_for_user_graceful_async(user_id, 4500).await;
         if !closed {
             return Err("Previous Roblox instance did not close before relaunch".into());
         }
@@ -144,7 +144,7 @@ async fn launch_account_for_cycle(
             .await;
     }
     if detect_auth_failure_window(pid).await {
-        let _ = tracker.kill_for_user(user_id);
+        let _ = tracker.kill_for_user_async(user_id).await;
         return Err("Roblox authentication failed (429) while joining".into());
     }
 
@@ -381,7 +381,7 @@ async fn run_botting_session(
             if stop_flag.load(Ordering::Relaxed) {
                 break;
             }
-            let closed = tracker.kill_for_user_graceful(uid, 4500);
+            let closed = tracker.kill_for_user_graceful_async(uid, 4500).await;
             if !closed {
                 let pid_hint = tracker
                     .get_pid(uid)

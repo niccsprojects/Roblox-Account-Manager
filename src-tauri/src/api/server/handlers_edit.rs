@@ -3,6 +3,14 @@ async fn handle_get_alias(
     Query(params): Query<AccountQuery>,
     v2: bool,
 ) -> Response {
+    if !state.settings.get_bool("WebServer", "AllowGetAccounts") {
+        return reply(401, "AllowGetAccounts is disabled", v2);
+    }
+
+    if !check_password(&state, &params.password) {
+        return reply(401, "Invalid password", v2);
+    }
+
     let identifier = match params.account {
         Some(ref a) if !a.is_empty() => a,
         _ => return reply(400, "Missing Account parameter", v2),
@@ -24,6 +32,14 @@ async fn handle_get_description(
     Query(params): Query<AccountQuery>,
     v2: bool,
 ) -> Response {
+    if !state.settings.get_bool("WebServer", "AllowGetAccounts") {
+        return reply(401, "AllowGetAccounts is disabled", v2);
+    }
+
+    if !check_password(&state, &params.password) {
+        return reply(401, "Invalid password", v2);
+    }
+
     let identifier = match params.account {
         Some(ref a) if !a.is_empty() => a,
         _ => return reply(400, "Missing Account parameter", v2),
@@ -45,6 +61,14 @@ async fn handle_get_field(
     Query(params): Query<AccountQuery>,
     v2: bool,
 ) -> Response {
+    if !state.settings.get_bool("WebServer", "AllowGetAccounts") {
+        return reply(401, "AllowGetAccounts is disabled", v2);
+    }
+
+    if !check_password(&state, &params.password) {
+        return reply(401, "Invalid password", v2);
+    }
+
     let identifier = match params.account {
         Some(ref a) if !a.is_empty() => a,
         _ => return reply(400, "Missing Account parameter", v2),

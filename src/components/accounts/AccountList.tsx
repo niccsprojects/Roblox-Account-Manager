@@ -135,6 +135,13 @@ export function AccountList() {
     const startX = e.clientX - listRect.left + initialScrollLeft;
     const startY = e.clientY - listRect.top + initialScrollTop;
     const baseSelection = new Set(store.selectedIds);
+    const selectableIds = new Set(store.orderedUserIds);
+    const collapsedGroupIds = new Map<string, number[]>();
+    for (const group of store.groups) {
+      if (store.collapsedGroups.has(group.key)) {
+        collapsedGroupIds.set(group.key, group.accounts.map((a) => a.UserID));
+      }
+    }
 
     let dragging = false;
     const threshold = 4;
@@ -162,6 +169,7 @@ export function AccountList() {
         if (!userIdRaw) continue;
         const userId = Number(userIdRaw);
         if (!Number.isFinite(userId)) continue;
+        if (!selectableIds.has(userId)) continue;
 
         const rowRect = row.getBoundingClientRect();
         const rowLeft = rowRect.left - listRect.left + list.scrollLeft;
@@ -178,32 +186,70 @@ export function AccountList() {
         if (intersects) selectedInRect.add(userId);
       }
 
+      if (collapsedGroupIds.size > 0) {
+        const headers = list.querySelectorAll<HTMLElement>("[data-group-header='true']");
+        for (const header of headers) {
+          const groupKey = header.dataset.groupKey;
+          if (!groupKey) continue;
+          const memberIds = collapsedGroupIds.get(groupKey);
+          if (!memberIds) continue;
+
+          const headerRect = header.getBoundingClientRect();
+          const headerLeft = headerRect.left - listRect.left + list.scrollLeft;
+          const headerTop = headerRect.top - listRect.top + list.scrollTop;
+          const headerRight = headerLeft + headerRect.width;
+          const headerBottom = headerTop + headerRect.height;
+
+          const intersects =
+            headerRight >= left &&
+            headerLeft <= right &&
+            headerBottom >= top &&
+            headerTop <= bottom;
+
+          if (intersects) {
+            for (const id of memberIds) selectedInRect.add(id);
+          }
+        }
+      }
+
       const next = additive
         ? new Set<number>([...baseSelection, ...selectedInRect])
         : selectedInRect;
       store.setSelectedIds(next);
 
       setDragSelectRect({
-        left: left - list.scrollLeft,
-        top: top - list.scrollTop,
+        left,
+        top,
         width,
         height,
       });
       suppressClickRef.current = true;
     };
 
-    const onMouseMove = (ev: MouseEvent) => {
-      updateSelection(ev.clientX, ev.clientY);
-    };
-
-    const onMouseUp = () => {
+    const endDrag = (clearSuppress: boolean) => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
+      document.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("blur", onCancel);
       setDragSelectRect(null);
+      if (clearSuppress) suppressClickRef.current = false;
+    };
+
+    const onMouseUp = () => endDrag(false);
+    const onCancel = () => endDrag(true);
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (ev.buttons === 0) {
+        endDrag(true);
+        return;
+      }
+      updateSelection(ev.clientX, ev.clientY);
     };
 
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
+    document.addEventListener("pointercancel", onCancel);
+    window.addEventListener("blur", onCancel);
   }
 
   if (store.accounts.length === 0 && !store.searchQuery) {
