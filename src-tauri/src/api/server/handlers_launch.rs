@@ -365,27 +365,15 @@ async fn handle_set_recommended_server(
         return reply(400, "No servers available", v2);
     }
 
-    let mut attempted: Vec<String> = Vec::new();
-
-    for _ in 0..10 {
-        for server in servers_response.data.iter().rev() {
-            if attempted.contains(&server.id) {
-                continue;
-            }
-
-            attempted.push(server.id.clone());
-
-            match roblox::join_game_instance(&account.security_token, place_id, &server.id, false).await {
-                Ok(_) => return reply(200, "Recommended server set successfully", v2),
-                Err(_) => continue,
-            }
-        }
-
-        if attempted.len() >= 100 {
-            attempted.clear();
+    for server in servers_response.data.iter().rev() {
+        if roblox::join_game_instance(&account.security_token, place_id, &server.id, false)
+            .await
+            .is_ok()
+        {
+            return reply(200, "Recommended server set successfully", v2);
         }
     }
 
-    reply(400, "Too many failed attempts", v2)
+    reply(400, "Failed to join any available server", v2)
 }
 
