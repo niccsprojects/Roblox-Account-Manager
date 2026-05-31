@@ -214,6 +214,18 @@ impl ProcessTracker {
         exited
     }
 
+    pub async fn kill_for_user_async(&'static self, user_id: i64) -> bool {
+        tokio::task::spawn_blocking(move || self.kill_for_user(user_id))
+            .await
+            .unwrap_or(false)
+    }
+
+    pub async fn kill_for_user_graceful_async(&'static self, user_id: i64, timeout_ms: u64) -> bool {
+        tokio::task::spawn_blocking(move || self.kill_for_user_graceful(user_id, timeout_ms))
+            .await
+            .unwrap_or(false)
+    }
+
     pub fn is_watcher_active(&self) -> bool {
         self.watcher_active.load(Ordering::SeqCst)
     }

@@ -70,7 +70,7 @@ async fn launch_roblox(
 
     let tracker = windows::tracker();
     if auto_close_last_process && tracker.get_pid(user_id).is_some() {
-        let closed = tracker.kill_for_user_graceful(user_id, 4500);
+        let closed = tracker.kill_for_user_graceful_async(user_id, 4500).await;
         if !closed {
             return Err("Previous Roblox instance did not close before relaunch".into());
         }
@@ -477,7 +477,7 @@ async fn launch_multiple(
         patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal);
 
         if auto_close_last_process && tracker.get_pid(uid).is_some() {
-            let closed = tracker.kill_for_user_graceful(uid, 4500);
+            let closed = tracker.kill_for_user_graceful_async(uid, 4500).await;
             if !closed {
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 continue;

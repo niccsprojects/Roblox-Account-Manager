@@ -59,7 +59,7 @@ async fn handle_launch_account(
 
         let tracker = windows::tracker();
         if auto_close_last_process && tracker.get_pid(account.user_id).is_some() {
-            tracker.kill_for_user(account.user_id);
+            tracker.kill_for_user_async(account.user_id).await;
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
 
@@ -224,7 +224,7 @@ async fn handle_follow_user(
 
         let tracker = windows::tracker();
         if auto_close_last_process && tracker.get_pid(account.user_id).is_some() {
-            tracker.kill_for_user(account.user_id);
+            tracker.kill_for_user_async(account.user_id).await;
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
 
