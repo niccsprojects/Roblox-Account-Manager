@@ -51,6 +51,8 @@ export function GroupSection({
     <div className="mb-0.5">
       {showHeader && (
         <div
+          data-group-header="true"
+          data-group-key={group.key}
           className={`theme-group-header flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none text-xs transition-all duration-150 ${
             store.dragState ? "hover:bg-[var(--accent-soft)] hover:pl-4" : "hover:bg-[var(--row-hover)]"
           }`}
