@@ -72,14 +72,6 @@ pub fn this_process_holds_multi_roblox() -> bool {
 }
 
 pub fn disable_multi_roblox() -> Result<(), String> {
-    let mut cookie_handle = COOKIES_LOCK_HANDLE.lock().map_err(|e| e.to_string())?;
-    if let Some(SendHandle(h)) = cookie_handle.take() {
-        unsafe {
-            CloseHandle(h);
-        }
-    }
-    drop(cookie_handle);
-
     let mut handle = MULTI_ROBLOX_HANDLE.lock().map_err(|e| e.to_string())?;
     if let Some(SendHandle(h)) = handle.take() {
         unsafe {
@@ -87,6 +79,9 @@ pub fn disable_multi_roblox() -> Result<(), String> {
             CloseHandle(h);
         }
     }
+    drop(handle);
+
+    lock_roblox_cookies()?;
     Ok(())
 }
 
