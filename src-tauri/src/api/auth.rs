@@ -75,6 +75,7 @@ pub async fn get_csrf_token(security_token: &str) -> Result<String, String> {
         .post("https://auth.roblox.com/v1/authentication-ticket/")
         .header(COOKIE, cookie_header(security_token))
         .header(REFERER, REFERER_URL)
+        .header("RBXAuthenticationNegotiation", "1")
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
@@ -111,6 +112,7 @@ pub async fn get_auth_ticket(security_token: &str) -> Result<String, String> {
         .header(COOKIE, cookie_header(security_token))
         .header("x-csrf-token", &csrf)
         .header(REFERER, REFERER_URL)
+        .header("RBXAuthenticationNegotiation", "1")
         .header("Content-Type", "application/json")
         .body("")
         .send()
