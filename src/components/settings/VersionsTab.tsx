@@ -137,12 +137,12 @@ export function VersionsTab({ s }: { s: UseSettingsReturn }) {
           <div>
             {t("Version metadata catalog via")}{" "}
             <a
-              href="https://weao.gg"
+              href="https://weao.xyz"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sky-400 hover:text-sky-300"
             >
-              weao.gg
+              weao.xyz
             </a>
             {" "}({t("WhatExpsAre.Online")}).
           </div>
