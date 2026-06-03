@@ -4,8 +4,8 @@ use futures_util::stream::{FuturesUnordered, StreamExt};
 use tauri::Manager;
 
 const CDN_HOST: &str = "https://setup-aws.rbxcdn.com";
-const WEAO_CURRENT_URL: &str = "https://weao.gg/api/versions/current";
-const WEAO_PAST_URL: &str = "https://weao.gg/api/versions/past";
+const WEAO_CURRENT_URL: &str = "https://weao.xyz/api/versions/current";
+const WEAO_PAST_URL: &str = "https://weao.xyz/api/versions/past";
 
 const EXTRACT_ROOTS: &[(&str, &str)] = &[
     ("RobloxApp.zip", ""),

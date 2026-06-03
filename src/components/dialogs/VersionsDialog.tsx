@@ -425,7 +425,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-[11px] text-zinc-500">
-                  {t("Versions exposed by weao.gg/api/versions")}
+                  {t("Versions exposed by weao.xyz/api/versions")}
                 </div>
                 <button
                   onClick={() => refreshRemote(true)}
@@ -560,12 +560,12 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
             {" "}
             ({t("MIT")}). {t("Version catalog via")}{" "}
             <a
-              href="https://weao.gg"
+              href="https://weao.xyz"
               target="_blank"
               rel="noopener noreferrer"
               className="text-sky-400 hover:text-sky-300"
             >
-              weao.gg
+              weao.xyz
             </a>
             .
           </div>
