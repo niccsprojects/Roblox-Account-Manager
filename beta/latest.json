@@ -1,19 +1,19 @@
 {
-  "version": "4.6.4-beta",
-  "notes": "> [!WARNING]\nThis is a beta release. Missing features, bugs, and crashes are possible. Run at your own risk.\n\nChannel: Beta\nRelease commit: 75c84f0\nApp version: 4.6.4\n\n**Full Changelog**: https://github.com/niccsprojects/Roblox-Account-Manager/compare/v4.6.2-beta...v4.6.4-beta",
-  "pub_date": "2026-06-02T17:00:32.204Z",
+  "version": "4.6.5-beta",
+  "notes": "> [!WARNING]\nThis is a beta release. Missing features, bugs, and crashes are possible. Run at your own risk.\n\nChannel: Beta\nRelease commit: 35f61bf\nApp version: 4.6.5\n\n## What's Changed\n* fix(rdd): replace weao.gg with weao.xyz by @Null-Austin in https://github.com/niccsprojects/Roblox-Account-Manager/pull/61\n\n## New Contributors\n* @Null-Austin made their first contribution in https://github.com/niccsprojects/Roblox-Account-Manager/pull/61\n\n**Full Changelog**: https://github.com/niccsprojects/Roblox-Account-Manager/compare/v4.6.4-beta...v4.6.5-beta",
+  "pub_date": "2026-06-03T09:21:00.672Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3Qll4eVRXMDFuYzhpLzJYZHNnVXMrQWNjeUM2SEFIK0t0dFg2M1E5RmtaamVSSHZmSVRlRGY1UXk2MUxvdktsY1MvS2YzQ0ZOV083K3psZTdZSUc2eWdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNDE5NjI1CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjYuNF94NjRfZW4tVVMubXNpClJ1dmRIYitNdEtmTHZJOWs2ZzN5ZTJ2VEgwbS8xbUJjdXVpV1dray9mZENXVlBvbHpWVGZIdytmMmNIRldJWnc3VSt3OTJtdDRWUFpwQ1M0cTlEaUR3PT0K",
-      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.6.4-beta/Roblox.Account.Manager_4.6.4_x64_en-US.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QldIL1lKcTJmT0pzalVsTEdLQlZObStXNjlBSXRodnFHaTVQM20wdG1QVEhhcnR4L1JlUmJpT01CN3c2VGNlaFdLQktEVTU1YlRhaGoyeGw1djFSVFFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNDc4NDUzCWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjYuNV94NjRfZW4tVVMubXNpCjVCZXpBM1h6Z3p1eFE4QlFWUDRsOEtWVmFrVGhBbUNNNjZOTmwyQ2pDcHpidzZ3dDJIR2ZzR08vZkJIQitEVk9GR3J6UlFrNklBSyttWWdOMGpEakF3PT0K",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.6.5-beta/Roblox.Account.Manager_4.6.5_x64_en-US.msi"
     },
     "windows-x86_64-msi": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3Qll4eVRXMDFuYzhpLzJYZHNnVXMrQWNjeUM2SEFIK0t0dFg2M1E5RmtaamVSSHZmSVRlRGY1UXk2MUxvdktsY1MvS2YzQ0ZOV083K3psZTdZSUc2eWdBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNDE5NjI1CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjYuNF94NjRfZW4tVVMubXNpClJ1dmRIYitNdEtmTHZJOWs2ZzN5ZTJ2VEgwbS8xbUJjdXVpV1dray9mZENXVlBvbHpWVGZIdytmMmNIRldJWnc3VSt3OTJtdDRWUFpwQ1M0cTlEaUR3PT0K",
-      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.6.4-beta/Roblox.Account.Manager_4.6.4_x64_en-US.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QldIL1lKcTJmT0pzalVsTEdLQlZObStXNjlBSXRodnFHaTVQM20wdG1QVEhhcnR4L1JlUmJpT01CN3c2VGNlaFdLQktEVTU1YlRhaGoyeGw1djFSVFFFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNDc4NDUzCWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjYuNV94NjRfZW4tVVMubXNpCjVCZXpBM1h6Z3p1eFE4QlFWUDRsOEtWVmFrVGhBbUNNNjZOTmwyQ2pDcHpidzZ3dDJIR2ZzR08vZkJIQitEVk9GR3J6UlFrNklBSyttWWdOMGpEakF3PT0K",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.6.5-beta/Roblox.Account.Manager_4.6.5_x64_en-US.msi"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QlVpRnpkcE9TTlQxY2xXZW9Ga3lyOEdrY3BEeFNFK0RPb1lobFhqV2NGRVFKa3NBTFNYM01rdXJqQ1orK3hWN2F1eEFSNXQvclJ1bmpRK3lBVFh5OXdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNDE5NjI1CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjYuNF94NjQtc2V0dXAuZXhlCnVNNm1QcVBHTmpUSGN6b1VRaUcvK2VxSHJmSlk0Q21KOWVKa1B1MGFXdHhTWHUwTjlaQTh2VTFGdlRqdVVyeGRqZXBDK0RNbmJFSEtLeXByMHErY0NnPT0K",
-      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.6.4-beta/Roblox.Account.Manager_4.6.4_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QmJYNVJwYVB2WUxydW11anBzQy91OUdpT09ucEpQSTQrWkhXQk55djVJb1lhdlJGOEVFejJWNXN4WUlnNWJqVnNzUVNMT1BBeWNaM2ZndkRYTzdXWkFnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgwNDc4NDUzCWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjYuNV94NjQtc2V0dXAuZXhlClpQU0VueTcySlI2VWs4S3NEenkzSlM1aklFODdvMmhMK2gyNXg4bXZDOUVHRzJFWHp6NzlFTm9RTHNlVW5zRjZwN3lkazQ4a3JwU2xqZ0ZYaE1qS0RnPT0K",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.6.5-beta/Roblox.Account.Manager_4.6.5_x64-setup.exe"
     }
   }
 }
