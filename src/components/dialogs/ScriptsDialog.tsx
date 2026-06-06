@@ -106,6 +106,9 @@ const ALLOWED_HTTP_METHODS = new Set([
 const SCRIPT_INVOKE_COMMANDS = [
   "get_accounts",
   "update_account",
+  "add_account",
+  "remove_account",
+  "validate_cookie",
   "launch_roblox",
   "launch_multiple",
   "cmd_kill_roblox",
@@ -113,6 +116,14 @@ const SCRIPT_INVOKE_COMMANDS = [
   "get_presence",
   "start_botting_mode",
   "stop_botting_mode",
+  "get_botting_mode_status",
+  "add_botting_accounts",
+  "set_botting_player_accounts",
+  "botting_account_action",
+  "start_generator",
+  "stop_generator",
+  "get_generator_status",
+  "generator_test_key",
   "start_web_server",
   "stop_web_server",
   "start_nexus_server",
@@ -260,6 +271,558 @@ while (true) {
 }
 `;
 
+const HUB_LINK_TEMPLATE = `
+const DEVICE_ID_KEY = "deviceId";
+
+function asText(value, fallback) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : fallback;
+  }
+  if (value === null || value === undefined) return fallback;
+  const text = String(value).trim();
+  return text.length > 0 ? text : fallback;
+}
+
+function asBool(value, fallback) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(v)) return true;
+    if (["0", "false", "no", "off"].includes(v)) return false;
+  }
+  return fallback;
+}
+
+function asInt(value, fallback, min, max) {
+  const raw = value === null || value === undefined ? "" : value;
+  const n = Number.parseInt(String(raw), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function parseJson(text) {
+  if (typeof text !== "string") return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch (error) {
+    return null;
+  }
+}
+
+function trimTrailingSlash(url) {
+  let s = String(url || "");
+  while (s.length > 0 && s.charAt(s.length - 1) === "/") {
+    s = s.slice(0, s.length - 1);
+  }
+  return s;
+}
+
+function deriveWsUrl(hubUrl) {
+  const base = trimTrailingSlash(hubUrl);
+  if (base.indexOf("https://") === 0) return "wss://" + base.slice(8) + "/agent";
+  if (base.indexOf("http://") === 0) return "ws://" + base.slice(7) + "/agent";
+  return base + "/agent";
+}
+
+function normalizeAction(value) {
+  const v = asText(value, "");
+  if (!v) return "";
+  const lower = v.charAt(0).toLowerCase() + v.slice(1);
+  const allowed = ["disconnect", "close", "closeDisconnect", "restartClient", "restartLoop"];
+  return allowed.includes(lower) ? lower : "";
+}
+
+const state = {
+  hubUrl: "",
+  wsUrl: "",
+  deviceId: "",
+  deviceToken: "",
+  instanceId: "",
+  pairingCode: "",
+  publishIntervalMs: 4000,
+  enabled: true,
+  pauseActions: false,
+  wsConnectionId: "",
+  wsState: "DISCONNECTED",
+  wsHelloSent: false,
+  reconnectBaseMs: 1000,
+  reconnectMaxMs: 30000,
+  reconnectAttempt: 0,
+  nextAttemptAtMs: 0,
+  lastPublishAtMs: 0,
+  lastError: "",
+};
+
+const handledCommandIds = new Map();
+
+async function loadConfig() {
+  state.hubUrl = trimTrailingSlash(asText(await ram.settings.get("hubUrl", ""), ""));
+  state.wsUrl = asText(await ram.settings.get("wsUrl", ""), "");
+  state.deviceId = asText(await ram.settings.get(DEVICE_ID_KEY, ""), "");
+  state.deviceToken = asText(await ram.settings.get("deviceToken", ""), "");
+  state.instanceId = asText(await ram.settings.get("instanceId", ""), "");
+  state.publishIntervalMs = asInt(await ram.settings.get("publishIntervalMs", "4000"), 4000, 1000, 60000);
+  state.enabled = asBool(await ram.settings.get("enabled", "true"), true);
+  state.pauseActions = asBool(await ram.settings.get("pauseActions", "false"), false);
+  if (!state.deviceId) {
+    state.deviceId = "dev-" + ram.randomId();
+    await ram.settings.set(DEVICE_ID_KEY, state.deviceId);
+  }
+  if (!state.wsUrl && state.hubUrl) {
+    state.wsUrl = deriveWsUrl(state.hubUrl);
+  }
+}
+
+function connTone() {
+  if (state.wsState === "OPEN") return "success";
+  if (state.wsState === "ERROR") return "error";
+  return "warn";
+}
+
+function lastPublishText() {
+  if (!state.lastPublishAtMs) return "Last push: never";
+  return "Last push: " + new Date(state.lastPublishAtMs).toLocaleTimeString();
+}
+
+function lastErrorText() {
+  return state.lastError ? "Last error: " + state.lastError : "Last error: none";
+}
+
+function renderUi() {
+  const paired = !!state.deviceToken;
+  const items = [
+    { id: "conn", type: "badge", text: "Hub: " + state.wsState, tone: connTone() },
+    { id: "instance", type: "badge", text: "Instance: " + (state.instanceId || "unpaired"), tone: "accent" },
+    { id: "last_publish", type: "badge", text: lastPublishText(), tone: "default" },
+    { id: "last_error", type: "badge", text: lastErrorText(), tone: state.lastError ? "error" : "default" },
+    { id: "divider_1", type: "divider" },
+  ];
+  if (!paired) {
+    items.push({ id: "hub_url", type: "text", label: "Hub URL", value: state.hubUrl, placeholder: "https://your-hub.up.railway.app" });
+    items.push({ id: "pairing_code", type: "text", label: "Pairing code", value: state.pairingCode, placeholder: "ABCD-EFGH" });
+    items.push({ id: "pair", type: "button", text: "Pair with hub" });
+  } else {
+    items.push({ id: "pause_actions", type: "toggle", label: "Pause remote actions", value: state.pauseActions });
+    items.push({ id: "reconnect", type: "button", text: "Reconnect" });
+    items.push({ id: "unpair", type: "button", text: "Unpair" });
+  }
+  ram.ui.set(items);
+}
+
+function patchUi() {
+  ram.ui.patch("conn", { text: "Hub: " + state.wsState, tone: connTone() });
+  ram.ui.patch("instance", { text: "Instance: " + (state.instanceId || "unpaired") });
+  ram.ui.patch("last_publish", { text: lastPublishText() });
+  ram.ui.patch("last_error", { text: lastErrorText(), tone: state.lastError ? "error" : "default" });
+}
+
+function setLastError(error) {
+  state.lastError = typeof error === "string" ? error : String(error);
+  ram.error(state.lastError);
+  patchUi();
+}
+
+function rememberCommand(id) {
+  if (!id) return;
+  handledCommandIds.set(id, Date.now());
+  if (handledCommandIds.size > 5000) {
+    const cutoff = Date.now() - 30 * 60 * 1000;
+    for (const entry of handledCommandIds.entries()) {
+      if (entry[1] < cutoff) handledCommandIds.delete(entry[0]);
+    }
+  }
+}
+
+async function sendWs(payload) {
+  if (!state.wsConnectionId || state.wsState !== "OPEN") return false;
+  try {
+    await ram.ws.send(state.wsConnectionId, payload);
+    return true;
+  } catch (error) {
+    scheduleReconnect(String(error));
+    return false;
+  }
+}
+
+async function sendHello() {
+  if (state.wsHelloSent) return;
+  if (!state.wsConnectionId || state.wsState !== "OPEN") return;
+  const ok = await sendWs({
+    type: "hello",
+    deviceToken: state.deviceToken,
+    deviceId: state.deviceId,
+    instanceId: state.instanceId,
+    ramVersion: "4",
+    capabilities: ["status", "commands"],
+  });
+  if (ok) state.wsHelloSent = true;
+}
+
+function scheduleReconnect(reason) {
+  state.wsConnectionId = "";
+  state.wsState = "DISCONNECTED";
+  state.wsHelloSent = false;
+  state.reconnectAttempt += 1;
+  const raw = Math.min(state.reconnectMaxMs, state.reconnectBaseMs * Math.pow(2, state.reconnectAttempt - 1));
+  const jitter = Math.floor(Math.random() * Math.min(1000, Math.max(100, raw * 0.2)));
+  state.nextAttemptAtMs = Date.now() + raw + jitter;
+  if (reason) ram.warn("Hub reconnect scheduled", reason);
+  patchUi();
+}
+
+async function connectIfNeeded() {
+  if (!state.enabled) return;
+  if (!state.deviceToken || !state.wsUrl) return;
+  if (state.wsConnectionId) return;
+  if (Date.now() < state.nextAttemptAtMs) return;
+  try {
+    state.wsState = "CONNECTING";
+    patchUi();
+    const result = await ram.ws.connect({ url: state.wsUrl });
+    state.wsConnectionId = String(result.connectionId || "");
+    state.wsState = asText(result.state, "CONNECTING").toUpperCase();
+    state.wsHelloSent = false;
+    await sendHello();
+    patchUi();
+  } catch (error) {
+    scheduleReconnect(String(error));
+  }
+}
+
+async function moveToGroup(userId, group) {
+  const accounts = await ram.invoke("get_accounts", {});
+  const list = Array.isArray(accounts) ? accounts : [];
+  let found = null;
+  for (const acc of list) {
+    if (Number(acc.UserID) === Number(userId)) {
+      found = acc;
+      break;
+    }
+  }
+  if (!found) throw new Error("account not found: " + userId);
+  found.Group = group;
+  await ram.invoke("update_account", { account: found });
+}
+
+async function runCommand(name, args) {
+  const a = args && typeof args === "object" ? args : {};
+  if (name === "list_accounts") {
+    const accounts = await ram.invoke("get_accounts", {});
+    return { accounts };
+  }
+  if (name === "add_account_cookie") {
+    const cookie = asText(a.cookie, "");
+    if (!cookie) throw new Error("missing cookie");
+    const info = await ram.invoke("validate_cookie", { cookie });
+    const userId = Number(info && info.user_id) || 0;
+    const username = asText(info && info.name, "");
+    await ram.invoke("add_account", {
+      securityToken: cookie,
+      username,
+      userId,
+      password: a.password ? String(a.password) : null,
+    });
+    if (a.group) {
+      await moveToGroup(userId, String(a.group));
+    }
+    return { userId, username };
+  }
+  if (name === "remove_account") {
+    const removed = await ram.invoke("remove_account", { userId: Number(a.userId) });
+    return { removed };
+  }
+  if (name === "move_to_group") {
+    const ids = Array.isArray(a.userIds) ? a.userIds : (a.userId !== undefined ? [a.userId] : []);
+    for (const id of ids) await moveToGroup(Number(id), String(a.group || ""));
+    return { moved: ids.length };
+  }
+  if (name === "start_generator") {
+    return await ram.invoke("start_generator", {
+      provider: asText(a.provider, "BloxGen"),
+      endpoint: asText(a.endpoint, ""),
+      apiKey: asText(a.apiKey, ""),
+      accountType: asText(a.accountType, ""),
+      extraDelaySeconds: asInt(a.extraDelaySeconds, 1, 0, 3600),
+      targetGroup: asText(a.targetGroup, ""),
+      maxAccounts: asInt(a.maxAccounts, 0, 0, 1000000),
+    });
+  }
+  if (name === "stop_generator") {
+    await ram.invoke("stop_generator", {});
+    return { ok: true };
+  }
+  if (name === "generator_test_key") {
+    const balance = await ram.invoke("generator_test_key", {
+      provider: asText(a.provider, "BloxGen"),
+      endpoint: asText(a.endpoint, ""),
+      apiKey: asText(a.apiKey, ""),
+    });
+    return { balance };
+  }
+  if (name === "start_botting") {
+    return await ram.invoke("start_botting_mode", {
+      userIds: Array.isArray(a.userIds) ? a.userIds.map(Number) : [],
+      placeId: Number(a.placeId) || 0,
+      jobId: asText(a.jobId, ""),
+      launchData: asText(a.launchData, ""),
+      playerUserIds: Array.isArray(a.playerUserIds) ? a.playerUserIds.map(Number) : [],
+      intervalMinutes: asInt(a.intervalMinutes, 30, 1, 1000000),
+      launchDelaySeconds: asInt(a.launchDelaySeconds, 10, 0, 1000000),
+      playerGraceMinutes: asInt(a.playerGraceMinutes, 10, 0, 1000000),
+    });
+  }
+  if (name === "stop_botting") {
+    await ram.invoke("stop_botting_mode", { closeBotAccounts: asBool(a.closeBotAccounts, false) });
+    return { ok: true };
+  }
+  if (name === "add_botting_accounts") {
+    return await ram.invoke("add_botting_accounts", {
+      userIds: Array.isArray(a.userIds) ? a.userIds.map(Number) : [],
+    });
+  }
+  if (name === "set_botting_players") {
+    const ids = Array.isArray(a.userIds) ? a.userIds : (Array.isArray(a.playerUserIds) ? a.playerUserIds : []);
+    return await ram.invoke("set_botting_player_accounts", { playerUserIds: ids.map(Number) });
+  }
+  if (name === "botting_account_action") {
+    const action = normalizeAction(a.action);
+    if (!action) throw new Error("invalid action");
+    return await ram.invoke("botting_account_action", { userId: Number(a.userId), action });
+  }
+  if (name === "ping") {
+    return { pong: true };
+  }
+  throw new Error("unsupported command: " + name);
+}
+
+async function handleCommand(msg) {
+  const id = asText(msg.id, "");
+  const name = asText(msg.name, "");
+  if (id && handledCommandIds.has(id)) return;
+  if (state.pauseActions) {
+    await sendWs({ type: "result", id, ok: false, error: "actions paused" });
+    return;
+  }
+  try {
+    const result = await runCommand(name, msg.args);
+    if (id) rememberCommand(id);
+    await sendWs({ type: "result", id, ok: true, result });
+  } catch (error) {
+    const message = error && error.message ? error.message : String(error);
+    await sendWs({ type: "result", id, ok: false, error: message });
+  }
+  await publishStatus("command", true);
+}
+
+async function handleServerMessage(msg) {
+  const type = asText(msg.type, "");
+  if (type === "helloAck") {
+    if (msg.ok === false) {
+      setLastError("pairing rejected: " + asText(msg.error, "unknown"));
+      await unpair();
+      return;
+    }
+    if (msg.instanceId) {
+      state.instanceId = String(msg.instanceId);
+      await ram.settings.set("instanceId", state.instanceId);
+    }
+    patchUi();
+    return;
+  }
+  if (type === "ping") {
+    await sendWs({ type: "pong", t: Date.now() });
+    return;
+  }
+  if (type === "command") {
+    await handleCommand(msg);
+    return;
+  }
+}
+
+async function publishStatus(trigger, full) {
+  if (!state.wsConnectionId || state.wsState !== "OPEN") return;
+  const snap = await ram.window.snapshot();
+  const presence = snap.presenceByUserId || {};
+  const launched = Array.isArray(snap.launchedUserIds) ? snap.launchedUserIds : [];
+  const accounts = (snap.accounts || []).map((acc) => {
+    const p = Number(presence[String(acc.userId)] || 0);
+    return {
+      userId: acc.userId,
+      username: acc.username,
+      alias: acc.alias,
+      group: acc.group,
+      valid: acc.valid,
+      lastUse: acc.lastUse,
+      presence: p,
+      online: p >= 1,
+      launched: launched.includes(acc.userId),
+    };
+  });
+  const sent = await sendWs({
+    type: "status",
+    full: full === true,
+    trigger,
+    ts: Date.now(),
+    instanceId: state.instanceId,
+    placeId: snap.placeId,
+    jobId: snap.jobId,
+    botting: snap.botting || null,
+    generator: snap.generator || null,
+    accounts,
+  });
+  if (sent) {
+    state.lastPublishAtMs = Date.now();
+    state.lastError = "";
+    patchUi();
+  }
+}
+
+async function pair() {
+  if (!state.hubUrl) {
+    setLastError("set the hub URL first");
+    return;
+  }
+  if (!state.pairingCode) {
+    setLastError("enter a pairing code");
+    return;
+  }
+  try {
+    const response = await ram.http.request({
+      url: state.hubUrl + "/agent/pair",
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: {
+        code: state.pairingCode,
+        deviceId: state.deviceId,
+        deviceName: "RAM",
+        ramVersion: "4",
+      },
+      timeoutMs: 15000,
+    });
+    const data = response.json || parseJson(response.text);
+    if (!response.ok || !data || !data.deviceToken) {
+      const reason = data && data.error ? data.error : String(response.status);
+      setLastError("pairing failed: " + reason);
+      return;
+    }
+    state.deviceToken = String(data.deviceToken);
+    state.instanceId = String(data.instanceId || "");
+    state.wsUrl = asText(data.wsUrl, deriveWsUrl(state.hubUrl));
+    await ram.settings.set("deviceToken", state.deviceToken);
+    await ram.settings.set("instanceId", state.instanceId);
+    await ram.settings.set("wsUrl", state.wsUrl);
+    state.pairingCode = "";
+    state.lastError = "";
+    ram.info("Paired with hub", state.instanceId);
+    renderUi();
+  } catch (error) {
+    setLastError("pairing error: " + String(error));
+  }
+}
+
+async function unpair() {
+  state.deviceToken = "";
+  state.instanceId = "";
+  await ram.settings.set("deviceToken", "");
+  await ram.settings.set("instanceId", "");
+  if (state.wsConnectionId) {
+    try {
+      await ram.ws.close(state.wsConnectionId, { code: 1000, reason: "unpair" });
+    } catch (error) {
+    }
+  }
+  state.wsConnectionId = "";
+  state.wsState = "DISCONNECTED";
+  renderUi();
+}
+
+ram.ws.on(async (evt) => {
+  if (!evt || typeof evt !== "object") return;
+  if (evt.connectionId && state.wsConnectionId && evt.connectionId !== state.wsConnectionId) return;
+  if (evt.event === "open") {
+    state.wsState = "OPEN";
+    state.reconnectAttempt = 0;
+    state.nextAttemptAtMs = 0;
+    await sendHello();
+    await publishStatus("open", true);
+    patchUi();
+    return;
+  }
+  if (evt.event === "error") {
+    state.wsState = "ERROR";
+    patchUi();
+    return;
+  }
+  if (evt.event === "close") {
+    state.wsHelloSent = false;
+    scheduleReconnect((String(evt.code || "") + " " + String(evt.reason || "")).trim());
+    return;
+  }
+  if (evt.event === "message") {
+    const msg = evt.json || parseJson(evt.text);
+    if (!msg || typeof msg !== "object") return;
+    await handleServerMessage(msg);
+  }
+});
+
+ram.ui.on(async (evt) => {
+  if (!evt || typeof evt !== "object") return;
+  if (evt.id === "hub_url" && evt.action === "change") {
+    state.hubUrl = trimTrailingSlash(asText(evt.value, ""));
+    await ram.settings.set("hubUrl", state.hubUrl);
+    return;
+  }
+  if (evt.id === "pairing_code" && evt.action === "change") {
+    state.pairingCode = asText(evt.value, "");
+    return;
+  }
+  if (evt.id === "pair" && evt.action === "click") {
+    await pair();
+    return;
+  }
+  if (evt.id === "unpair" && evt.action === "click") {
+    await unpair();
+    return;
+  }
+  if (evt.id === "pause_actions" && evt.action === "change") {
+    state.pauseActions = asBool(evt.value, state.pauseActions);
+    await ram.settings.set("pauseActions", state.pauseActions ? "true" : "false");
+    return;
+  }
+  if (evt.id === "reconnect" && evt.action === "click") {
+    if (state.wsConnectionId) {
+      try {
+        await ram.ws.close(state.wsConnectionId, { code: 1000, reason: "manual" });
+      } catch (error) {
+      }
+    }
+    state.wsConnectionId = "";
+    state.nextAttemptAtMs = 0;
+    state.reconnectAttempt = 0;
+    await connectIfNeeded();
+    patchUi();
+  }
+});
+
+await loadConfig();
+renderUi();
+ram.info("Hub Link started", { instanceId: state.instanceId, wsUrl: state.wsUrl });
+
+while (true) {
+  try {
+    await connectIfNeeded();
+    await publishStatus("interval", false);
+  } catch (error) {
+    setLastError(error);
+  }
+  await ram.sleep(state.publishIntervalMs);
+}
+`;
+
 function nowMs(): number {
   return Date.now();
 }
@@ -278,6 +841,18 @@ function defaultPermissions(): ScriptPermissions {
     allowModal: false,
     allowSettings: false,
     allowUi: false,
+  };
+}
+
+function allPermissions(): ScriptPermissions {
+  return {
+    allowInvoke: true,
+    allowHttp: true,
+    allowWebSocket: true,
+    allowWindow: true,
+    allowModal: true,
+    allowSettings: true,
+    allowUi: true,
   };
 }
 
@@ -330,7 +905,12 @@ function normalizeScript(input: ManagedScript): ManagedScript {
   };
 }
 
-function createScript(name: string, description: string, source: string): ManagedScript {
+function createScript(
+  name: string,
+  description: string,
+  source: string,
+  overrides?: Partial<Pick<ManagedScript, "trusted" | "autoStart" | "permissions">>
+): ManagedScript {
   const ts = nowMs();
   const normalizedName = trimToLength(name, SCRIPT_SECURITY_LIMITS.maxScriptNameChars) || "New Script";
   const normalizedDescription = trimToLength(
@@ -344,9 +924,9 @@ function createScript(name: string, description: string, source: string): Manage
     language: "javascript",
     source,
     enabled: true,
-    trusted: false,
-    autoStart: false,
-    permissions: defaultPermissions(),
+    trusted: overrides?.trusted ?? false,
+    autoStart: overrides?.autoStart ?? false,
+    permissions: overrides?.permissions ?? defaultPermissions(),
     createdAtMs: ts,
     updatedAtMs: ts,
   };
@@ -679,6 +1259,7 @@ export function ScriptsDialog({ open, onClose }: ScriptsDialogProps) {
     presenceByUserId: {},
     launchedUserIds: [],
     botting: null,
+    generator: null,
     settings: null,
   });
 
@@ -727,6 +1308,7 @@ export function ScriptsDialog({ open, onClose }: ScriptsDialogProps) {
       ),
       launchedUserIds: [...store.launchedByProgram],
       botting: store.bottingStatus,
+      generator: store.generatorStatus,
       settings: store.settings,
     };
   }, [
@@ -738,6 +1320,7 @@ export function ScriptsDialog({ open, onClose }: ScriptsDialogProps) {
     store.presenceByUserId,
     store.launchedByProgram,
     store.bottingStatus,
+    store.generatorStatus,
     store.settings,
   ]);
 
@@ -2012,30 +2595,35 @@ export function ScriptsDialog({ open, onClose }: ScriptsDialogProps) {
     return SCRIPT_INVOKE_COMMANDS.filter((command) => command.toLowerCase().includes(q));
   }, [apiSearch]);
 
-  async function handleCreate(kind: "blank" | "monitor" | "discord") {
+  async function handleCreate(kind: "blank" | "monitor" | "discord" | "hub") {
     const name =
       (await prompt(
-        kind === "discord"
-          ? "Script name"
-          : kind === "monitor"
-            ? "Script name"
-            : "Script name",
-        kind === "discord"
-          ? "Discord Bridge"
-          : kind === "monitor"
-            ? "Window Monitor"
-            : "New Script"
+        "Script name",
+        kind === "hub"
+          ? "Hub Link"
+          : kind === "discord"
+            ? "Discord Bridge"
+            : kind === "monitor"
+              ? "Window Monitor"
+              : "New Script"
       )) || "";
 
     const trimmed = name.trim();
     if (!trimmed) return;
 
     const script =
-      kind === "discord"
-        ? createScript(trimmed, "Send account presence to a local Discord bot bridge.", DISCORD_BRIDGE_TEMPLATE)
-        : kind === "monitor"
-          ? createScript(trimmed, "Watch app state, react to UI actions, and call commands.", DEFAULT_SCRIPT_SOURCE)
-          : createScript(trimmed, "", "ram.info(\"Hello from script\");\n");
+      kind === "hub"
+        ? createScript(
+            trimmed,
+            "Link this RAM to a remote hub for web and Discord control.",
+            HUB_LINK_TEMPLATE,
+            { trusted: true, autoStart: true, permissions: allPermissions() }
+          )
+        : kind === "discord"
+          ? createScript(trimmed, "Send account presence to a local Discord bot bridge.", DISCORD_BRIDGE_TEMPLATE)
+          : kind === "monitor"
+            ? createScript(trimmed, "Watch app state, react to UI actions, and call commands.", DEFAULT_SCRIPT_SOURCE)
+            : createScript(trimmed, "", "ram.info(\"Hello from script\");\n");
 
     const saved = await persistScript(script);
     if (!saved) return;
@@ -2435,6 +3023,16 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                       className="w-full text-left px-3 py-2 text-[12px] text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/70 transition-all duration-200"
                     >
                       {t("Discord Bridge Template")}
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setNewMenuOpen(false);
+                        void handleCreate("hub");
+                      }}
+                      className="w-full text-left px-3 py-2 text-[12px] text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800/70 transition-all duration-200"
+                    >
+                      {t("Hub Link Template")}
                     </button>
                   </div>
                 )}

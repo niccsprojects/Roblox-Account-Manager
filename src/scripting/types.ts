@@ -119,6 +119,7 @@ export interface ScriptWindowSnapshot {
   presenceByUserId: Record<string, number>;
   launchedUserIds: number[];
   botting: unknown;
+  generator: unknown;
   settings: Record<string, Record<string, string>> | null;
 }
 
