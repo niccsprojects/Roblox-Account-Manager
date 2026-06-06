@@ -623,6 +623,7 @@ async function handleServerMessage(msg) {
   if (type === "helloAck") {
     if (msg.ok === false) {
       setLastError("pairing rejected: " + asText(msg.error, "unknown"));
+      await unpair();
       return;
     }
     if (msg.instanceId) {
