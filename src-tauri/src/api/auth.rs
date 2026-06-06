@@ -75,7 +75,6 @@ pub async fn get_csrf_token(security_token: &str) -> Result<String, String> {
         .post("https://auth.roblox.com/v1/authentication-ticket/")
         .header(COOKIE, cookie_header(security_token))
         .header(REFERER, REFERER_URL)
-        .header("RBXAuthenticationNegotiation", "1")
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
@@ -112,7 +111,6 @@ pub async fn get_auth_ticket(security_token: &str) -> Result<String, String> {
         .header(COOKIE, cookie_header(security_token))
         .header("x-csrf-token", &csrf)
         .header(REFERER, REFERER_URL)
-        .header("RBXAuthenticationNegotiation", "1")
         .header("Content-Type", "application/json")
         .body("")
         .send()
@@ -397,6 +395,88 @@ pub async fn quick_login_validate_code(security_token: &str, code: &str) -> Resu
         Ok(())
     } else {
         Err("Failed to validate code".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- cookie_header tests ---
+
+    #[test]
+    fn cookie_header_formats_roblosecurity_prefix() {
+        let header = cookie_header("my_token_123");
+        assert_eq!(header, ".ROBLOSECURITY=my_token_123");
+    }
+
+    #[test]
+    fn cookie_header_with_empty_token() {
+        let header = cookie_header("");
+        assert_eq!(header, ".ROBLOSECURITY=");
+    }
+
+    #[test]
+    fn cookie_header_with_typical_warning_prefix_token() {
+        let token = "_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|abc123";
+        let header = cookie_header(token);
+        assert!(header.starts_with(".ROBLOSECURITY="));
+        assert!(header.contains(token));
+    }
+
+    #[test]
+    fn cookie_header_does_not_include_rbx_negotiation_header() {
+        // This regression test documents that the RBXAuthenticationNegotiation header
+        // was removed from the request building — the cookie_header helper only
+        // produces the .ROBLOSECURITY= cookie value, nothing else.
+        let header = cookie_header("token");
+        assert!(!header.contains("RBXAuthenticationNegotiation"));
+    }
+
+    // --- normalize_quick_login_code tests ---
+
+    #[test]
+    fn normalize_quick_login_code_keeps_only_digits() {
+        let result = normalize_quick_login_code("123456");
+        assert_eq!(result, "123456");
+    }
+
+    #[test]
+    fn normalize_quick_login_code_strips_non_digit_chars() {
+        let result = normalize_quick_login_code("abc123def456");
+        assert_eq!(result, "123456");
+    }
+
+    #[test]
+    fn normalize_quick_login_code_strips_spaces_and_dashes() {
+        let result = normalize_quick_login_code("12 34-56");
+        assert_eq!(result, "123456");
+    }
+
+    #[test]
+    fn normalize_quick_login_code_empty_input_yields_empty() {
+        let result = normalize_quick_login_code("");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn normalize_quick_login_code_all_non_digits_yields_empty() {
+        let result = normalize_quick_login_code("abcdef");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn normalize_quick_login_code_with_unicode_strips_non_ascii_digits() {
+        // Unicode digit characters (like \u{FF10} '０') should NOT be kept
+        // because the filter only passes ASCII digits via is_ascii_digit()
+        let result = normalize_quick_login_code("1\u{FF10}2");
+        assert_eq!(result, "12");
+    }
+
+    #[test]
+    fn normalize_quick_login_code_preserves_leading_zeros() {
+        let result = normalize_quick_login_code("007007");
+        assert_eq!(result, "007007");
     }
 }
 

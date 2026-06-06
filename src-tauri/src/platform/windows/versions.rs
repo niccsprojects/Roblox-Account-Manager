@@ -4,8 +4,8 @@ use futures_util::stream::{FuturesUnordered, StreamExt};
 use tauri::Manager;
 
 const CDN_HOST: &str = "https://setup-aws.rbxcdn.com";
-const WEAO_CURRENT_URL: &str = "https://weao.xyz/api/versions/current";
-const WEAO_PAST_URL: &str = "https://weao.xyz/api/versions/past";
+const WEAO_CURRENT_URL: &str = "https://weao.gg/api/versions/current";
+const WEAO_PAST_URL: &str = "https://weao.gg/api/versions/past";
 
 const EXTRACT_ROOTS: &[(&str, &str)] = &[
     ("RobloxApp.zip", ""),
@@ -714,4 +714,392 @@ pub fn resolve_roblox_install_path(
     }
 
     get_roblox_path().map(|p| (p, None))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- URL constant tests ---
+
+    #[test]
+    fn weao_current_url_uses_weao_gg_domain() {
+        assert!(
+            WEAO_CURRENT_URL.contains("weao.gg"),
+            "WEAO_CURRENT_URL should point to weao.gg, got: {}",
+            WEAO_CURRENT_URL
+        );
+        assert!(
+            !WEAO_CURRENT_URL.contains("weao.xyz"),
+            "WEAO_CURRENT_URL must not reference the old weao.xyz domain"
+        );
+    }
+
+    #[test]
+    fn weao_past_url_uses_weao_gg_domain() {
+        assert!(
+            WEAO_PAST_URL.contains("weao.gg"),
+            "WEAO_PAST_URL should point to weao.gg, got: {}",
+            WEAO_PAST_URL
+        );
+        assert!(
+            !WEAO_PAST_URL.contains("weao.xyz"),
+            "WEAO_PAST_URL must not reference the old weao.xyz domain"
+        );
+    }
+
+    #[test]
+    fn weao_current_url_has_expected_path() {
+        assert_eq!(WEAO_CURRENT_URL, "https://weao.gg/api/versions/current");
+    }
+
+    #[test]
+    fn weao_past_url_has_expected_path() {
+        assert_eq!(WEAO_PAST_URL, "https://weao.gg/api/versions/past");
+    }
+
+    // --- channel_base_url tests ---
+
+    #[test]
+    fn channel_base_url_live_returns_cdn_root() {
+        let url = channel_base_url("LIVE");
+        assert_eq!(url, format!("{}/", CDN_HOST));
+    }
+
+    #[test]
+    fn channel_base_url_lowercase_live_returns_cdn_root() {
+        let url = channel_base_url("live");
+        assert_eq!(url, format!("{}/", CDN_HOST));
+    }
+
+    #[test]
+    fn channel_base_url_mixed_case_live_returns_cdn_root() {
+        let url = channel_base_url("LiVe");
+        assert_eq!(url, format!("{}/", CDN_HOST));
+    }
+
+    #[test]
+    fn channel_base_url_empty_returns_cdn_root() {
+        let url = channel_base_url("");
+        assert_eq!(url, format!("{}/", CDN_HOST));
+    }
+
+    #[test]
+    fn channel_base_url_whitespace_only_returns_cdn_root() {
+        let url = channel_base_url("  ");
+        assert_eq!(url, format!("{}/", CDN_HOST));
+    }
+
+    #[test]
+    fn channel_base_url_custom_channel_includes_channel_path() {
+        let url = channel_base_url("zcanary");
+        assert_eq!(url, format!("{}/channel/zcanary/", CDN_HOST));
+    }
+
+    #[test]
+    fn channel_base_url_normalizes_channel_to_lowercase() {
+        let url = channel_base_url("ZCanary");
+        assert_eq!(url, format!("{}/channel/zcanary/", CDN_HOST));
+    }
+
+    #[test]
+    fn channel_base_url_with_leading_whitespace_is_trimmed() {
+        let url = channel_base_url("  zcanary  ");
+        assert_eq!(url, format!("{}/channel/zcanary/", CDN_HOST));
+    }
+
+    // --- is_valid_channel_name tests ---
+
+    #[test]
+    fn is_valid_channel_name_accepts_alphanumeric() {
+        assert!(is_valid_channel_name("LIVE"));
+        assert!(is_valid_channel_name("zcanary"));
+        assert!(is_valid_channel_name("channel123"));
+    }
+
+    #[test]
+    fn is_valid_channel_name_accepts_allowed_special_chars() {
+        assert!(is_valid_channel_name("my_channel"));
+        assert!(is_valid_channel_name("my-channel"));
+        assert!(is_valid_channel_name("my.channel"));
+    }
+
+    #[test]
+    fn is_valid_channel_name_rejects_empty_string() {
+        assert!(!is_valid_channel_name(""));
+    }
+
+    #[test]
+    fn is_valid_channel_name_rejects_dot_only() {
+        assert!(!is_valid_channel_name("."));
+    }
+
+    #[test]
+    fn is_valid_channel_name_rejects_double_dot() {
+        assert!(!is_valid_channel_name(".."));
+    }
+
+    #[test]
+    fn is_valid_channel_name_rejects_name_exceeding_64_chars() {
+        let long_name = "a".repeat(65);
+        assert!(!is_valid_channel_name(&long_name));
+    }
+
+    #[test]
+    fn is_valid_channel_name_accepts_exactly_64_chars() {
+        let name_64 = "a".repeat(64);
+        assert!(is_valid_channel_name(&name_64));
+    }
+
+    #[test]
+    fn is_valid_channel_name_rejects_spaces() {
+        assert!(!is_valid_channel_name("my channel"));
+        assert!(!is_valid_channel_name(" channel"));
+    }
+
+    #[test]
+    fn is_valid_channel_name_rejects_slashes() {
+        assert!(!is_valid_channel_name("my/channel"));
+        assert!(!is_valid_channel_name("my\\channel"));
+    }
+
+    #[test]
+    fn is_valid_channel_name_rejects_path_traversal_chars() {
+        assert!(!is_valid_channel_name("../etc"));
+        assert!(!is_valid_channel_name("../../root"));
+    }
+
+    // --- is_valid_version_hash tests ---
+
+    #[test]
+    fn is_valid_version_hash_accepts_typical_hash() {
+        assert!(is_valid_version_hash("version-0123456789abcdef"));
+    }
+
+    #[test]
+    fn is_valid_version_hash_accepts_min_length_hash() {
+        // minimum: "version-" (8 chars) + 1 hex char = 9 chars
+        assert!(is_valid_version_hash("version-a"));
+    }
+
+    #[test]
+    fn is_valid_version_hash_rejects_too_short() {
+        // "version-" is 8 chars, total = 8, less than min 9
+        assert!(!is_valid_version_hash("version-"));
+    }
+
+    #[test]
+    fn is_valid_version_hash_rejects_missing_prefix() {
+        assert!(!is_valid_version_hash("0123456789abcdef"));
+        assert!(!is_valid_version_hash("v-0123456789abcdef"));
+    }
+
+    #[test]
+    fn is_valid_version_hash_rejects_non_hex_chars_after_prefix() {
+        assert!(!is_valid_version_hash("version-xyz_not_hex"));
+        assert!(!is_valid_version_hash("version-GGG"));
+    }
+
+    #[test]
+    fn is_valid_version_hash_rejects_too_long() {
+        // max is 96 chars total
+        let too_long = format!("version-{}", "a".repeat(96));
+        assert!(!is_valid_version_hash(&too_long));
+    }
+
+    #[test]
+    fn is_valid_version_hash_accepts_at_max_length() {
+        // max is 96 chars total: "version-" (8) + 88 hex chars = 96
+        let max_len = format!("version-{}", "a".repeat(88));
+        assert!(is_valid_version_hash(&max_len));
+    }
+
+    #[test]
+    fn is_valid_version_hash_rejects_empty() {
+        assert!(!is_valid_version_hash(""));
+    }
+
+    // --- extract_root_for tests ---
+
+    #[test]
+    fn extract_root_for_roblox_app_zip_returns_empty_root() {
+        assert_eq!(extract_root_for("RobloxApp.zip"), Some(""));
+    }
+
+    #[test]
+    fn extract_root_for_shaders_zip_returns_shaders_subdir() {
+        assert_eq!(extract_root_for("shaders.zip"), Some("shaders/"));
+    }
+
+    #[test]
+    fn extract_root_for_ssl_zip_returns_ssl_subdir() {
+        assert_eq!(extract_root_for("ssl.zip"), Some("ssl/"));
+    }
+
+    #[test]
+    fn extract_root_for_content_avatar_zip_returns_content_avatar_subdir() {
+        assert_eq!(extract_root_for("content-avatar.zip"), Some("content/avatar/"));
+    }
+
+    #[test]
+    fn extract_root_for_case_insensitive_match() {
+        assert_eq!(extract_root_for("ROBLOXAPP.ZIP"), Some(""));
+        assert_eq!(extract_root_for("Shaders.Zip"), Some("shaders/"));
+    }
+
+    #[test]
+    fn extract_root_for_unknown_filename_returns_none() {
+        assert_eq!(extract_root_for("unknown.zip"), None);
+        assert_eq!(extract_root_for("SomeOther.zip"), None);
+        assert_eq!(extract_root_for(""), None);
+    }
+
+    // --- parse_pkg_manifest tests ---
+
+    #[test]
+    fn parse_pkg_manifest_rejects_empty_input() {
+        let result = parse_pkg_manifest("");
+        assert!(result.is_err(), "empty manifest should fail");
+    }
+
+    #[test]
+    fn parse_pkg_manifest_rejects_wrong_header() {
+        let result = parse_pkg_manifest("v1\nRobloxApp.zip\nabc123\n1234\nsome_sig");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unexpected manifest header"));
+    }
+
+    #[test]
+    fn parse_pkg_manifest_accepts_v0_header_case_insensitive() {
+        // "V0" should be accepted same as "v0"
+        let manifest = "V0\nRobloxApp.zip\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n1234\nsome_sig";
+        let result = parse_pkg_manifest(manifest);
+        // May parse with no packages (hash length != 32 or 64) but should not error
+        assert!(result.is_ok(), "V0 header should be accepted");
+    }
+
+    #[test]
+    fn parse_pkg_manifest_parses_single_zip_entry_with_md5_hash() {
+        let md5_hash = "a".repeat(32); // 32 hex chars = MD5
+        let manifest = format!(
+            "v0\nRobloxApp.zip\n{}\n12345\nsome_signature\n",
+            md5_hash
+        );
+        let result = parse_pkg_manifest(&manifest).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].filename, "RobloxApp.zip");
+        assert_eq!(result[0].hash, Some(md5_hash));
+    }
+
+    #[test]
+    fn parse_pkg_manifest_parses_single_zip_entry_with_sha256_hash() {
+        let sha256_hash = "b".repeat(64); // 64 hex chars = SHA-256
+        let manifest = format!(
+            "v0\nRobloxApp.zip\n{}\n12345\nsome_signature\n",
+            sha256_hash
+        );
+        let result = parse_pkg_manifest(&manifest).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].filename, "RobloxApp.zip");
+        assert_eq!(result[0].hash, Some(sha256_hash));
+    }
+
+    #[test]
+    fn parse_pkg_manifest_treats_non_hex_hash_as_none() {
+        let manifest = "v0\nRobloxApp.zip\nnot_a_valid_hash_!!\n12345\nsome_signature\n";
+        let result = parse_pkg_manifest(manifest).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].hash, None);
+    }
+
+    #[test]
+    fn parse_pkg_manifest_skips_non_zip_entries() {
+        let md5_hash = "c".repeat(32);
+        let manifest = format!(
+            "v0\nsome_non_zip_file.txt\n{}\n12345\nsome_sig\nRobloxApp.zip\n{}\n67890\nother_sig\n",
+            md5_hash, md5_hash
+        );
+        let result = parse_pkg_manifest(&manifest).unwrap();
+        // Only RobloxApp.zip should be parsed
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].filename, "RobloxApp.zip");
+    }
+
+    #[test]
+    fn parse_pkg_manifest_returns_empty_vec_for_header_only() {
+        let result = parse_pkg_manifest("v0").unwrap();
+        assert!(result.is_empty(), "header-only manifest should yield empty vec");
+    }
+
+    #[test]
+    fn parse_pkg_manifest_handles_multiple_packages() {
+        let hash32 = "d".repeat(32);
+        let hash64 = "e".repeat(64);
+        let manifest = format!(
+            "v0\nRobloxApp.zip\n{}\n11111\nsig1\nshaders.zip\n{}\n22222\nsig2\n",
+            hash32, hash64
+        );
+        let result = parse_pkg_manifest(&manifest).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].filename, "RobloxApp.zip");
+        assert_eq!(result[0].hash, Some(hash32));
+        assert_eq!(result[1].filename, "shaders.zip");
+        assert_eq!(result[1].hash, Some(hash64));
+    }
+
+    // --- verify_hash tests ---
+
+    #[test]
+    fn verify_hash_accepts_unknown_hash_length() {
+        // Lengths != 32 and != 64 should always return true (no verification)
+        assert!(verify_hash(b"any data", "tooshort"));
+        assert!(verify_hash(b"", "12345"));
+    }
+
+    #[test]
+    fn verify_hash_validates_md5_correctly() {
+        use md5::Digest;
+        let data = b"hello world";
+        let mut hasher = md5::Md5::new();
+        hasher.update(data);
+        let computed = hasher.finalize();
+        let hex: String = computed.iter().map(|b| format!("{:02x}", b)).collect();
+        assert!(verify_hash(data, &hex), "correct md5 should verify");
+    }
+
+    #[test]
+    fn verify_hash_rejects_wrong_md5() {
+        let wrong_md5 = "a".repeat(32);
+        // "hello world" MD5 is not all 'a's
+        assert!(!verify_hash(b"hello world", &wrong_md5));
+    }
+
+    #[test]
+    fn verify_hash_validates_sha256_correctly() {
+        use sha2::Digest;
+        let data = b"hello world";
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(data);
+        let computed = hasher.finalize();
+        let hex: String = computed.iter().map(|b| format!("{:02x}", b)).collect();
+        assert!(verify_hash(data, &hex), "correct sha256 should verify");
+    }
+
+    #[test]
+    fn verify_hash_rejects_wrong_sha256() {
+        let wrong_sha256 = "f".repeat(64);
+        // "hello world" SHA256 is not all 'f's
+        assert!(!verify_hash(b"hello world", &wrong_sha256));
+    }
+
+    #[test]
+    fn verify_hash_is_case_insensitive_for_md5() {
+        use md5::Digest;
+        let data = b"test data";
+        let mut hasher = md5::Md5::new();
+        hasher.update(data);
+        let computed = hasher.finalize();
+        let hex_upper: String = computed.iter().map(|b| format!("{:02X}", b)).collect();
+        assert!(verify_hash(data, &hex_upper), "uppercase hex md5 should verify");
+    }
 }
