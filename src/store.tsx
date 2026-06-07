@@ -266,6 +266,7 @@ export interface StoreValue {
   generatorStatus: GeneratorStatus | null;
   versionsDialogOpen: boolean;
   setVersionsDialogOpen: (open: boolean) => void;
+  setDefaultVersion: (versionId: string | null) => void;
   missingAssets: { userId: number; username: string; assetIds: number[] } | null;
   setMissingAssets: (v: { userId: number; username: string; assetIds: number[] } | null) => void;
 
@@ -1167,6 +1168,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setFirstRunWalkthroughMode("manual");
   }, []);
 
+  const setDefaultVersion = useCallback(
+    async (versionId: string | null) => {
+      const value = versionId ?? "";
+      setSettings((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          Versions: {
+            ...(prev.Versions || {}),
+            DefaultVersion: value,
+          },
+        };
+      });
+      try {
+        await invoke("versions_set_default", { versionId });
+      } catch (e) {
+        addToast(tr("Failed to set version: {{error}}", { error: String(e) }));
+      }
+    },
+    [addToast]
+  );
+
   const setFirstRunWalkthroughStateLocal = useCallback((state: "completed" | "skipped") => {
     setSettings((prev) => {
       if (!prev) return prev;
@@ -1997,6 +2020,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     generatorStatus,
     versionsDialogOpen,
     setVersionsDialogOpen,
+    setDefaultVersion,
     missingAssets,
     setMissingAssets,
     nexusOpen,

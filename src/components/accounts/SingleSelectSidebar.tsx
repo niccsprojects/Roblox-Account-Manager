@@ -73,24 +73,6 @@ export function SingleSelectSidebar() {
     };
   }, []);
 
-  async function handleVersionOverrideChange(versionId: string) {
-    try {
-      await invoke("versions_set_account_override", {
-        userId: account.UserID,
-        versionId: versionId || null,
-      });
-      const fields = { ...account.Fields };
-      if (versionId) {
-        fields.RobloxVersion = versionId;
-      } else {
-        delete fields.RobloxVersion;
-      }
-      store.updateAccount({ ...account, Fields: fields });
-    } catch (e) {
-      store.addToast(tr("Failed to set version: {{error}}", { error: String(e) }));
-    }
-  }
-
   function handleSetAlias() {
     store.updateAccount({ ...account, Alias: alias.slice(0, 30) });
     store.addToast(tr("Alias updated"));
@@ -374,9 +356,9 @@ export function SingleSelectSidebar() {
         {installedVersions.length > 0 && (
           <SidebarSection title={t("Roblox Version")}>
             <Select
-              value={account.Fields?.RobloxVersion ?? ""}
+              value={store.settings?.Versions?.DefaultVersion ?? ""}
               options={[
-                { value: "", label: t("Default") },
+                { value: "", label: t("Latest installed") },
                 ...installedVersions.map((v) => ({
                   value: `${v.channel}:${v.versionHash}`,
                   label:
@@ -384,7 +366,7 @@ export function SingleSelectSidebar() {
                     `${v.channel} · ${v.displayVersion ?? v.versionHash.slice(8, 16)}`,
                 })),
               ]}
-              onChange={handleVersionOverrideChange}
+              onChange={(versionId) => store.setDefaultVersion(versionId || null)}
               className="w-full"
             />
             <button
