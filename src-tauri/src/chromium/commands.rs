@@ -147,19 +147,21 @@ pub async fn open_login_browser(
 
     let port = port.ok_or("Could not start the login browser")?;
 
+    let mut cdp = match CdpClient::connect(port).await {
+        Ok(cdp) => cdp,
+        Err(e) => {
+            chromium.close_login_session();
+            return Err(e);
+        }
+    };
+    if let Err(e) = setup_login_session(&mut cdp, stealth, persistent, start_url).await {
+        chromium.close_login_session();
+        return Err(e);
+    }
+
     let app_task = app.clone();
     tauri::async_runtime::spawn(async move {
-        let Ok(mut cdp) = CdpClient::connect(port).await else {
-            return;
-        };
         let chromium = app_task.state::<ChromiumManager>();
-        if setup_login_session(&mut cdp, stealth, persistent, start_url)
-            .await
-            .is_err()
-        {
-            chromium.close_login_session();
-            return;
-        }
         for _ in 0..480 {
             if !chromium.is_alive(LOGIN_KEY) {
                 return;
@@ -237,7 +239,9 @@ pub async fn import_userpass(
     if let Err(e) = setup_login_session(&mut cdp, stealth, persistent, start_url).await {
         chromium.close_login_session();
         if !persistent {
-            let _ = std::fs::remove_dir_all(&profile);
+            if let Err(cleanup) = wipe_profile_dir(&profile) {
+                return Err(format!("{}; {}", e, cleanup));
+            }
         }
         return Err(e);
     }
