@@ -471,6 +471,17 @@ fn wipe_full_versions(
             }
             wipe_path(&base.join("Logs"), report, dry.as_deref_mut());
             wipe_path(&base.join("Downloads"), report, dry.as_deref_mut());
+
+            let launcher_versions = base.join("Versions");
+            if let Ok(entries) = std::fs::read_dir(&launcher_versions) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !include_studio && path.join("RobloxStudioBeta.exe").exists() {
+                        continue;
+                    }
+                    wipe_path(&path, report, dry.as_deref_mut());
+                }
+            }
         }
     }
 }

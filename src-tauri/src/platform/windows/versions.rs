@@ -713,5 +713,23 @@ pub fn resolve_roblox_install_path(
         return Ok((entry.install_path.clone(), Some(entry.version_id())));
     }
 
+    if let Some(entry) = most_recently_used_version(catalog) {
+        return Ok((entry.install_path.clone(), Some(entry.version_id())));
+    }
+
     get_roblox_path().map(|p| (p, None))
+}
+
+fn most_recently_used_version(
+    catalog: &crate::data::versions::VersionsCatalogStore,
+) -> Option<crate::data::versions::VersionEntry> {
+    catalog
+        .list()
+        .into_iter()
+        .filter(|entry| {
+            std::path::Path::new(&entry.install_path)
+                .join("RobloxPlayerBeta.exe")
+                .exists()
+        })
+        .max_by_key(|entry| entry.last_launched_at.or(entry.installed_at))
 }

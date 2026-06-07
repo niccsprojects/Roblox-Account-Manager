@@ -338,6 +338,18 @@ impl SettingsStore {
             }
         }
 
+        let login_defaults: &[(&str, &str)] = &[
+            ("PersistentProfile", "true"),
+            ("StealthMode", "true"),
+        ];
+
+        let login = ini.section("Login");
+        for (key, value) in login_defaults {
+            if !login.exists(key) {
+                login.set(key, value, None);
+            }
+        }
+
         ini.section("Prompts");
 
         drop(ini);
