@@ -1171,9 +1171,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setDefaultVersion = useCallback(
     async (versionId: string | null) => {
       const value = versionId ?? "";
-      const previous = settings?.Versions?.DefaultVersion ?? "";
+      let previous = "";
       setSettings((prev) => {
         if (!prev) return prev;
+        previous = prev.Versions?.DefaultVersion ?? "";
         return {
           ...prev,
           Versions: {
@@ -1198,7 +1199,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addToast(tr("Failed to set version: {{error}}", { error: String(e) }));
       }
     },
-    [addToast, settings]
+    [addToast]
   );
 
   const setFirstRunWalkthroughStateLocal = useCallback((state: "completed" | "skipped") => {

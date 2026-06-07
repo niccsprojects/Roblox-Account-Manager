@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -88,22 +89,35 @@ pub async fn open_account_browser(
     }
 }
 
+fn wipe_profile_dir(profile: &Path) -> Result<(), String> {
+    match std::fs::remove_dir_all(profile) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!(
+            "Could not clear login profile at {}: {}",
+            profile.display(),
+            e
+        )),
+    }
+}
+
 async fn setup_login_session(
     cdp: &mut CdpClient,
     stealth: bool,
     persistent: bool,
     start_url: &str,
-) {
+) -> Result<(), String> {
     if stealth {
         let _ = cdp.inject_stealth().await;
     }
     if persistent {
-        let _ = cdp.delete_roblosecurity(".roblox.com").await;
-        let _ = cdp.delete_roblosecurity("www.roblox.com").await;
+        cdp.delete_roblosecurity(".roblox.com").await?;
+        cdp.delete_roblosecurity("www.roblox.com").await?;
     }
     if start_url != ROBLOX_LOGIN_URL {
-        let _ = cdp.navigate(ROBLOX_LOGIN_URL).await;
+        cdp.navigate(ROBLOX_LOGIN_URL).await?;
     }
+    Ok(())
 }
 
 #[tauri::command]
@@ -120,7 +134,7 @@ pub async fn open_login_browser(
 
     let profile = ChromiumManager::login_profile(&app)?;
     if !persistent {
-        let _ = std::fs::remove_dir_all(&profile);
+        wipe_profile_dir(&profile)?;
     }
 
     let start_url = if persistent || stealth {
@@ -138,8 +152,14 @@ pub async fn open_login_browser(
         let Ok(mut cdp) = CdpClient::connect(port).await else {
             return;
         };
-        setup_login_session(&mut cdp, stealth, persistent, start_url).await;
         let chromium = app_task.state::<ChromiumManager>();
+        if setup_login_session(&mut cdp, stealth, persistent, start_url)
+            .await
+            .is_err()
+        {
+            chromium.close_login_session();
+            return;
+        }
         for _ in 0..480 {
             if !chromium.is_alive(LOGIN_KEY) {
                 return;
@@ -200,7 +220,7 @@ pub async fn import_userpass(
 
     let profile = ChromiumManager::login_profile(&app)?;
     if !persistent {
-        let _ = std::fs::remove_dir_all(&profile);
+        wipe_profile_dir(&profile)?;
     }
 
     let start_url = if persistent || stealth {
@@ -214,7 +234,13 @@ pub async fn import_userpass(
     let port = port.ok_or("Could not start the login browser")?;
     let mut cdp = CdpClient::connect(port).await?;
 
-    setup_login_session(&mut cdp, stealth, persistent, start_url).await;
+    if let Err(e) = setup_login_session(&mut cdp, stealth, persistent, start_url).await {
+        chromium.close_login_session();
+        if !persistent {
+            let _ = std::fs::remove_dir_all(&profile);
+        }
+        return Err(e);
+    }
 
     if cdp.wait_for_selector("#login-username", 40).await {
         let _ = cdp.fill_login(&username, &password).await;
