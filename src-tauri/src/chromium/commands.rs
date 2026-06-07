@@ -88,6 +88,24 @@ pub async fn open_account_browser(
     }
 }
 
+async fn setup_login_session(
+    cdp: &mut CdpClient,
+    stealth: bool,
+    persistent: bool,
+    start_url: &str,
+) {
+    if stealth {
+        let _ = cdp.inject_stealth().await;
+    }
+    if persistent {
+        let _ = cdp.delete_roblosecurity(".roblox.com").await;
+        let _ = cdp.delete_roblosecurity("www.roblox.com").await;
+    }
+    if start_url != ROBLOX_LOGIN_URL {
+        let _ = cdp.navigate(ROBLOX_LOGIN_URL).await;
+    }
+}
+
 #[tauri::command]
 pub async fn open_login_browser(
     app: AppHandle,
@@ -120,16 +138,7 @@ pub async fn open_login_browser(
         let Ok(mut cdp) = CdpClient::connect(port).await else {
             return;
         };
-        if stealth {
-            let _ = cdp.inject_stealth().await;
-        }
-        if persistent {
-            let _ = cdp.delete_roblosecurity(".roblox.com").await;
-            let _ = cdp.delete_roblosecurity("www.roblox.com").await;
-        }
-        if start_url != ROBLOX_LOGIN_URL {
-            let _ = cdp.navigate(ROBLOX_LOGIN_URL).await;
-        }
+        setup_login_session(&mut cdp, stealth, persistent, start_url).await;
         let chromium = app_task.state::<ChromiumManager>();
         for _ in 0..480 {
             if !chromium.is_alive(LOGIN_KEY) {
@@ -205,16 +214,7 @@ pub async fn import_userpass(
     let port = port.ok_or("Could not start the login browser")?;
     let mut cdp = CdpClient::connect(port).await?;
 
-    if stealth {
-        let _ = cdp.inject_stealth().await;
-    }
-    if persistent {
-        let _ = cdp.delete_roblosecurity(".roblox.com").await;
-        let _ = cdp.delete_roblosecurity("www.roblox.com").await;
-    }
-    if start_url != ROBLOX_LOGIN_URL {
-        let _ = cdp.navigate(ROBLOX_LOGIN_URL).await;
-    }
+    setup_login_session(&mut cdp, stealth, persistent, start_url).await;
 
     if cdp.wait_for_selector("#login-username", 40).await {
         let _ = cdp.fill_login(&username, &password).await;

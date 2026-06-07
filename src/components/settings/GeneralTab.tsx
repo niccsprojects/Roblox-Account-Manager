@@ -235,7 +235,7 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
         checked={s.get("Login", "StealthMode", "true") !== "false"}
         onChange={(v) => s.setBool("Login", "StealthMode", v)}
         label="Reduce automation signals"
-        description="Hide browser automation flags Roblox can detect during login. Helps lower captcha prompts"
+        description="Hide browser automation flags Roblox can detect during login. Helps lower captcha prompts but is not a complete solution"
       />
 
       <Divider />

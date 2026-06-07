@@ -713,14 +713,14 @@ pub fn resolve_roblox_install_path(
         return Ok((entry.install_path.clone(), Some(entry.version_id())));
     }
 
-    if let Some(entry) = latest_installed_version(catalog) {
+    if let Some(entry) = most_recently_used_version(catalog) {
         return Ok((entry.install_path.clone(), Some(entry.version_id())));
     }
 
     get_roblox_path().map(|p| (p, None))
 }
 
-fn latest_installed_version(
+fn most_recently_used_version(
     catalog: &crate::data::versions::VersionsCatalogStore,
 ) -> Option<crate::data::versions::VersionEntry> {
     catalog

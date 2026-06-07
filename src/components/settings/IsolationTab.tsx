@@ -57,6 +57,13 @@ export function IsolationTab({ s }: { s: UseSettingsReturn }) {
   }
 
   useEffect(() => {
+    const stored = s.get("Isolation", "Mode", "Off").trim().toLowerCase();
+    if (stored === "light" || stored === "medium") {
+      s.set("Isolation", "Mode", "Full");
+    }
+  }, []);
+
+  useEffect(() => {
     if (spoofMac && adapters.length === 0 && !adaptersLoading) {
       void loadAdapters();
     }
