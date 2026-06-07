@@ -234,7 +234,18 @@ pub async fn import_userpass(
     chromium.track(LOGIN_KEY, child);
 
     let port = port.ok_or("Could not start the login browser")?;
-    let mut cdp = CdpClient::connect(port).await?;
+    let mut cdp = match CdpClient::connect(port).await {
+        Ok(cdp) => cdp,
+        Err(e) => {
+            chromium.close_login_session();
+            if !persistent {
+                if let Err(cleanup) = wipe_profile_dir(&profile) {
+                    return Err(format!("{}; {}", e, cleanup));
+                }
+            }
+            return Err(e);
+        }
+    };
 
     if let Err(e) = setup_login_session(&mut cdp, stealth, persistent, start_url).await {
         chromium.close_login_session();
