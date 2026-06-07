@@ -224,6 +224,21 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
       />
 
       <Divider />
+      <SectionLabel>Login Browser</SectionLabel>
+      <Toggle
+        checked={s.get("Login", "PersistentProfile", "true") !== "false"}
+        onChange={(v) => s.setBool("Login", "PersistentProfile", v)}
+        label="Persistent login profile"
+        description="Reuse the login browser profile so the device builds trust over time, which cuts down on login captchas. Only the Roblox sign-in cookie is cleared before each login"
+      />
+      <Toggle
+        checked={s.get("Login", "StealthMode", "true") !== "false"}
+        onChange={(v) => s.setBool("Login", "StealthMode", v)}
+        label="Reduce automation signals"
+        description="Hide browser automation flags Roblox can detect during login. Helps lower captcha prompts"
+      />
+
+      <Divider />
       <SectionLabel>Hidden Names</SectionLabel>
 
       <NumberField
