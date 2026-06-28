@@ -36,6 +36,7 @@ export function IsolationTab({ s }: { s: UseSettingsReturn }) {
   const spoofMac = s.getBool("Isolation", "SpoofMacAddress");
   const targetAdapter = s.get("Isolation", "TargetAdapter", "");
   const includeStudio = s.getBool("Isolation", "IncludeStudio");
+  const reinstallRoblox = s.get("Isolation", "ReinstallRoblox", "true") !== "false";
   const preserveFastFlags = s.get("Isolation", "PreserveFastFlags", "true") !== "false";
   const preserveBasicSettings =
     s.get("Isolation", "PreserveBasicSettings", "true") !== "false";
@@ -167,6 +168,17 @@ export function IsolationTab({ s }: { s: UseSettingsReturn }) {
           </button>
         ))}
       </div>
+
+      {fullActive && (
+        <div className="mt-1.5">
+          <Toggle
+            checked={reinstallRoblox}
+            onChange={(v) => s.setBool("Isolation", "ReinstallRoblox", v)}
+            label="Reinstall Roblox after wipe"
+            description="RAM installs a clean Roblox into the standard location after clearing it (cached, so it only downloads when Roblox updates). Turn off to let Roblox reinstall itself."
+          />
+        </div>
+      )}
 
       <Divider />
       <SectionLabel>Hardware Identifiers</SectionLabel>

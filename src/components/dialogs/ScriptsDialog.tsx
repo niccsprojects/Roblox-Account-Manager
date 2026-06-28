@@ -34,7 +34,7 @@ import {
 } from "../../scripting/security";
 import { createScriptWorker } from "../../scripting/workerSource";
 import { Select } from "../ui/Select";
-import { MenuItemView } from "../menus/MenuItemView";
+import { MenuItemView, MenuLevel } from "../menus/MenuItemView";
 import type { MenuItem } from "../menus/MenuItemView";
 import type {
   ManagedScript,
@@ -3678,13 +3678,16 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                 top: scriptContextPos?.top ?? scriptContextMenu.y,
               }}
             >
-              {scriptContextItems.map((item, index) => (
-                <MenuItemView
-                  key={`${contextScript.id}-${index}`}
-                  item={item}
-                  close={closeScriptContextMenu}
-                />
-              ))}
+              <MenuLevel>
+                {scriptContextItems.map((item, index) => (
+                  <MenuItemView
+                    key={`${contextScript.id}-${index}`}
+                    item={item}
+                    close={closeScriptContextMenu}
+                    itemKey={String(index)}
+                  />
+                ))}
+              </MenuLevel>
             </div>
           )}
         </div>

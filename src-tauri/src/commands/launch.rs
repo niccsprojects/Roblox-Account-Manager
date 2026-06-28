@@ -29,26 +29,69 @@ async fn launch_roblox(
         .and_then(|a| a.fields.get("RobloxVersion").cloned())
         .filter(|v| !v.trim().is_empty());
 
-    let (resolved_base_path, resolved_version_id) =
+    let (mut resolved_base_path, resolved_version_id) =
         windows::resolve_roblox_install_path(account_version_override.as_deref(), &settings, &versions)?;
     let isolation_will_wipe_install = settings
         .get_string("Isolation", "Mode")
         .eq_ignore_ascii_case("Full")
         && resolved_version_id.is_none();
-    let use_old_join = if isolation_will_wipe_install {
-        false
+    let reinstall_roblox = isolation_will_wipe_install
+        && settings.get_string("Isolation", "ReinstallRoblox") != "false";
+
+    let pristine = if reinstall_roblox {
+        match windows::ensure_pristine_roblox(&app).await {
+            Ok(p) => Some(p),
+            Err(e) => {
+                let _ = app.emit(
+                    "isolation-progress",
+                    serde_json::json!({ "stage": "reinstall-failed", "message": e, "pathsCleaned": 0, "bytesFreed": 0, "finished": false }),
+                );
+                None
+            }
+        }
     } else {
-        configured_old_join || resolved_version_id.is_some()
+        None
     };
 
     if let Some(report) = run_pre_launch_isolation(&app, &settings).await? {
         let _ = app.emit("isolation-report", &report);
-        if windows::has_pending_fast_flags() {
+        if windows::has_pending_fast_flags() && pristine.is_none() {
             tokio::spawn(apply_pending_fast_flags_when_ready(
                 std::time::Duration::from_secs(240),
             ));
         }
     }
+
+    let mut reinstalled = false;
+    if let Some(p) = pristine {
+        match tauri::async_runtime::spawn_blocking(move || windows::swap_in_standard_roblox(&p)).await {
+            Ok(Ok(fresh)) => {
+                resolved_base_path = fresh;
+                reinstalled = true;
+            }
+            Ok(Err(e)) => {
+                let _ = app.emit(
+                    "isolation-progress",
+                    serde_json::json!({ "stage": "reinstall-failed", "message": e, "pathsCleaned": 0, "bytesFreed": 0, "finished": false }),
+                );
+            }
+            Err(e) => {
+                let _ = app.emit(
+                    "isolation-progress",
+                    serde_json::json!({ "stage": "reinstall-failed", "message": format!("Reinstall task panicked: {}", e), "pathsCleaned": 0, "bytesFreed": 0, "finished": false }),
+                );
+            }
+        }
+    }
+
+    let slow_bootstrap = isolation_will_wipe_install && !reinstalled;
+    let use_old_join = if reinstalled {
+        true
+    } else if isolation_will_wipe_install {
+        false
+    } else {
+        configured_old_join || resolved_version_id.is_some()
+    };
 
     let tracker_check = windows::tracker();
     let _ = tracker_check.cleanup_dead_processes();
@@ -114,7 +157,7 @@ async fn launch_roblox(
 
     let pids_before = windows::get_roblox_pids();
 
-    let pid_wait_secs = if isolation_will_wipe_install { 180 } else { 12 };
+    let pid_wait_secs = if slow_bootstrap { 180 } else { 12 };
     let pending_id = tracker.add_pending_launch(
         user_id,
         resolved_version_id.clone(),
@@ -156,7 +199,7 @@ async fn launch_roblox(
 
     let detected_pid =
         wait_for_new_roblox_pid(&pids_before, std::time::Duration::from_secs(pid_wait_secs)).await;
-    if detected_pid.is_none() && !isolation_will_wipe_install {
+    if detected_pid.is_none() && !slow_bootstrap {
         tracker.clear_pending_launch(pending_id);
     }
     if let Some(pid) = detected_pid {
@@ -367,6 +410,7 @@ async fn launch_multiple(
     place_id: i64,
     job_id: String,
     launch_data: String,
+    shuffle_job: bool,
 ) -> Result<(), String> {
     use platform::windows;
 
@@ -382,12 +426,54 @@ async fn launch_multiple(
     let tracker = windows::tracker();
     tracker.reset_launch_cancelled();
 
+    let reinstall_roblox = settings
+        .get_string("Isolation", "Mode")
+        .eq_ignore_ascii_case("Full")
+        && settings.get_string("Isolation", "ReinstallRoblox") != "false";
+    let pristine = if reinstall_roblox {
+        match windows::ensure_pristine_roblox(&app).await {
+            Ok(p) => Some(p),
+            Err(e) => {
+                let _ = app.emit(
+                    "isolation-progress",
+                    serde_json::json!({ "stage": "reinstall-failed", "message": e, "pathsCleaned": 0, "bytesFreed": 0, "finished": false }),
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     if let Some(report) = run_pre_launch_isolation(&app, &settings).await? {
         let _ = app.emit("isolation-report", &report);
-        if windows::has_pending_fast_flags() {
+        if windows::has_pending_fast_flags() && pristine.is_none() {
             tokio::spawn(apply_pending_fast_flags_when_ready(
                 std::time::Duration::from_secs(240),
             ));
+        }
+    }
+
+    let mut reinstalled = false;
+    let mut fresh_standard_path: Option<String> = None;
+    if let Some(p) = pristine {
+        match tauri::async_runtime::spawn_blocking(move || windows::swap_in_standard_roblox(&p)).await {
+            Ok(Ok(fresh)) => {
+                reinstalled = true;
+                fresh_standard_path = Some(fresh);
+            }
+            Ok(Err(e)) => {
+                let _ = app.emit(
+                    "isolation-progress",
+                    serde_json::json!({ "stage": "reinstall-failed", "message": e, "pathsCleaned": 0, "bytesFreed": 0, "finished": false }),
+                );
+            }
+            Err(e) => {
+                let _ = app.emit(
+                    "isolation-progress",
+                    serde_json::json!({ "stage": "reinstall-failed", "message": format!("Reinstall task panicked: {}", e), "pathsCleaned": 0, "bytesFreed": 0, "finished": false }),
+                );
+            }
         }
     }
 
@@ -436,7 +522,16 @@ async fn launch_multiple(
             .get_string("Isolation", "Mode")
             .eq_ignore_ascii_case("Full")
             && acct_version_id.is_none();
-        let acct_use_old_join = if acct_isolation_wipes_install {
+        let acct_reinstalled = reinstalled && acct_isolation_wipes_install;
+        let acct_slow_bootstrap = acct_isolation_wipes_install && !acct_reinstalled;
+        let acct_base_path = if acct_reinstalled {
+            fresh_standard_path.clone().unwrap_or(acct_base_path)
+        } else {
+            acct_base_path
+        };
+        let acct_use_old_join = if acct_reinstalled {
+            true
+        } else if acct_isolation_wipes_install {
             false
         } else {
             configured_old_join || acct_version_id.is_some()
@@ -467,6 +562,24 @@ async fn launch_multiple(
         );
 
         let resolved_launch = resolve_launch_job(&acct_job, false, "");
+
+        let mut actual_job = resolved_launch.job_id.clone();
+        if shuffle_job && actual_job.trim().is_empty() {
+            if let Ok(response) = run_with_session_retry(state.inner(), uid, |cookie| async move {
+                api::roblox::get_servers(acct_place, "Public", None, Some(&cookie)).await
+            })
+            .await
+            {
+                if !response.data.is_empty() {
+                    let idx = (std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_nanos() as usize)
+                        % response.data.len();
+                    actual_job = response.data[idx].id.clone();
+                }
+            }
+        }
 
         if multi_rbx {
             ensure_multi_roblox_enabled(auto_close_multi_conflicts).await?;
@@ -512,7 +625,7 @@ async fn launch_multiple(
 
         let pids_before = windows::get_roblox_pids();
 
-        let acct_pid_wait_secs = if acct_isolation_wipes_install { 180 } else { 12 };
+        let acct_pid_wait_secs = if acct_slow_bootstrap { 180 } else { 12 };
         let acct_pending_id = tracker.add_pending_launch(
             uid,
             acct_version_id.clone(),
@@ -524,7 +637,7 @@ async fn launch_multiple(
                 &acct_base_path,
                 &ticket,
                 private_join.place_id,
-                &resolved_launch.job_id,
+                &actual_job,
                 &launch_data,
                 false,
                 private_join.use_private_join,
@@ -536,7 +649,7 @@ async fn launch_multiple(
             let url = windows::build_launch_url(
                 &ticket,
                 private_join.place_id,
-                &resolved_launch.job_id,
+                &actual_job,
                 &browser_tracker_id,
                 &launch_data,
                 false,
@@ -559,7 +672,7 @@ async fn launch_multiple(
             std::time::Duration::from_secs(acct_pid_wait_secs),
         )
         .await;
-        if acct_detected_pid.is_none() && !acct_isolation_wipes_install {
+        if acct_detected_pid.is_none() && !acct_slow_bootstrap {
             tracker.clear_pending_launch(acct_pending_id);
         }
         if let Some(pid) = acct_detected_pid {
@@ -615,6 +728,7 @@ async fn launch_multiple(
     place_id: i64,
     job_id: String,
     launch_data: String,
+    shuffle_job: bool,
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -657,6 +771,25 @@ async fn launch_multiple(
             );
 
             let resolved_launch = resolve_launch_job(&acct_job, false, "");
+
+            let mut actual_job = resolved_launch.job_id.clone();
+            if shuffle_job && actual_job.trim().is_empty() {
+                if let Ok(response) =
+                    run_with_session_retry(state.inner(), uid, |cookie| async move {
+                        api::roblox::get_servers(acct_place, "Public", None, Some(&cookie)).await
+                    })
+                    .await
+                {
+                    if !response.data.is_empty() {
+                        let idx = (std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_nanos() as usize)
+                            % response.data.len();
+                        actual_job = response.data[idx].id.clone();
+                    }
+                }
+            }
 
             if multi_rbx {
                 let enabled = macos::enable_multi_roblox()?;
@@ -709,7 +842,7 @@ async fn launch_multiple(
                 macos::launch_old_join(
                     &ticket,
                     private_join.place_id,
-                    &resolved_launch.job_id,
+                    &actual_job,
                     &launch_data,
                     false,
                     private_join.use_private_join,
@@ -721,7 +854,7 @@ async fn launch_multiple(
                 let url = macos::build_launch_url(
                     &ticket,
                     private_join.place_id,
-                    &resolved_launch.job_id,
+                    &actual_job,
                     &browser_tracker_id,
                     &launch_data,
                     false,
@@ -766,7 +899,16 @@ async fn launch_multiple(
 
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     {
-        let _ = (app, state, settings, user_ids, place_id, job_id, launch_data);
+        let _ = (
+            app,
+            state,
+            settings,
+            user_ids,
+            place_id,
+            job_id,
+            launch_data,
+            shuffle_job,
+        );
         Err("Launching is only supported on Windows and macOS".into())
     }
 }

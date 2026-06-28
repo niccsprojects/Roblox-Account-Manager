@@ -882,6 +882,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         placeId: pid,
         jobId,
         launchData,
+        shuffleJob: shuffleJobId,
       });
       await loadAccounts();
       void recordRecentGame(pid, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});

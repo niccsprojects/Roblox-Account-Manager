@@ -16,6 +16,7 @@ interface VersionEntry {
   installedAt: string | null;
   lastLaunchedAt: string | null;
   userLabel: string | null;
+  exists: boolean;
 }
 
 interface RemoteVersionEntry {
@@ -363,6 +364,11 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                             {isDefault && (
                               <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-[10px] text-sky-400">
                                 {t("Default")}
+                              </span>
+                            )}
+                            {!entry.exists && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-[10px] text-amber-400">
+                                {t("Missing files")}
                               </span>
                             )}
                           </div>

@@ -324,6 +324,7 @@ impl SettingsStore {
             ("SpoofMacAddress", "false"),
             ("TargetAdapter", ""),
             ("IncludeStudio", "false"),
+            ("ReinstallRoblox", "true"),
             ("PreserveFastFlags", "true"),
             ("PreserveBasicSettings", "true"),
             ("BackupMachineGuid", ""),

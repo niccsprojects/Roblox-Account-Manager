@@ -434,16 +434,13 @@ impl Drop for StagingGuard {
     }
 }
 
-pub async fn install_version(
+async fn download_version_into(
     app: tauri::AppHandle,
     install_id: String,
     channel: String,
     version_hash: String,
-    label: Option<String>,
-) -> Result<crate::data::versions::VersionEntry, String> {
-    use crate::data::versions::VersionEntry;
-
-    let target = install_target_dir(&channel, &version_hash)?;
+    target: PathBuf,
+) -> Result<(), String> {
     let staging_name = format!(
         "{}.staging-{}",
         target
@@ -623,6 +620,28 @@ pub async fn install_version(
         let _ = std::fs::remove_dir_all(&backup);
     }
 
+    Ok(())
+}
+
+pub async fn install_version(
+    app: tauri::AppHandle,
+    install_id: String,
+    channel: String,
+    version_hash: String,
+    label: Option<String>,
+) -> Result<crate::data::versions::VersionEntry, String> {
+    use crate::data::versions::VersionEntry;
+
+    let target = install_target_dir(&channel, &version_hash)?;
+    download_version_into(
+        app.clone(),
+        install_id.clone(),
+        channel.clone(),
+        version_hash.clone(),
+        target.clone(),
+    )
+    .await?;
+
     let install_size = folder_size(&target);
 
     let entry = VersionEntry {
@@ -654,13 +673,116 @@ pub async fn install_version(
             version_hash,
             stage: "ready".into(),
             package: None,
-            current: total,
-            total,
+            current: 0,
+            total: 0,
             message: None,
         },
     );
 
     Ok(entry)
+}
+
+fn pristine_cache_dir() -> Option<PathBuf> {
+    let local = std::env::var_os("LOCALAPPDATA")?;
+    Some(
+        PathBuf::from(local)
+            .join("Roblox Account Manager")
+            .join("IsolationCache"),
+    )
+}
+
+pub struct PristineRoblox {
+    pub channel: String,
+    pub version_hash: String,
+    pub path: PathBuf,
+}
+
+pub async fn ensure_pristine_roblox(app: &tauri::AppHandle) -> Result<PristineRoblox, String> {
+    let catalog = fetch_remote_catalog().await?;
+    let current = catalog
+        .current
+        .iter()
+        .find(|e| e.binary_type.eq_ignore_ascii_case("WindowsPlayer"))
+        .ok_or_else(|| "Could not determine the current Roblox version".to_string())?;
+    let channel = if current.channel.trim().is_empty() {
+        "LIVE".to_string()
+    } else {
+        current.channel.clone()
+    };
+    let version_hash = current.version_hash.clone();
+
+    let root = pristine_cache_dir().ok_or_else(|| "Could not resolve LOCALAPPDATA".to_string())?;
+    let path = root.join(&version_hash);
+
+    if path.join("RobloxPlayerBeta.exe").exists() {
+        return Ok(PristineRoblox {
+            channel,
+            version_hash,
+            path,
+        });
+    }
+
+    if let Ok(entries) = std::fs::read_dir(&root) {
+        for entry in entries.flatten() {
+            if entry.path() != path {
+                let _ = std::fs::remove_dir_all(entry.path());
+            }
+        }
+    }
+    ensure_dir(&root)?;
+
+    download_version_into(
+        app.clone(),
+        "isolation-pristine".to_string(),
+        channel.clone(),
+        version_hash.clone(),
+        path.clone(),
+    )
+    .await?;
+
+    Ok(PristineRoblox {
+        channel,
+        version_hash,
+        path,
+    })
+}
+
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
+    ensure_dir(dst)?;
+    let entries =
+        std::fs::read_dir(src).map_err(|e| format!("Could not read {}: {}", src.display(), e))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let dest = dst.join(entry.file_name());
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("Could not read {}: {}", path.display(), e))?;
+        if file_type.is_dir() {
+            copy_dir_recursive(&path, &dest)?;
+        } else {
+            std::fs::copy(&path, &dest)
+                .map_err(|e| format!("Could not copy {}: {}", path.display(), e))?;
+        }
+    }
+    Ok(())
+}
+
+pub fn swap_in_standard_roblox(pristine: &PristineRoblox) -> Result<String, String> {
+    let local =
+        std::env::var_os("LOCALAPPDATA").ok_or_else(|| "Could not resolve LOCALAPPDATA".to_string())?;
+    let target = PathBuf::from(local)
+        .join("Roblox")
+        .join("Versions")
+        .join(&pristine.version_hash);
+    if target.exists() {
+        std::fs::remove_dir_all(&target)
+            .map_err(|e| format!("Could not clear existing Roblox install: {}", e))?;
+    }
+    if let Some(parent) = target.parent() {
+        ensure_dir(parent)?;
+    }
+    copy_dir_recursive(&pristine.path, &target)?;
+    Ok(target.to_string_lossy().into_owned())
 }
 
 pub fn uninstall_version(channel: &str, version_hash: &str) -> Result<bool, String> {
@@ -679,57 +801,23 @@ pub fn resolve_roblox_install_path(
     catalog: &crate::data::versions::VersionsCatalogStore,
 ) -> Result<(String, Option<String>), String> {
     if let Some(version_id) = account_version.filter(|v| !v.trim().is_empty()) {
-        let entry = catalog.find(version_id).ok_or_else(|| {
-            format!(
-                "Account is set to Roblox version '{}' but it is not in the installed catalog. Reinstall it from Settings > Versions or clear the per-account override.",
-                version_id
-            )
-        })?;
-        let path = std::path::Path::new(&entry.install_path);
-        if !path.join("RobloxPlayerBeta.exe").exists() {
-            return Err(format!(
-                "Account is set to Roblox version '{}' but RobloxPlayerBeta.exe is missing at {}. Reinstall it from Settings > Versions or clear the per-account override.",
-                version_id, entry.install_path
-            ));
+        if let Some(entry) = catalog.find(version_id) {
+            let path = std::path::Path::new(&entry.install_path);
+            if path.join("RobloxPlayerBeta.exe").exists() {
+                return Ok((entry.install_path.clone(), Some(entry.version_id())));
+            }
         }
-        return Ok((entry.install_path.clone(), Some(entry.version_id())));
     }
 
     let default = settings.get_string("Versions", "DefaultVersion");
     if !default.trim().is_empty() {
-        let entry = catalog.find(&default).ok_or_else(|| {
-            format!(
-                "Default Roblox version '{}' is not in the installed catalog. Reinstall it from Settings > Versions or change the default.",
-                default
-            )
-        })?;
-        let path = std::path::Path::new(&entry.install_path);
-        if !path.join("RobloxPlayerBeta.exe").exists() {
-            return Err(format!(
-                "Default Roblox version '{}' is missing RobloxPlayerBeta.exe at {}. Reinstall it from Settings > Versions or change the default.",
-                default, entry.install_path
-            ));
+        if let Some(entry) = catalog.find(&default) {
+            let path = std::path::Path::new(&entry.install_path);
+            if path.join("RobloxPlayerBeta.exe").exists() {
+                return Ok((entry.install_path.clone(), Some(entry.version_id())));
+            }
         }
-        return Ok((entry.install_path.clone(), Some(entry.version_id())));
-    }
-
-    if let Some(entry) = most_recently_used_version(catalog) {
-        return Ok((entry.install_path.clone(), Some(entry.version_id())));
     }
 
     get_roblox_path().map(|p| (p, None))
-}
-
-fn most_recently_used_version(
-    catalog: &crate::data::versions::VersionsCatalogStore,
-) -> Option<crate::data::versions::VersionEntry> {
-    catalog
-        .list()
-        .into_iter()
-        .filter(|entry| {
-            std::path::Path::new(&entry.install_path)
-                .join("RobloxPlayerBeta.exe")
-                .exists()
-        })
-        .max_by_key(|entry| entry.last_launched_at.or(entry.installed_at))
 }

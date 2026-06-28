@@ -117,6 +117,7 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(account_store)
         .manage(settings_store)
         .manage(theme_store)
@@ -127,6 +128,16 @@ pub fn run() {
         .manage(UpdaterRuntimeState::default())
         .manage(chromium::ChromiumManager::new())
         .setup(|app| {
+            #[cfg(target_os = "windows")]
+            {
+                let custom = app
+                    .state::<SettingsStore>()
+                    .get_string("Versions", "CustomInstallPath");
+                if !custom.trim().is_empty() {
+                    platform::windows::set_custom_roblox_path(Some(custom));
+                }
+            }
+
             let show = MenuItemBuilder::with_id("show", "Show").build(app)?;
             let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
             let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
@@ -318,6 +329,9 @@ pub fn run() {
             versions_set_account_override,
             versions_set_label,
             versions_open_folder,
+            versions_detect_install_path,
+            versions_set_custom_install_path,
+            versions_prune_missing,
             start_watcher,
             stop_watcher,
             chromium::commands::open_login_browser,

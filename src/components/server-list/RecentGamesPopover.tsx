@@ -64,7 +64,7 @@ export function RecentGamesPopover({
 
       const a = anchor.getBoundingClientRect();
       const p = panel.getBoundingClientRect();
-      const panelW = p.width || 300;
+      const panelW = p.width || 320;
       const panelH = p.height || 0;
 
       const preferredLeft = a.right - panelW;
@@ -85,7 +85,7 @@ export function RecentGamesPopover({
       setPos({
         top,
         left,
-        maxHeight: Math.min(360, maxHeight),
+        maxHeight: Math.min(440, maxHeight),
         transformOrigin: openBelow ? "top right" : "bottom right",
       });
     }
@@ -114,7 +114,7 @@ export function RecentGamesPopover({
   const panel = (
     <div
       ref={panelRef}
-      className="theme-modal-scope theme-panel theme-border fixed w-[300px] bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl z-[999] animate-scale-in p-2 flex flex-col"
+      className="theme-modal-scope theme-panel theme-border fixed w-[320px] bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl z-[999] animate-scale-in p-2 flex flex-col overflow-hidden"
       style={
         pos
           ? { top: pos.top, left: pos.left, maxHeight: pos.maxHeight, transformOrigin: pos.transformOrigin }

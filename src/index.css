@@ -995,10 +995,6 @@ body {
   animation: toast-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.submenu-trigger:hover > .submenu-panel {
-  display: block;
-}
-
 .sidebar-input {
   width: 100%;
   padding: 6px 10px;
