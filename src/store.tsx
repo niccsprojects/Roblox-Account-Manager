@@ -378,8 +378,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const getDragState = useCallback(() => dragStateRef.current, []);
   const [dropIndicator, setDropIndicator] = useState<DropTarget | null>(null);
   const [reorderMode, setReorderMode] = useState(false);
-  const undoStackRef = useRef<{ accounts: Account[]; groupOrder: string }[]>([]);
-  const redoStackRef = useRef<{ accounts: Account[]; groupOrder: string }[]>([]);
+  const undoStackRef = useRef<{ order: { id: number; group: string }[]; groupOrder: string }[]>([]);
+  const redoStackRef = useRef<{ order: { id: number; group: string }[]; groupOrder: string }[]>([]);
   const [toasts, setToasts] = useState<string[]>([]);
   const [modal, setModal] = useState<{ title: string; content: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -789,7 +789,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   function captureLayout() {
     return {
-      accounts: accounts.map((a) => ({ ...a })),
+      order: accounts.map((a) => ({ id: a.UserID, group: a.Group || "Default" })),
       groupOrder: settings?.General?.GroupOrder ?? "",
     };
   }
@@ -800,31 +800,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     redoStackRef.current = [];
   }
 
-  async function applyLayout(snap: { accounts: Account[]; groupOrder: string }) {
+  async function applyLayout(snap: { order: { id: number; group: string }[]; groupOrder: string }) {
     const prev = accounts;
-    setAccounts(snap.accounts);
+    const byId = new Map(accounts.map((a) => [a.UserID, a]));
+    const next: Account[] = [];
+    for (const { id, group } of snap.order) {
+      const a = byId.get(id);
+      if (!a) continue;
+      next.push((a.Group || "Default") === group ? a : { ...a, Group: group });
+    }
+    for (const a of accounts) {
+      if (!next.some((n) => n.UserID === a.UserID)) next.push(a);
+    }
+
+    const prevGroupOrder = settings?.General?.GroupOrder ?? "";
+    const groupOrderChanged = prevGroupOrder !== snap.groupOrder;
+    setAccounts(next);
+    if (groupOrderChanged) {
+      setSettings((p) => (p ? { ...p, General: { ...p.General, GroupOrder: snap.groupOrder } } : p));
+    }
+
     try {
-      await invoke("reorder_accounts", { userIds: snap.accounts.map((a) => a.UserID) });
-      for (const a of snap.accounts) {
+      await invoke("reorder_accounts", { userIds: next.map((a) => a.UserID) });
+      for (const a of next) {
         const cur = prev.find((o) => o.UserID === a.UserID);
         if (cur && (cur.Group || "Default") !== (a.Group || "Default")) {
           await invoke("update_account", { account: a });
         }
       }
+      if (groupOrderChanged) {
+        await invoke("update_setting", { section: "General", key: "GroupOrder", value: snap.groupOrder });
+      }
     } catch (e) {
       setError(String(e));
+      if (groupOrderChanged) {
+        setSettings((p) => (p ? { ...p, General: { ...p.General, GroupOrder: prevGroupOrder } } : p));
+      }
       await loadAccounts().catch(() => {});
-      return;
-    }
-    if ((settings?.General?.GroupOrder ?? "") !== snap.groupOrder) {
-      setSettings((p) =>
-        p ? { ...p, General: { ...p.General, GroupOrder: snap.groupOrder } } : p
-      );
-      await invoke("update_setting", {
-        section: "General",
-        key: "GroupOrder",
-        value: snap.groupOrder,
-      }).catch(() => {});
     }
   }
 
@@ -875,12 +887,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     pushUndo();
     const prev = accounts;
+    const prevGroupOrder = settings?.General?.GroupOrder ?? "";
     setAccounts(next);
 
     if (nextGroupOrderValue !== null) {
       const value = nextGroupOrderValue;
       setSettings((p) => (p ? { ...p, General: { ...p.General, GroupOrder: value } } : p));
-      void invoke("update_setting", { section: "General", key: "GroupOrder", value }).catch(() => {});
     }
 
     try {
@@ -891,8 +903,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           await invoke("update_account", { account: a });
         }
       }
+      if (nextGroupOrderValue !== null) {
+        await invoke("update_setting", { section: "General", key: "GroupOrder", value: nextGroupOrderValue });
+      }
     } catch (e) {
       setError(String(e));
+      if (nextGroupOrderValue !== null) {
+        setSettings((p) => (p ? { ...p, General: { ...p.General, GroupOrder: prevGroupOrder } } : p));
+      }
       await loadAccounts().catch(() => {});
     }
   }
@@ -906,15 +924,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .filter((a): a is Account => !!a);
     if (dragged.length === 0) return;
 
-    pushUndo();
-
     if (target.kind === "group-end" && target.groupKey === "__all__") {
+      pushUndo();
       const next = [...rest, ...dragged];
       setAccounts(next);
       try {
         await invoke("reorder_accounts", { userIds: next.map((a) => a.UserID) });
       } catch (e) {
         setError(String(e));
+        await loadAccounts().catch(() => {});
       }
       return;
     }
@@ -946,6 +964,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ...rest.slice(insertIndex),
     ];
 
+    pushUndo();
     setAccounts(next);
 
     try {

@@ -81,25 +81,28 @@ export function AccountList() {
   function onDragOver(e: DragOverEvent) {
     const { active, over } = e;
     if (!over || typeof active.id !== "number") return;
-    const activeKey = findContainerKey(active.id);
-    const overKey = findContainerKey(over.id);
-    if (!activeKey || !overKey || activeKey === overKey) return;
+    const activeNum = active.id;
+    const overId = over.id;
 
     setContainers((prev) => {
-      const activeC = prev.find((c) => c.key === activeKey);
+      const keyOf = (id: UniqueIdentifier): string | undefined => {
+        if (typeof id === "number") return prev.find((c) => c.userIds.includes(id))?.key;
+        const s = String(id);
+        if (s.startsWith("g:")) return s.slice(2);
+        return prev.find((c) => c.key === s)?.key;
+      };
+      const activeKey = keyOf(activeNum);
+      const overKey = keyOf(overId);
+      if (!activeKey || !overKey || activeKey === overKey) return prev;
       const overC = prev.find((c) => c.key === overKey);
-      if (!activeC || !overC) return prev;
-      const activeIds = activeC.userIds.filter((id) => id !== active.id);
+      if (!overC) return prev;
+      const activeIds = prev.find((c) => c.key === activeKey)!.userIds.filter((id) => id !== activeNum);
       let newIndex = overC.userIds.length;
-      if (typeof over.id === "number") {
-        const overIndex = overC.userIds.indexOf(over.id);
+      if (typeof overId === "number") {
+        const overIndex = overC.userIds.indexOf(overId);
         if (overIndex >= 0) newIndex = overIndex;
       }
-      const overIds = [
-        ...overC.userIds.slice(0, newIndex),
-        active.id as number,
-        ...overC.userIds.slice(newIndex),
-      ];
+      const overIds = [...overC.userIds.slice(0, newIndex), activeNum, ...overC.userIds.slice(newIndex)];
       return prev.map((c) =>
         c.key === activeKey ? { ...c, userIds: activeIds } : c.key === overKey ? { ...c, userIds: overIds } : c
       );
@@ -130,18 +133,19 @@ export function AccountList() {
     if (typeof active.id !== "number") {
       const fromKey = String(active.id).slice(2);
       const overKey = findContainerKey(over.id);
-      if (overKey && fromKey !== overKey) {
-        setContainers((prev) => {
-          const from = prev.findIndex((c) => c.key === fromKey);
-          const to = prev.findIndex((c) => c.key === overKey);
-          if (from < 0 || to < 0) return prev;
-          const next = arrayMove(prev, from, to);
-          commit(next);
-          return next;
-        });
-      } else {
+      if (!overKey || fromKey === overKey) {
         resync();
+        return;
       }
+      const from = containers.findIndex((c) => c.key === fromKey);
+      const to = containers.findIndex((c) => c.key === overKey);
+      if (from < 0 || to < 0) {
+        resync();
+        return;
+      }
+      const next = arrayMove(containers, from, to);
+      setContainers(next);
+      commit(next);
       return;
     }
 
@@ -152,24 +156,23 @@ export function AccountList() {
       return;
     }
 
-    setContainers((prev) => {
-      let next = prev;
-      if (activeKey === overKey && typeof over.id === "number") {
-        const c = prev.find((x) => x.key === activeKey);
-        if (c) {
-          const oldI = c.userIds.indexOf(active.id as number);
-          const newI = c.userIds.indexOf(over.id);
-          if (oldI >= 0 && newI >= 0 && oldI !== newI) {
-            const moved = arrayMove(c.userIds, oldI, newI);
-            next = prev.map((x) => (x.key === activeKey ? { ...x, userIds: moved } : x));
-          }
+    const selfDrop = active.id === over.id;
+    let next = containers;
+    if (activeKey === overKey && typeof over.id === "number" && !selfDrop) {
+      const c = containers.find((x) => x.key === activeKey);
+      if (c) {
+        const oldI = c.userIds.indexOf(active.id as number);
+        const newI = c.userIds.indexOf(over.id);
+        if (oldI >= 0 && newI >= 0 && oldI !== newI) {
+          const moved = arrayMove(c.userIds, oldI, newI);
+          next = containers.map((x) => (x.key === activeKey ? { ...x, userIds: moved } : x));
         }
       }
-      const sel = dragSelectionRef.current;
-      if (sel.length > 1) next = relocateSelection(next, active.id as number, sel);
-      commit(next);
-      return next;
-    });
+    }
+    const sel = dragSelectionRef.current;
+    if (sel.length > 1 && !selfDrop) next = relocateSelection(next, active.id as number, sel);
+    setContainers(next);
+    commit(next);
   }
 
   function onDragCancel() {
@@ -264,6 +267,8 @@ export function AccountList() {
       if (!(e.ctrlKey || e.metaKey)) return;
       const ae = document.activeElement as HTMLElement | null;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable)) return;
+      const inList = !ae || ae === document.body || (listRef.current?.contains(ae) ?? false);
+      if (!inList) return;
       if ((e.key === "z" || e.key === "Z") && !e.shiftKey) {
         e.preventDefault();
         store.undo();
