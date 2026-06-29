@@ -139,21 +139,20 @@ export function Toolbar() {
           {store.hideUsernames ? t("Hidden") : t("Names")}
         </button>
 
-        {store.settings?.General?.ReorderStyle === "mode" && (
-          <Tooltip content={store.reorderMode ? t("Done reordering") : t("Reorder accounts")} side="bottom">
-            <button
-              type="button"
-              onClick={() => store.setReorderMode(!store.reorderMode)}
-              aria-pressed={store.reorderMode}
-              aria-label={store.reorderMode ? t("Done reordering") : t("Reorder accounts")}
-              className={`p-1.5 rounded-lg border transition-colors ${
-                store.reorderMode ? activeToggleStyle : "theme-btn-ghost"
-              }`}
-            >
-              <ArrowUpDown size={16} strokeWidth={1.5} />
-            </button>
-          </Tooltip>
-        )}
+        <Tooltip content={store.reorderMode ? t("Done reordering") : t("Reorder accounts")} side="bottom">
+          <button
+            type="button"
+            onClick={() => store.setReorderMode(!store.reorderMode)}
+            aria-pressed={store.reorderMode}
+            aria-label={store.reorderMode ? t("Done reordering") : t("Reorder accounts")}
+            className={`p-1.5 rounded-lg border transition-colors ${
+              store.reorderMode ? activeToggleStyle : "theme-btn-ghost"
+            }`}
+          >
+            <ArrowUpDown size={16} strokeWidth={1.5} />
+          </button>
+        </Tooltip>
+
 
         <Tooltip content={store.sidebarOpen ? t("Hide panel") : t("Show panel")} side="bottom">
           <button

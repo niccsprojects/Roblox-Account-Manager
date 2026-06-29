@@ -210,13 +210,17 @@ export interface StoreValue {
   sortGroupAlphabetically: (groupKey: string) => void;
   moveAccounts: (userIds: number[], target: DropTarget) => Promise<void>;
   reorderGroup: (groupKey: string, target: DropTarget) => Promise<void>;
+  applyArrangement: (arrangement: { key: string; userIds: number[] }[]) => Promise<void>;
   nudgeSelectionVertical: (dir: "up" | "down") => void;
   nudgeGroup: (groupKey: string, dir: "up" | "down") => void;
+  undo: () => void;
+  redo: () => void;
   joiningAccounts: Set<number>;
   launchProgress: LaunchProgressState | null;
 
   dragState: DragState | null;
   setDragState: (s: DragState | null) => void;
+  getDragState: () => DragState | null;
   dropIndicator: DropTarget | null;
   setDropIndicator: (t: DropTarget | null) => void;
   reorderMode: boolean;
@@ -365,9 +369,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [firstRunWalkthroughOpen, setFirstRunWalkthroughOpen] = useState(false);
   const [firstRunWalkthroughMode, setFirstRunWalkthroughMode] = useState<"firstRun" | "manual">("firstRun");
   const [initialized, setInitialized] = useState(false);
-  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [dragState, _setDragState] = useState<DragState | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const setDragState = useCallback((s: DragState | null) => {
+    dragStateRef.current = s;
+    _setDragState(s);
+  }, []);
+  const getDragState = useCallback(() => dragStateRef.current, []);
   const [dropIndicator, setDropIndicator] = useState<DropTarget | null>(null);
   const [reorderMode, setReorderMode] = useState(false);
+  const undoStackRef = useRef<{ accounts: Account[]; groupOrder: string }[]>([]);
+  const redoStackRef = useRef<{ accounts: Account[]; groupOrder: string }[]>([]);
   const [toasts, setToasts] = useState<string[]>([]);
   const [modal, setModal] = useState<{ title: string; content: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -725,6 +737,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   async function moveToGroup(userIds: number[], group: string) {
+    pushUndo();
     const updated = accounts.map((a) =>
       userIds.includes(a.UserID) ? { ...a, Group: group } : a
     );
@@ -738,6 +751,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   function sortGroupAlphabetically(groupKey: string) {
+    pushUndo();
     setAccounts((prev) => {
       const targetIndices: number[] = [];
       const targetAccounts: Account[] = [];
@@ -773,6 +787,116 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addToast(tr("Sorted {{group}}", { group: parseGroupName(groupKey).displayName }));
   }
 
+  function captureLayout() {
+    return {
+      accounts: accounts.map((a) => ({ ...a })),
+      groupOrder: settings?.General?.GroupOrder ?? "",
+    };
+  }
+
+  function pushUndo() {
+    undoStackRef.current.push(captureLayout());
+    if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+    redoStackRef.current = [];
+  }
+
+  async function applyLayout(snap: { accounts: Account[]; groupOrder: string }) {
+    const prev = accounts;
+    setAccounts(snap.accounts);
+    try {
+      await invoke("reorder_accounts", { userIds: snap.accounts.map((a) => a.UserID) });
+      for (const a of snap.accounts) {
+        const cur = prev.find((o) => o.UserID === a.UserID);
+        if (cur && (cur.Group || "Default") !== (a.Group || "Default")) {
+          await invoke("update_account", { account: a });
+        }
+      }
+    } catch (e) {
+      setError(String(e));
+      await loadAccounts().catch(() => {});
+      return;
+    }
+    if ((settings?.General?.GroupOrder ?? "") !== snap.groupOrder) {
+      setSettings((p) =>
+        p ? { ...p, General: { ...p.General, GroupOrder: snap.groupOrder } } : p
+      );
+      await invoke("update_setting", {
+        section: "General",
+        key: "GroupOrder",
+        value: snap.groupOrder,
+      }).catch(() => {});
+    }
+  }
+
+  function undo() {
+    const snap = undoStackRef.current.pop();
+    if (!snap) return;
+    redoStackRef.current.push(captureLayout());
+    void applyLayout(snap);
+  }
+
+  function redo() {
+    const snap = redoStackRef.current.pop();
+    if (!snap) return;
+    undoStackRef.current.push(captureLayout());
+    void applyLayout(snap);
+  }
+
+  async function applyArrangement(arrangement: { key: string; userIds: number[] }[]) {
+    const usesGroups = !(arrangement.length === 1 && arrangement[0]?.key === "__all__");
+    const byId = new Map(accounts.map((a) => [a.UserID, a]));
+    const next: Account[] = [];
+    for (const { key, userIds } of arrangement) {
+      for (const id of userIds) {
+        const a = byId.get(id);
+        if (!a) continue;
+        const group = usesGroups ? key : a.Group || "Default";
+        next.push((a.Group || "Default") === group ? a : { ...a, Group: group });
+      }
+    }
+    for (const a of accounts) {
+      if (!next.some((n) => n.UserID === a.UserID)) next.push(a);
+    }
+
+    const sameOrder =
+      next.length === accounts.length &&
+      next.every((a, i) => a.UserID === accounts[i].UserID && (a.Group || "Default") === (accounts[i].Group || "Default"));
+
+    let nextGroupOrderValue: string | null = null;
+    if (usesGroups) {
+      const visibleKeys = arrangement.map((g) => g.key);
+      const allKeys = [...new Set(accounts.map((a) => a.Group || "Default"))];
+      const hidden = allKeys.filter((k) => !visibleKeys.includes(k));
+      const value = JSON.stringify([...visibleKeys, ...hidden]);
+      if ((settings?.General?.GroupOrder ?? "") !== value) nextGroupOrderValue = value;
+    }
+
+    if (sameOrder && nextGroupOrderValue === null) return;
+
+    pushUndo();
+    const prev = accounts;
+    setAccounts(next);
+
+    if (nextGroupOrderValue !== null) {
+      const value = nextGroupOrderValue;
+      setSettings((p) => (p ? { ...p, General: { ...p.General, GroupOrder: value } } : p));
+      void invoke("update_setting", { section: "General", key: "GroupOrder", value }).catch(() => {});
+    }
+
+    try {
+      await invoke("reorder_accounts", { userIds: next.map((a) => a.UserID) });
+      for (const a of next) {
+        const cur = prev.find((o) => o.UserID === a.UserID);
+        if (cur && (cur.Group || "Default") !== (a.Group || "Default")) {
+          await invoke("update_account", { account: a });
+        }
+      }
+    } catch (e) {
+      setError(String(e));
+      await loadAccounts().catch(() => {});
+    }
+  }
+
   async function moveAccounts(userIds: number[], target: DropTarget) {
     if (userIds.length === 0) return;
     const draggedSet = new Set(userIds);
@@ -781,6 +905,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       .map((id) => accounts.find((a) => a.UserID === id))
       .filter((a): a is Account => !!a);
     if (dragged.length === 0) return;
+
+    pushUndo();
 
     if (target.kind === "group-end" && target.groupKey === "__all__") {
       const next = [...rest, ...dragged];
@@ -856,6 +982,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     const from = allKeys.indexOf(groupKey);
     if (from < 0 || allKeys.indexOf(target.groupKey) < 0) return;
+    pushUndo();
     allKeys.splice(from, 1);
     const tIdx = allKeys.indexOf(target.groupKey);
     allKeys.splice(target.kind === "before-group" ? tIdx : tIdx + 1, 0, groupKey);
@@ -2121,12 +2248,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     sortGroupAlphabetically,
     moveAccounts,
     reorderGroup,
+    applyArrangement,
     nudgeSelectionVertical,
     nudgeGroup,
+    undo,
+    redo,
     joiningAccounts,
     launchProgress,
     dragState,
     setDragState,
+    getDragState,
     dropIndicator,
     setDropIndicator,
     reorderMode,

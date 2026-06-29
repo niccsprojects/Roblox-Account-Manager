@@ -1,4 +1,6 @@
-import { Check, User, GripVertical } from "lucide-react";
+import { Check, User } from "lucide-react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useStore } from "../../store";
 import type { Account } from "../../types";
 import { timeAgo, getFreshnessColor } from "../../types";
@@ -12,16 +14,45 @@ function maskName(name: string, previewLetters: number): string {
   return "************";
 }
 
-export function AccountRow({ account }: { account: Account }) {
+export function SortableAccountRow({ account }: { account: Account }) {
+  const store = useStore();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: account.UserID,
+    disabled: !store.reorderMode,
+  });
+  return (
+    <AccountRowView
+      account={account}
+      setNodeRef={setNodeRef}
+      dragStyle={{ transform: CSS.Transform.toString(transform), transition }}
+      handleProps={store.reorderMode ? { ...attributes, ...listeners } : undefined}
+      dimmed={isDragging}
+    />
+  );
+}
+
+export function AccountRowView({
+  account,
+  setNodeRef,
+  dragStyle,
+  handleProps,
+  dimmed,
+  overlay,
+}: {
+  account: Account;
+  setNodeRef?: (el: HTMLElement | null) => void;
+  dragStyle?: React.CSSProperties;
+  handleProps?: Record<string, unknown>;
+  dimmed?: boolean;
+  overlay?: boolean;
+}) {
   const t = useTr();
   const store = useStore();
   const selected = store.selectedIds.has(account.UserID);
   const multiMode = store.selectedIds.size > 1;
   const avatarUrl = store.avatarUrls.get(account.UserID);
   const freshness =
-    store.settings?.General?.DisableAgingAlert === "true"
-      ? null
-      : getFreshnessColor(account.LastUse);
+    store.settings?.General?.DisableAgingAlert === "true" ? null : getFreshnessColor(account.LastUse);
   const rawName = account.Alias || account.Username;
   const displayName = store.hideUsernames ? maskName(rawName, store.hiddenNameLetters) : rawName;
   const showUsername = !!account.Alias && !store.hideUsernames;
@@ -42,18 +73,11 @@ export function AccountRow({ account }: { account: Account }) {
         : { label: t("Offline"), dotClass: "", dotStyle: { backgroundColor: "var(--panel-muted)" } };
 
   const statusDots: Array<{ color: string; title: string }> = [];
-  if (!account.Valid) {
-    statusDots.push({ color: "#ef4444", title: t("Invalid session") });
-  }
-  if (freshness) {
-    statusDots.push({ color: freshness, title: t("Aged account (20+ days inactive)") });
-  }
-  if (launchedLocally) {
-    statusDots.push({ color: "#f59e0b", title: t("Launched by Roblox Account Manager") });
-  }
+  if (!account.Valid) statusDots.push({ color: "#ef4444", title: t("Invalid session") });
+  if (freshness) statusDots.push({ color: freshness, title: t("Aged account (20+ days inactive)") });
+  if (launchedLocally) statusDots.push({ color: "#f59e0b", title: t("Launched by Roblox Account Manager") });
   if (showPresence && presenceType >= 1) {
-    const presenceColor =
-      presenceType === 3 ? "#4629d8" : presenceType >= 2 ? "#02b757" : "#00a2ff";
+    const presenceColor = presenceType === 3 ? "#4629d8" : presenceType >= 2 ? "#02b757" : "#00a2ff";
     statusDots.push({ color: presenceColor, title: presenceMeta.label });
   }
 
@@ -65,105 +89,50 @@ export function AccountRow({ account }: { account: Account }) {
   function handleContext(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    if (!store.selectedIds.has(account.UserID)) {
-      store.selectSingle(account.UserID);
-    }
+    if (!store.selectedIds.has(account.UserID)) store.selectSingle(account.UserID);
     store.openContextMenu(e.clientX, e.clientY);
   }
 
-  const reorderStyle = store.settings?.General?.ReorderStyle === "mode" ? "mode" : "handle";
-  const rowDraggable = reorderStyle === "mode" && store.reorderMode;
+  const cursor = overlay
+    ? "cursor-grabbing"
+    : store.reorderMode
+    ? "cursor-grab active:cursor-grabbing"
+    : "cursor-default";
 
-  function startAccountDrag(e: React.DragEvent) {
-    const isSel = store.selectedIds.has(account.UserID);
-    const ids = isSel
-      ? store.orderedUserIds.filter((id) => store.selectedIds.has(id))
-      : [account.UserID];
-    if (!isSel) store.selectSingle(account.UserID);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(account.UserID));
-    store.setDragState({ kind: "accounts", userIds: ids });
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    if (store.dragState?.kind !== "accounts") return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (store.dragState.userIds.includes(account.UserID)) {
-      store.setDropIndicator(null);
-      return;
-    }
-    const rect = e.currentTarget.getBoundingClientRect();
-    const after = e.clientY - rect.top > rect.height / 2;
-    store.setDropIndicator({ kind: after ? "after-account" : "before-account", userId: account.UserID });
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    const ds = store.dragState;
-    const target = store.dropIndicator;
-    store.setDragState(null);
-    store.setDropIndicator(null);
-    if (ds?.kind !== "accounts") return;
-    if (ds.userIds.includes(account.UserID)) return;
-    if (target && (target.kind === "before-account" || target.kind === "after-account")) {
-      void store.moveAccounts(ds.userIds, target);
-    } else {
-      void store.moveAccounts(ds.userIds, { kind: "before-account", userId: account.UserID });
-    }
-  }
-
-  function handleDragEnd() {
-    store.setDragState(null);
-    store.setDropIndicator(null);
-  }
+  const style: React.CSSProperties = {
+    ...(dragStyle || {}),
+    ...(selected ? { borderLeftColor: "var(--accent-color)" } : {}),
+  };
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       data-account-row="true"
       data-user-id={account.UserID}
-      className={`group/row theme-row-hover relative flex items-center gap-3 px-3 py-1.5 cursor-default select-none border-l-2 transition-colors duration-100 ${
+      className={`group/row theme-row-hover relative flex items-center gap-3 px-3 py-1.5 select-none border-l-2 transition-colors duration-100 ${cursor} ${
         selected ? "theme-row-selected" : "border-l-transparent"
+      } ${dimmed ? "opacity-40" : ""} ${
+        overlay ? "theme-panel rounded-lg shadow-2xl ring-1 ring-[var(--accent-strong)]" : ""
       }`}
-      style={selected ? { borderLeftColor: "var(--accent-color)" } : undefined}
-      onClick={handleClick}
-      onContextMenu={handleContext}
-      draggable={rowDraggable}
-      onDragStart={rowDraggable ? startAccountDrag : undefined}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      onDragEnd={handleDragEnd}
+      onClick={overlay ? undefined : handleClick}
+      onContextMenu={overlay ? undefined : handleContext}
+      {...(overlay ? {} : handleProps ?? {})}
     >
-      {reorderStyle === "handle" && (
-        <div
-          draggable
-          onDragStart={startAccountDrag}
-          onDragEnd={handleDragEnd}
-          onClick={(e) => e.stopPropagation()}
-          title={t("Drag to reorder")}
-          aria-label={t("Drag to reorder")}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity duration-100 cursor-grab active:cursor-grabbing theme-muted hover:text-[var(--panel-fg)]"
-        >
-          <GripVertical size={13} strokeWidth={1.5} />
-        </div>
-      )}
-      <div className={`shrink-0 overflow-hidden transition-all duration-150 ease-out ${
-        multiMode ? "w-4 opacity-100" : "w-0 opacity-0"
-      }`}>
+      <div
+        className={`shrink-0 overflow-hidden transition-all duration-150 ease-out ${
+          multiMode ? "w-4 opacity-100" : "w-0 opacity-0"
+        }`}
+      >
         <div
           className={`w-4 h-4 rounded border flex items-center justify-center transition-all duration-100 ${
             selected ? "" : "theme-border group-hover/row:brightness-110"
           }`}
           style={
-            selected
-              ? { backgroundColor: "var(--accent-color)", borderColor: "var(--accent-color)" }
-              : undefined
+            selected ? { backgroundColor: "var(--accent-color)", borderColor: "var(--accent-color)" } : undefined
           }
         >
-          {selected && (
-            <Check size={10} stroke="var(--forms-bg)" strokeWidth={3} />
-          )}
+          {selected && <Check size={10} stroke="var(--forms-bg)" strokeWidth={3} />}
         </div>
       </div>
 
@@ -203,7 +172,9 @@ export function AccountRow({ account }: { account: Account }) {
           {showPresence && presenceType >= 1 && (
             <Tooltip content={presenceMeta.label} side="bottom">
               <span
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${presenceMeta.dotClass} ${presenceType >= 1 ? "animate-pulse" : ""}`}
+                className={`w-1.5 h-1.5 rounded-full shrink-0 ${presenceMeta.dotClass} ${
+                  presenceType >= 1 ? "animate-pulse" : ""
+                }`}
                 style={presenceMeta.dotStyle}
               />
             </Tooltip>
@@ -216,19 +187,13 @@ export function AccountRow({ account }: { account: Account }) {
             {displayName}
           </div>
         </div>
-        {showUsername && (
-          <div className="text-[11px] theme-muted truncate leading-tight">
-            @{account.Username}
-          </div>
-        )}
+        {showUsername && <div className="text-[11px] theme-muted truncate leading-tight">@{account.Username}</div>}
       </div>
 
       {description && (
         <div className="min-w-0 max-w-[38%]">
           <Tooltip content={description}>
-            <div className="text-[11px] theme-muted truncate leading-tight text-right">
-              {description}
-            </div>
+            <div className="text-[11px] theme-muted truncate leading-tight text-right">{description}</div>
           </Tooltip>
         </div>
       )}

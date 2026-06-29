@@ -850,6 +850,7 @@
   "Reinstall Roblox after wipe": "Roblox nach Bereinigung neu installieren",
   "RAM installs a clean Roblox into the standard location after clearing it (cached, so it only downloads when Roblox updates). Turn off to let Roblox reinstall itself.": "RAM installiert nach dem Bereinigen eine saubere Roblox in den Standard-Speicherort (zwischengespeichert, lädt also nur bei Roblox-Updates neu). Ausschalten, damit Roblox sich selbst neu installiert",
   "Drag to reorder": "Zum Umsortieren ziehen",
+  "Drop accounts here": "Konten hier ablegen",
   "Drag to reorder group": "Gruppe zum Umsortieren ziehen",
   "Account List": "Kontoliste",
   "Reordering style": "Umsortier-Stil",
