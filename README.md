@@ -3,11 +3,14 @@ Full credit to [ic3w0lf22](https://github.com/ic3w0lf22) for the original Roblox
 # Roblox Account Manager
 ![github-large](Images/Image5.png)
 
-**[Download Latest v4 Pre-release](https://github.com/niccsprojects/Roblox-Account-Manager/releases?q=beta)**
+[![Download Latest v4 release](https://img.shields.io/badge/⬇_Download_Latest_v4_Pre--release-2EA043?style=for-the-badge&logo=github&logoColor=white)](https://github.com/niccsprojects/Roblox-Account-Manager/releases?q=beta)
 
 [![Total Downloads](https://img.shields.io/github/downloads/niccsprojects/Roblox-Account-Manager/total?label=Total%20Downloads&color=2ea043)](https://github.com/niccsprojects/Roblox-Account-Manager/releases)
 [![Latest Release Downloads](https://img.shields.io/github/downloads/niccsprojects/Roblox-Account-Manager/latest/total?label=Latest%20Release%20Downloads&color=3b82f6)](https://github.com/niccsprojects/Roblox-Account-Manager/releases/latest)
 [![Latest Release](https://img.shields.io/github/v/release/niccsprojects/Roblox-Account-Manager?include_prereleases&label=Latest%20Release)](https://github.com/niccsprojects/Roblox-Account-Manager/releases/latest)
+
+[![Support this project on Ko-fi](https://img.shields.io/badge/Support%20me%20on-Ko--fi-FF5E5B?style=flat&logo=ko-fi&logoColor=white)](https://ko-fi.com/niccdevs)
+
 
 Release download counts are based on GitHub release asset downloads across tags and are not unique installs.
 
