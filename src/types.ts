@@ -71,6 +71,17 @@ export interface ParsedGroup {
   accounts: Account[];
 }
 
+export type DragState =
+  | { kind: "accounts"; userIds: number[] }
+  | { kind: "group"; groupKey: string };
+
+export type DropTarget =
+  | { kind: "before-account"; userId: number }
+  | { kind: "after-account"; userId: number }
+  | { kind: "group-end"; groupKey: string }
+  | { kind: "before-group"; groupKey: string }
+  | { kind: "after-group"; groupKey: string };
+
 export interface PlatformCapabilities {
   os: string;
   sessionType: string;

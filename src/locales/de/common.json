@@ -848,5 +848,15 @@
   "Managed versions are opt-in. Leave this on 'Default Roblox install' to launch with the standard Roblox install on this PC, or pick a downloaded version to use it for every account.": "Verwaltete Versionen sind optional. Lass dies auf „Standard-Roblox-Installation“, um mit der normalen Roblox-Installation auf diesem PC zu starten, oder wähle eine heruntergeladene Version, um sie für alle Konten zu verwenden",
   "Place {{id}}": "Spiel {{id}}",
   "Reinstall Roblox after wipe": "Roblox nach Bereinigung neu installieren",
-  "RAM installs a clean Roblox into the standard location after clearing it (cached, so it only downloads when Roblox updates). Turn off to let Roblox reinstall itself.": "RAM installiert nach dem Bereinigen eine saubere Roblox in den Standard-Speicherort (zwischengespeichert, lädt also nur bei Roblox-Updates neu). Ausschalten, damit Roblox sich selbst neu installiert"
+  "RAM installs a clean Roblox into the standard location after clearing it (cached, so it only downloads when Roblox updates). Turn off to let Roblox reinstall itself.": "RAM installiert nach dem Bereinigen eine saubere Roblox in den Standard-Speicherort (zwischengespeichert, lädt also nur bei Roblox-Updates neu). Ausschalten, damit Roblox sich selbst neu installiert",
+  "Drag to reorder": "Zum Umsortieren ziehen",
+  "Drop accounts here": "Konten hier ablegen",
+  "Drag to reorder group": "Gruppe zum Umsortieren ziehen",
+  "Account List": "Kontoliste",
+  "Reordering style": "Umsortier-Stil",
+  "Drag the grip handle on each row and group, or switch to a reorder mode you toggle on and off": "Ziehe den Griff an jeder Zeile und Gruppe, oder wechsle zu einem Umsortier-Modus, den du ein- und ausschaltest",
+  "Drag handles": "Ziehgriffe",
+  "Reorder mode toggle": "Umsortier-Modus-Schalter",
+  "Done reordering": "Umsortieren fertig",
+  "Reorder accounts": "Konten umsortieren"
 }
