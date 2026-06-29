@@ -55,7 +55,7 @@ async fn launch_roblox(
 
     if let Some(report) = run_pre_launch_isolation(&app, &settings).await? {
         let _ = app.emit("isolation-report", &report);
-        if windows::has_pending_fast_flags() && pristine.is_none() {
+        if windows::has_pending_fast_flags() {
             tokio::spawn(apply_pending_fast_flags_when_ready(
                 std::time::Duration::from_secs(240),
             ));
@@ -127,7 +127,12 @@ async fn launch_roblox(
     }
 
     let mut actual_job = resolved_launch.job_id.clone();
-    if shuffle_job && !follow_user && actual_job.trim().is_empty() {
+    if shuffle_job
+        && !follow_user
+        && !resolved_launch.join_vip
+        && resolved_launch.link_code.is_empty()
+        && actual_job.trim().is_empty()
+    {
         if let Ok(response) = run_with_session_retry(state.inner(), user_id, |cookie| async move {
             api::roblox::get_servers(place_id, "Public", None, Some(&cookie)).await
         })
@@ -447,7 +452,7 @@ async fn launch_multiple(
 
     if let Some(report) = run_pre_launch_isolation(&app, &settings).await? {
         let _ = app.emit("isolation-report", &report);
-        if windows::has_pending_fast_flags() && pristine.is_none() {
+        if windows::has_pending_fast_flags() {
             tokio::spawn(apply_pending_fast_flags_when_ready(
                 std::time::Duration::from_secs(240),
             ));

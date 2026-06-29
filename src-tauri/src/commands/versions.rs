@@ -75,7 +75,7 @@ fn versions_prune_missing(
         removed += 1;
 
         if default == version_id {
-            let _ = settings.set("Versions", "DefaultVersion", "");
+            settings.set("Versions", "DefaultVersion", "")?;
         }
 
         let mut snapshot = accounts.get_all()?;

@@ -841,6 +841,7 @@
   "Select Roblox install folder": "Roblox-Installationsordner auswählen",
   "Roblox install path set: {{path}}": "Roblox-Installationspfad gesetzt: {{path}}",
   "Roblox install path override cleared": "Roblox-Installationspfad-Überschreibung gelöscht",
+  "Roblox install folder": "Roblox-Installationsordner",
   "Default Roblox install": "Standard-Roblox-Installation",
   "Missing files": "Dateien fehlen",
   "Remove {{count}} missing": "{{count}} fehlende entfernen",

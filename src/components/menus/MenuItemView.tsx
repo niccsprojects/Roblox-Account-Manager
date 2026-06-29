@@ -151,9 +151,13 @@ function SubmenuItem({
   useEffect(() => () => clearCloseTimer(), []);
 
   return (
-    <div ref={triggerRef} className="relative" onMouseEnter={openNow} onClick={openNow}>
-      <div
-        className={`flex items-center justify-between px-3 py-1.5 text-[13px] cursor-default rounded-md mx-1 ${
+    <div ref={triggerRef} className="relative" onMouseEnter={openNow}>
+      <button
+        type="button"
+        onClick={openNow}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`flex w-[calc(100%-0.5rem)] items-center justify-between px-3 py-1.5 text-[13px] text-left rounded-md mx-1 ${
           open ? "bg-zinc-800 text-zinc-100" : "text-zinc-300 hover:bg-zinc-800"
         }`}
       >
@@ -161,7 +165,7 @@ function SubmenuItem({
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-zinc-600">
           <path d="m9 18 6-6-6-6" />
         </svg>
-      </div>
+      </button>
       {open && (
         <div
           ref={panelRef}

@@ -843,6 +843,7 @@
   "Select Roblox install folder": "Select Roblox install folder",
   "Roblox install path set: {{path}}": "Roblox install path set: {{path}}",
   "Roblox install path override cleared": "Roblox install path override cleared",
+  "Roblox install folder": "Roblox install folder",
   "Default Roblox install": "Default Roblox install",
   "Missing files": "Missing files",
   "Remove {{count}} missing": "Remove {{count}} missing",

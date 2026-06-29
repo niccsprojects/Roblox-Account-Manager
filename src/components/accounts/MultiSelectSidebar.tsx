@@ -271,6 +271,9 @@ export function MultiSelectSidebar() {
                 <button
                   ref={recentsRef}
                   onClick={() => setRecentsOpen((v) => !v)}
+                  aria-label={t("Recent games")}
+                  aria-expanded={recentsOpen}
+                  aria-haspopup="menu"
                   className="theme-muted p-1 rounded hover:text-[var(--panel-fg)]"
                 >
                   <History size={14} strokeWidth={1.5} />
@@ -296,6 +299,8 @@ export function MultiSelectSidebar() {
               <Tooltip content={t("Shuffle Job ID")}>
                 <button
                   onClick={() => store.setShuffleJobId(!store.shuffleJobId)}
+                  aria-label={t("Shuffle Job ID")}
+                  aria-pressed={store.shuffleJobId}
                   className={`p-1 rounded text-xs ${
                     store.shuffleJobId
                       ? "text-emerald-400 bg-emerald-500/10"

@@ -710,6 +710,12 @@ pub async fn ensure_pristine_roblox(app: &tauri::AppHandle) -> Result<PristineRo
         current.channel.clone()
     };
     let version_hash = current.version_hash.clone();
+    if !is_valid_channel_name(&channel) {
+        return Err(format!("Invalid Roblox channel name: {:?}", channel));
+    }
+    if !is_valid_version_hash(&version_hash) {
+        return Err(format!("Invalid Roblox version hash: {:?}", version_hash));
+    }
 
     let root = pristine_cache_dir().ok_or_else(|| "Could not resolve LOCALAPPDATA".to_string())?;
     let path = root.join(&version_hash);
@@ -751,7 +757,9 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<()
     ensure_dir(dst)?;
     let entries =
         std::fs::read_dir(src).map_err(|e| format!("Could not read {}: {}", src.display(), e))?;
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry =
+            entry.map_err(|e| format!("Could not read entry in {}: {}", src.display(), e))?;
         let path = entry.path();
         let dest = dst.join(entry.file_name());
         let file_type = entry

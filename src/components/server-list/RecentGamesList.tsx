@@ -108,9 +108,10 @@ export function RecentGamesList({ userId, maxRecent, onSelect }: RecentGamesList
             {games.map((game) => {
               const named = !!game.name && game.name !== String(game.placeId);
               return (
-                <div
+                <button
+                  type="button"
                   key={game.placeId}
-                  className="flex items-center gap-3 rounded-lg p-2 cursor-pointer transition-colors hover:bg-zinc-800/50"
+                  className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-zinc-800/50"
                   onClick={() => onSelect(game.placeId, game.name, game.iconUrl)}
                   title={named ? game.name : String(game.placeId)}
                 >
@@ -137,7 +138,7 @@ export function RecentGamesList({ userId, maxRecent, onSelect }: RecentGamesList
                   <span className="shrink-0 whitespace-nowrap text-[10px] tabular-nums text-zinc-600">
                     {formatTime(game.lastPlayed)}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>

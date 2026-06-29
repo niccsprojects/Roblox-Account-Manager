@@ -30,7 +30,7 @@ export function VersionsTab({ s }: { s: UseSettingsReturn }) {
   const store = useStore();
   const [installed, setInstalled] = useState<VersionEntry[]>([]);
   const defaultVersion = s.get("Versions", "DefaultVersion", "");
-  const isWindows = (store.platformCapabilities?.os ?? "windows") === "windows";
+  const isWindows = store.platformCapabilities?.os === "windows";
   const savedCustomPath = s.get("Versions", "CustomInstallPath", "");
   const [customPath, setCustomPath] = useState(savedCustomPath);
   const [detectedPath, setDetectedPath] = useState<string | null>(null);
@@ -79,6 +79,9 @@ export function VersionsTab({ s }: { s: UseSettingsReturn }) {
 
   useEffect(() => {
     if (isWindows) void detectInstallPath();
+  }, [isWindows]);
+
+  useEffect(() => {
     void refresh();
     const unlisten = listen<{ stage: string }>("version-install-progress", (e) => {
       if (e.payload.stage === "ready") {
@@ -179,6 +182,7 @@ export function VersionsTab({ s }: { s: UseSettingsReturn }) {
               }}
               placeholder={t("Auto-detected")}
               spellCheck={false}
+              aria-label={t("Roblox install folder")}
               className="flex-1 rounded-lg border border-zinc-700/70 bg-zinc-900/50 px-2.5 py-1.5 font-mono text-[11px] text-zinc-200 outline-none focus:border-zinc-500"
             />
             <button
