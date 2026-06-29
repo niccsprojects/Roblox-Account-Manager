@@ -88,7 +88,9 @@ export function MultiSelectSidebar() {
   }
 
   async function handleCopyCombo() {
-    const lines = accounts.map((a) => `${a.Username}:${a.Password}:${a.SecurityToken}`);
+    const lines = accounts
+      .filter((a) => a.Username && a.Password && a.SecurityToken)
+      .map((a) => `${a.Username}:${a.Password}:${a.SecurityToken}`);
     await navigator.clipboard.writeText(lines.join("\n"));
     store.addToast(tr("Copied {{count}} user:pass:cookie", { count: lines.length }));
   }
