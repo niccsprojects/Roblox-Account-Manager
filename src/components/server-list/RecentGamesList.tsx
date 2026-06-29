@@ -41,6 +41,24 @@ export function RecentGamesList({ userId, maxRecent, onSelect }: RecentGamesList
     };
   }, [userId]);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showBottomFade, setShowBottomFade] = useState(false);
+
+  function updateFade() {
+    const el = scrollRef.current;
+    if (!el) return;
+    setShowBottomFade(el.scrollHeight - el.scrollTop - el.clientHeight > 2);
+  }
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateFade();
+    const ro = new ResizeObserver(() => updateFade());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [games]);
+
   function handleClear() {
     saveRecentGames([]);
     setGames([]);
@@ -80,34 +98,56 @@ export function RecentGamesList({ userId, maxRecent, onSelect }: RecentGamesList
           {t("Clear all")}
         </button>
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="flex flex-col gap-1 px-1">
-          {games.map((game) => (
-            <div
-              key={game.placeId}
-              className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-800/40 transition-colors cursor-pointer"
-              onClick={() => onSelect(game.placeId, game.name, game.iconUrl)}
-            >
-              <div className="w-9 h-9 rounded-md bg-zinc-800 shrink-0 overflow-hidden">
-                {game.iconUrl ? (
-                  <img src={game.iconUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-700">
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={scrollRef}
+          onScroll={updateFade}
+          className="h-full overflow-y-auto overscroll-contain"
+        >
+          <div className="flex flex-col gap-1 px-1 pb-1">
+            {games.map((game) => {
+              const named = !!game.name && game.name !== String(game.placeId);
+              return (
+                <button
+                  type="button"
+                  key={game.placeId}
+                  className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-zinc-800/50"
+                  onClick={() => onSelect(game.placeId, game.name, game.iconUrl)}
+                  title={named ? game.name : String(game.placeId)}
+                >
+                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-zinc-800">
+                    {game.iconUrl ? (
+                      <img src={game.iconUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-zinc-700">
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[12px] text-zinc-200 truncate">{game.name}</div>
-                <div className="text-[10px] text-zinc-600 font-mono">{t("ID: {{id}}", { id: game.placeId })}</div>
-              </div>
-              <span className="text-[10px] text-zinc-600 shrink-0">{formatTime(game.lastPlayed)}</span>
-            </div>
-          ))}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12px] leading-tight text-zinc-200">
+                      {named ? game.name : t("Place {{id}}", { id: game.placeId })}
+                    </div>
+                    <div className="mt-0.5 truncate font-mono text-[10px] text-zinc-600">
+                      {t("ID: {{id}}", { id: game.placeId })}
+                    </div>
+                  </div>
+                  <span className="shrink-0 whitespace-nowrap text-[10px] tabular-nums text-zinc-600">
+                    {formatTime(game.lastPlayed)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
+        <div
+          className={`pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-zinc-900 to-transparent transition-opacity duration-150 ${
+            showBottomFade ? "opacity-100" : "opacity-0"
+          }`}
+        />
       </div>
     </div>
   );

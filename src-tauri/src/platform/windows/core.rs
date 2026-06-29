@@ -133,7 +133,71 @@ fn is_773_fix_disabled() -> bool {
         .unwrap_or(false)
 }
 
-pub fn get_roblox_path() -> Result<String, String> {
+static CUSTOM_ROBLOX_PATH: Mutex<Option<String>> = Mutex::new(None);
+
+pub fn set_custom_roblox_path(path: Option<String>) {
+    if let Ok(mut guard) = CUSTOM_ROBLOX_PATH.lock() {
+        *guard = path
+            .map(|p| p.trim().to_string())
+            .filter(|p| !p.is_empty());
+    }
+}
+
+fn custom_roblox_path() -> Option<String> {
+    CUSTOM_ROBLOX_PATH.lock().ok().and_then(|g| g.clone())
+}
+
+fn scan_versions_dir(dir: &std::path::Path) -> Option<(SystemTime, String)> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    let mut best: Option<(SystemTime, String)> = None;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with("version-") && entry.path().join("RobloxPlayerBeta.exe").exists() {
+            if let Ok(meta) = entry.metadata() {
+                if let Ok(modified) = meta.modified() {
+                    if best.as_ref().map_or(true, |(t, _)| modified > *t) {
+                        best = Some((modified, entry.path().to_string_lossy().into_owned()));
+                    }
+                }
+            }
+        }
+    }
+    best
+}
+
+fn candidate_versions_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        dirs.push(PathBuf::from(local).join("Roblox").join("Versions"));
+    }
+    if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
+        dirs.push(PathBuf::from(pf86).join("Roblox").join("Versions"));
+    }
+    if let Ok(pf) = std::env::var("ProgramFiles") {
+        dirs.push(PathBuf::from(pf).join("Roblox").join("Versions"));
+    }
+    dirs
+}
+
+pub fn normalize_install_folder(folder: &str) -> Option<String> {
+    let folder = folder.trim();
+    if folder.is_empty() {
+        return None;
+    }
+    let path = std::path::Path::new(folder);
+    if path.join("RobloxPlayerBeta.exe").exists() {
+        return Some(path.to_string_lossy().into_owned());
+    }
+    if let Some((_, resolved)) = scan_versions_dir(path) {
+        return Some(resolved);
+    }
+    if let Some((_, resolved)) = scan_versions_dir(&path.join("Versions")) {
+        return Some(resolved);
+    }
+    None
+}
+
+pub fn auto_detect_roblox_path() -> Result<String, String> {
     unsafe {
         let key_name = encode_wide("roblox\\DefaultIcon");
         let mut hkey: windows_sys::Win32::System::Registry::HKEY = std::ptr::null_mut();
@@ -158,7 +222,7 @@ pub fn get_roblox_path() -> Result<String, String> {
                 let len = (buf_size as usize / 2).saturating_sub(1);
                 let path = String::from_utf16_lossy(&buf[..len]);
                 if let Some(parent) = std::path::Path::new(&path).parent() {
-                    if parent.exists() {
+                    if parent.join("RobloxPlayerBeta.exe").exists() {
                         return Ok(parent.to_string_lossy().into_owned());
                     }
                 }
@@ -166,29 +230,28 @@ pub fn get_roblox_path() -> Result<String, String> {
         }
     }
 
-    let local_app_data = std::env::var("LOCALAPPDATA").unwrap_or_default();
-    let versions_dir = format!("{}\\Roblox\\Versions", local_app_data);
-
-    if let Ok(entries) = std::fs::read_dir(&versions_dir) {
-        let mut best: Option<(SystemTime, String)> = None;
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with("version-") && entry.path().join("RobloxPlayerBeta.exe").exists() {
-                if let Ok(meta) = entry.metadata() {
-                    if let Ok(modified) = meta.modified() {
-                        if best.as_ref().map_or(true, |(t, _)| modified > *t) {
-                            best = Some((modified, entry.path().to_string_lossy().into_owned()));
-                        }
-                    }
-                }
+    let mut best: Option<(SystemTime, String)> = None;
+    for dir in candidate_versions_dirs() {
+        if let Some((modified, path)) = scan_versions_dir(&dir) {
+            if best.as_ref().map_or(true, |(t, _)| modified > *t) {
+                best = Some((modified, path));
             }
         }
-        if let Some((_, path)) = best {
-            return Ok(path);
-        }
+    }
+    if let Some((_, path)) = best {
+        return Ok(path);
     }
 
     Err("Roblox installation not found".into())
+}
+
+pub fn get_roblox_path() -> Result<String, String> {
+    if let Some(custom) = custom_roblox_path() {
+        if let Some(resolved) = normalize_install_folder(&custom) {
+            return Ok(resolved);
+        }
+    }
+    auto_detect_roblox_path()
 }
 
 fn get_client_settings_file() -> Result<PathBuf, String> {

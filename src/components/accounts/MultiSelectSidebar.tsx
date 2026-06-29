@@ -1,11 +1,14 @@
-import { useState, useMemo } from "react";
-import { ChevronDown, Save } from "lucide-react";
+import { useState, useMemo, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { ChevronDown, Save, Shuffle, History } from "lucide-react";
 import { useStore } from "../../store";
 import { usePrompt, useConfirm } from "../../hooks/usePrompt";
 import { useJoinOnlineWarning } from "../../hooks/useJoinOnlineWarning";
 import { parseGroupName } from "../../types";
 import { SidebarSection } from "./SidebarSection";
 import { AccountChip } from "./AccountChip";
+import { Tooltip } from "../ui/Tooltip";
+import { RecentGamesPopover } from "../server-list/RecentGamesPopover";
 import { tr, useTr } from "../../i18n/text";
 
 export function MultiSelectSidebar() {
@@ -20,6 +23,10 @@ export function MultiSelectSidebar() {
   const [moveOpen, setMoveOpen] = useState(false);
   const [accountsExpanded, setAccountsExpanded] = useState(false);
   const [savingLaunchFields, setSavingLaunchFields] = useState(false);
+  const [settingDisplayName, setSettingDisplayName] = useState(false);
+  const [recentsOpen, setRecentsOpen] = useState(false);
+  const recentsRef = useRef<HTMLButtonElement>(null);
+  const maxRecent = parseInt(store.settings?.General?.MaxRecentGames || "8") || 8;
 
   const previewAccounts = accounts.slice(0, 5);
   const remaining = count - previewAccounts.length;
@@ -78,6 +85,35 @@ export function MultiSelectSidebar() {
     const cookies = accounts.map((a) => a.SecurityToken).filter(Boolean);
     await navigator.clipboard.writeText(cookies.join("\n"));
     store.addToast(tr("Copied {{count}} cookies", { count: cookies.length }));
+  }
+
+  async function handleCopyCombo() {
+    const lines = accounts
+      .filter((a) => a.Username && a.Password && a.SecurityToken)
+      .map((a) => `${a.Username}:${a.Password}:${a.SecurityToken}`);
+    await navigator.clipboard.writeText(lines.join("\n"));
+    store.addToast(tr("Copied {{count}} user:pass:cookie", { count: lines.length }));
+  }
+
+  async function handleSetDisplayName() {
+    if (settingDisplayName) return;
+    const name = await prompt(tr("New display name:"));
+    if (name === null || !name.trim()) return;
+    if (!(await confirm(tr("Change display name for {{count}} accounts?", { count })))) return;
+    setSettingDisplayName(true);
+    let ok = 0;
+    let fail = 0;
+    for (const a of accounts) {
+      try {
+        await invoke("set_display_name", { userId: a.UserID, displayName: name.trim() });
+        ok++;
+      } catch {
+        fail++;
+      }
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+    setSettingDisplayName(false);
+    store.addToast(tr("Display name: {{ok}} ok, {{fail}} failed", { ok, fail }));
   }
 
   async function handleMoveToGroup(group: string) {
@@ -233,6 +269,26 @@ export function MultiSelectSidebar() {
                 placeholder={t("Place ID")}
                 className="sidebar-input flex-1 font-mono text-xs"
               />
+              <Tooltip content={t("Recent games")}>
+                <button
+                  ref={recentsRef}
+                  onClick={() => setRecentsOpen((v) => !v)}
+                  aria-label={t("Recent games")}
+                  aria-expanded={recentsOpen}
+                  aria-haspopup="menu"
+                  className="theme-muted p-1 rounded hover:text-[var(--panel-fg)]"
+                >
+                  <History size={14} strokeWidth={1.5} />
+                </button>
+              </Tooltip>
+              <RecentGamesPopover
+                open={recentsOpen}
+                onClose={() => setRecentsOpen(false)}
+                anchorRef={recentsRef}
+                userId={accounts[0]?.UserID ?? null}
+                maxRecent={maxRecent}
+                onSelect={(placeId) => store.setPlaceId(String(placeId))}
+              />
             </div>
             <div className="flex items-center gap-1.5">
               <label className="theme-label text-[10px] w-10 shrink-0">{t("Job")}</label>
@@ -242,6 +298,20 @@ export function MultiSelectSidebar() {
                 placeholder={t("Job ID")}
                 className="sidebar-input flex-1 font-mono text-xs"
               />
+              <Tooltip content={t("Shuffle Job ID")}>
+                <button
+                  onClick={() => store.setShuffleJobId(!store.shuffleJobId)}
+                  aria-label={t("Shuffle Job ID")}
+                  aria-pressed={store.shuffleJobId}
+                  className={`p-1 rounded text-xs ${
+                    store.shuffleJobId
+                      ? "text-emerald-400 bg-emerald-500/10"
+                      : "theme-muted hover:text-[var(--panel-fg)]"
+                  }`}
+                >
+                  <Shuffle size={14} strokeWidth={1.5} />
+                </button>
+              </Tooltip>
             </div>
             <div className="flex items-center gap-1.5">
               <label className="theme-label text-[10px] w-10 shrink-0">{t("Data")}</label>
@@ -322,6 +392,18 @@ export function MultiSelectSidebar() {
             </button>
             <button onClick={handleCopyCookies} className="sidebar-btn theme-btn">
               {t("Copy All Cookies")}
+            </button>
+            <button onClick={handleCopyCombo} className="sidebar-btn theme-btn">
+              {t("Copy User:Pass:Cookie")}
+            </button>
+            <button
+              onClick={handleSetDisplayName}
+              disabled={settingDisplayName}
+              className="sidebar-btn theme-btn disabled:opacity-50"
+            >
+              {settingDisplayName
+                ? t("Setting display names...")
+                : t("Set Display Name ({{count}})", { count })}
             </button>
 
             <div className="relative">

@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useStore } from "../../store";
 import { usePrompt, useConfirm } from "../../hooks/usePrompt";
 import { useTr } from "../../i18n/text";
-import { MenuItemView } from "./MenuItemView";
+import { MenuItemView, MenuLevel } from "./MenuItemView";
 import type { MenuItem } from "./MenuItemView";
 
 export function ContextMenu() {
@@ -88,6 +88,11 @@ export function ContextMenu() {
     {
       label: t("User:Pass"),
       action: () => copyMulti((a) => `${a.Username}:${a.Password}`, t("user:pass")),
+    },
+    {
+      label: t("User:Pass:Cookie"),
+      action: () =>
+        copyMulti((a) => `${a.Username}:${a.Password}:${a.SecurityToken}`, t("user:pass:cookie")),
     },
     { separator: true, label: "" },
     {
@@ -375,11 +380,18 @@ export function ContextMenu() {
         top: menuPos?.top ?? pos.y,
       }}
     >
-      {items
-        .filter((item) => !item.devOnly || store.devMode)
-        .map((item, i) => (
-          <MenuItemView key={i} item={item} close={store.closeContextMenu} />
-        ))}
+      <MenuLevel>
+        {items
+          .filter((item) => !item.devOnly || store.devMode)
+          .map((item, i) => (
+            <MenuItemView
+              key={i}
+              item={item}
+              close={store.closeContextMenu}
+              itemKey={String(i)}
+            />
+          ))}
+      </MenuLevel>
     </div>
   );
 }

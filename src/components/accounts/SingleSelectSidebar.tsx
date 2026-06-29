@@ -33,8 +33,9 @@ export function SingleSelectSidebar() {
   const [argsOpen, setArgsOpen] = useState(false);
   const [recentsOpen, setRecentsOpen] = useState(false);
   const [installedVersions, setInstalledVersions] = useState<
-    { channel: string; versionHash: string; displayVersion: string | null; userLabel: string | null }[]
+    { channel: string; versionHash: string; displayVersion: string | null; userLabel: string | null; exists: boolean }[]
   >([]);
+  const [versionsLoaded, setVersionsLoaded] = useState(false);
   const argsRef = useRef<HTMLButtonElement>(null);
   const recentsRef = useRef<HTMLButtonElement>(null);
   const maxRecent = parseInt(store.settings?.General?.MaxRecentGames || "8") || 8;
@@ -56,7 +57,10 @@ export function SingleSelectSidebar() {
     if (savedData) store.setLaunchData(savedData);
 
     invoke<typeof installedVersions>("versions_list_installed")
-      .then((list) => setInstalledVersions(list))
+      .then((list) => {
+        setInstalledVersions(list);
+        setVersionsLoaded(true);
+      })
       .catch(() => {});
   }, [account.UserID]);
 
@@ -64,7 +68,10 @@ export function SingleSelectSidebar() {
     const unlisten = listen<{ stage: string }>("version-install-progress", (e) => {
       if (e.payload.stage === "ready") {
         invoke<typeof installedVersions>("versions_list_installed")
-          .then((list) => setInstalledVersions(list))
+          .then((list) => {
+            setInstalledVersions(list);
+            setVersionsLoaded(true);
+          })
           .catch(() => {});
       }
     });
@@ -72,6 +79,19 @@ export function SingleSelectSidebar() {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  const validVersions = installedVersions.filter((v) => v.exists);
+  const savedVersion = store.settings?.Versions?.DefaultVersion ?? "";
+  const savedVersionValid = validVersions.some(
+    (v) => `${v.channel}:${v.versionHash}` === savedVersion
+  );
+
+  useEffect(() => {
+    if (!versionsLoaded) return;
+    if (savedVersion && !savedVersionValid) {
+      store.setDefaultVersion(null);
+    }
+  }, [versionsLoaded, savedVersion, savedVersionValid]);
 
   function handleSetAlias() {
     store.updateAccount({ ...account, Alias: alias.slice(0, 30) });
@@ -252,6 +272,9 @@ export function SingleSelectSidebar() {
                 <button
                   ref={recentsRef}
                   onClick={() => setRecentsOpen((v) => !v)}
+                  aria-label={t("Recent games")}
+                  aria-expanded={recentsOpen}
+                  aria-haspopup="menu"
                   className="theme-muted p-1 rounded hover:text-[var(--panel-fg)]"
                 >
                   <History size={14} strokeWidth={1.5} />
@@ -277,6 +300,8 @@ export function SingleSelectSidebar() {
               <Tooltip content={t("Shuffle Job ID")}>
                 <button
                   onClick={() => store.setShuffleJobId(!store.shuffleJobId)}
+                  aria-label={t("Shuffle Job ID")}
+                  aria-pressed={store.shuffleJobId}
                   className={`p-1 rounded text-xs ${
                     store.shuffleJobId
                       ? "text-emerald-400 bg-emerald-500/10"
@@ -353,13 +378,13 @@ export function SingleSelectSidebar() {
           )}
         </SidebarSection>
 
-        {installedVersions.length > 0 && (
+        {validVersions.length > 0 && (
           <SidebarSection title={t("Roblox Version")}>
             <Select
-              value={store.settings?.Versions?.DefaultVersion ?? ""}
+              value={savedVersionValid ? savedVersion : ""}
               options={[
-                { value: "", label: t("Latest installed") },
-                ...installedVersions.map((v) => ({
+                { value: "", label: t("Default Roblox install") },
+                ...validVersions.map((v) => ({
                   value: `${v.channel}:${v.versionHash}`,
                   label:
                     v.userLabel ??
