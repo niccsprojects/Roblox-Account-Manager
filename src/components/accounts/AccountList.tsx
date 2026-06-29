@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { User } from "lucide-react";
 import { useStore } from "../../store";
 import { GroupSection } from "./GroupSection";
@@ -19,12 +19,21 @@ export function AccountList() {
   const suppressClickRef = useRef(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [dragSelectRect, setDragSelectRect] = useState<DragSelectRect | null>(null);
+  const [insertLine, setInsertLine] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [focusedGroupKey, setFocusedGroupKey] = useState<string | null>(null);
 
   useEffect(() => {
     const el = listRef.current;
     if (!el) return;
 
     function handleKeyDown(e: KeyboardEvent) {
+      if ((e.key === "ArrowUp" || e.key === "ArrowDown") && e.altKey && e.shiftKey) {
+        e.preventDefault();
+        const dir = e.key === "ArrowUp" ? "up" : "down";
+        if (focusedGroupKey) store.nudgeGroup(focusedGroupKey, dir);
+        else store.nudgeSelectionVertical(dir);
+        return;
+      }
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         e.preventDefault();
         store.navigateSelection(e.key === "ArrowUp" ? "up" : "down", e.shiftKey);
@@ -52,19 +61,52 @@ export function AccountList() {
 
     el.addEventListener("keydown", handleKeyDown);
     return () => el.removeEventListener("keydown", handleKeyDown);
-  }, [store.navigateSelection, store.selectAll, store.deselectAll, store.selectSingle, store.orderedUserIds]);
+  }, [
+    store.navigateSelection,
+    store.selectAll,
+    store.deselectAll,
+    store.selectSingle,
+    store.orderedUserIds,
+    store.nudgeSelectionVertical,
+    store.nudgeGroup,
+    focusedGroupKey,
+  ]);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const ind = store.dropIndicator;
+    if (!list || !ind) {
+      setInsertLine(null);
+      return;
+    }
+    let el: HTMLElement | null = null;
+    let edge: "top" | "bottom" = "top";
+    if (ind.kind === "before-account" || ind.kind === "after-account") {
+      el = list.querySelector(`[data-user-id="${ind.userId}"]`);
+      edge = ind.kind === "before-account" ? "top" : "bottom";
+    } else if (ind.kind === "before-group" || ind.kind === "after-group" || ind.kind === "group-end") {
+      el = list.querySelector(`[data-group-key=${CSS.escape(ind.groupKey)}]`);
+      edge = ind.kind === "before-group" ? "top" : "bottom";
+    }
+    if (!el) {
+      setInsertLine(null);
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const lr = list.getBoundingClientRect();
+    setInsertLine({
+      top: (edge === "top" ? r.top : r.bottom) - lr.top + list.scrollTop,
+      left: r.left - lr.left + list.scrollLeft,
+      width: r.width,
+    });
+  }, [store.dropIndicator]);
 
   function handleDrop(targetGroupKey: string) {
-    if (!store.dragState) return;
-    const userId = store.dragState.userId;
-    const sourceGroup = store.dragState.sourceGroup;
+    const ds = store.dragState;
     store.setDragState(null);
-    if (sourceGroup === targetGroupKey) return;
-
-    const selected = store.selectedIds.has(userId)
-      ? [...store.selectedIds]
-      : [userId];
-    store.moveToGroup(selected, targetGroupKey);
+    store.setDropIndicator(null);
+    if (ds?.kind !== "accounts") return;
+    void store.moveAccounts(ds.userIds, { kind: "group-end", groupKey: targetGroupKey });
   }
 
   function handleBackgroundClick(e: React.MouseEvent) {
@@ -94,6 +136,12 @@ export function AccountList() {
 
   function handleDragOver(e: React.DragEvent) {
     e.preventDefault();
+    const list = listRef.current;
+    if (!list || !store.dragState) return;
+    const r = list.getBoundingClientRect();
+    const edge = 48;
+    if (e.clientY < r.top + edge) list.scrollTop -= 14;
+    else if (e.clientY > r.bottom - edge) list.scrollTop += 14;
   }
 
   async function handleExternalDrop(e: React.DragEvent) {
@@ -112,6 +160,7 @@ export function AccountList() {
 
   function handleMouseDown(e: React.MouseEvent) {
     if (e.button !== 0) return;
+    if (store.reorderMode) return;
 
     const list = listRef.current;
     if (!list) return;
@@ -316,6 +365,18 @@ export function AccountList() {
           }}
         />
       )}
+      {insertLine && (
+        <div
+          className="pointer-events-none absolute z-40 h-0.5 rounded-full"
+          style={{
+            top: insertLine.top - 1,
+            left: insertLine.left,
+            width: insertLine.width,
+            backgroundColor: "var(--accent-color)",
+            boxShadow: "0 0 6px var(--accent-soft)",
+          }}
+        />
+      )}
       {store.groups.map((group) => (
         <GroupSection
           key={group.key}
@@ -323,6 +384,8 @@ export function AccountList() {
           collapsed={store.collapsedGroups.has(group.key)}
           onToggle={() => store.toggleGroup(group.key)}
           onDrop={handleDrop}
+          onHeaderFocus={() => setFocusedGroupKey(group.key)}
+          onHeaderBlur={() => setFocusedGroupKey((k) => (k === group.key ? null : k))}
         />
       ))}
     </div>

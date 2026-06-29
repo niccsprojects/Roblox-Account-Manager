@@ -850,5 +850,14 @@
   "Managed versions are opt-in. Leave this on 'Default Roblox install' to launch with the standard Roblox install on this PC, or pick a downloaded version to use it for every account.": "Managed versions are opt-in. Leave this on 'Default Roblox install' to launch with the standard Roblox install on this PC, or pick a downloaded version to use it for every account.",
   "Place {{id}}": "Place {{id}}",
   "Reinstall Roblox after wipe": "Reinstall Roblox after wipe",
-  "RAM installs a clean Roblox into the standard location after clearing it (cached, so it only downloads when Roblox updates). Turn off to let Roblox reinstall itself.": "RAM installs a clean Roblox into the standard location after clearing it (cached, so it only downloads when Roblox updates). Turn off to let Roblox reinstall itself."
+  "RAM installs a clean Roblox into the standard location after clearing it (cached, so it only downloads when Roblox updates). Turn off to let Roblox reinstall itself.": "RAM installs a clean Roblox into the standard location after clearing it (cached, so it only downloads when Roblox updates). Turn off to let Roblox reinstall itself.",
+  "Drag to reorder": "Drag to reorder",
+  "Drag to reorder group": "Drag to reorder group",
+  "Account List": "Account List",
+  "Reordering style": "Reordering style",
+  "Drag the grip handle on each row and group, or switch to a reorder mode you toggle on and off": "Drag the grip handle on each row and group, or switch to a reorder mode you toggle on and off",
+  "Drag handles": "Drag handles",
+  "Reorder mode toggle": "Reorder mode toggle",
+  "Done reordering": "Done reordering",
+  "Reorder accounts": "Reorder accounts"
 }

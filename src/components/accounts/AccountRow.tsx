@@ -1,4 +1,4 @@
-import { Check, User } from "lucide-react";
+import { Check, User, GripVertical } from "lucide-react";
 import { useStore } from "../../store";
 import type { Account } from "../../types";
 import { timeAgo, getFreshnessColor } from "../../types";
@@ -71,44 +71,82 @@ export function AccountRow({ account }: { account: Account }) {
     store.openContextMenu(e.clientX, e.clientY);
   }
 
+  const reorderStyle = store.settings?.General?.ReorderStyle === "mode" ? "mode" : "handle";
+  const rowDraggable = reorderStyle === "mode" && store.reorderMode;
+
+  function startAccountDrag(e: React.DragEvent) {
+    const isSel = store.selectedIds.has(account.UserID);
+    const ids = isSel
+      ? store.orderedUserIds.filter((id) => store.selectedIds.has(id))
+      : [account.UserID];
+    if (!isSel) store.selectSingle(account.UserID);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(account.UserID));
+    store.setDragState({ kind: "accounts", userIds: ids });
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    if (store.dragState?.kind !== "accounts") return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (store.dragState.userIds.includes(account.UserID)) {
+      store.setDropIndicator(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY - rect.top > rect.height / 2;
+    store.setDropIndicator({ kind: after ? "after-account" : "before-account", userId: account.UserID });
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
-
-    const dragged = store.dragState;
+    const ds = store.dragState;
+    const target = store.dropIndicator;
     store.setDragState(null);
-    if (!dragged) return;
-
-    if (dragged.sourceGroup === (account.Group || "Default")) {
-      store.reorderAccounts(dragged.userId, account.UserID);
-      return;
+    store.setDropIndicator(null);
+    if (ds?.kind !== "accounts") return;
+    if (target && (target.kind === "before-account" || target.kind === "after-account")) {
+      void store.moveAccounts(ds.userIds, target);
+    } else {
+      void store.moveAccounts(ds.userIds, { kind: "before-account", userId: account.UserID });
     }
+  }
 
-    store.moveToGroup([dragged.userId], account.Group || "Default");
+  function handleDragEnd() {
+    store.setDragState(null);
+    store.setDropIndicator(null);
   }
 
   return (
     <div
       data-account-row="true"
       data-user-id={account.UserID}
-      className={`group/row theme-row-hover flex items-center gap-3 px-3 py-1.5 cursor-default select-none border-l-2 transition-colors duration-100 ${
+      className={`group/row theme-row-hover relative flex items-center gap-3 px-3 py-1.5 cursor-default select-none border-l-2 transition-colors duration-100 ${
         selected ? "theme-row-selected" : "border-l-transparent"
       }`}
       style={selected ? { borderLeftColor: "var(--accent-color)" } : undefined}
       onClick={handleClick}
       onContextMenu={handleContext}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", String(account.UserID));
-        store.setDragState({ userId: account.UserID, sourceGroup: account.Group || "Default" });
-      }}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }}
+      draggable={rowDraggable}
+      onDragStart={rowDraggable ? startAccountDrag : undefined}
+      onDragOver={handleDragOver}
       onDrop={handleDrop}
+      onDragEnd={handleDragEnd}
     >
+      {reorderStyle === "handle" && (
+        <div
+          draggable
+          onDragStart={startAccountDrag}
+          onDragEnd={handleDragEnd}
+          onClick={(e) => e.stopPropagation()}
+          title={t("Drag to reorder")}
+          aria-label={t("Drag to reorder")}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-0.5 opacity-0 group-hover/row:opacity-100 transition-opacity duration-100 cursor-grab active:cursor-grabbing theme-muted hover:text-[var(--panel-fg)]"
+        >
+          <GripVertical size={13} strokeWidth={1.5} />
+        </div>
+      )}
       <div className={`shrink-0 overflow-hidden transition-all duration-150 ease-out ${
         multiMode ? "w-4 opacity-100" : "w-0 opacity-0"
       }`}>

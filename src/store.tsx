@@ -16,6 +16,8 @@ import type {
   ThumbnailData,
   ParsedGroup,
   PlatformCapabilities,
+  DragState,
+  DropTarget,
 } from "./types";
 import { parseGroupName } from "./types";
 import { applyThemeCssVariables, normalizeTheme, DEFAULT_THEME } from "./theme";
@@ -206,12 +208,19 @@ export interface StoreValue {
   refreshCookie: (userId: number) => Promise<boolean>;
   moveToGroup: (userIds: number[], group: string) => Promise<void>;
   sortGroupAlphabetically: (groupKey: string) => void;
-  reorderAccounts: (draggedUserId: number, targetUserId: number) => Promise<void>;
+  moveAccounts: (userIds: number[], target: DropTarget) => Promise<void>;
+  reorderGroup: (groupKey: string, target: DropTarget) => Promise<void>;
+  nudgeSelectionVertical: (dir: "up" | "down") => void;
+  nudgeGroup: (groupKey: string, dir: "up" | "down") => void;
   joiningAccounts: Set<number>;
   launchProgress: LaunchProgressState | null;
 
-  dragState: { userId: number; sourceGroup: string } | null;
-  setDragState: (s: { userId: number; sourceGroup: string } | null) => void;
+  dragState: DragState | null;
+  setDragState: (s: DragState | null) => void;
+  dropIndicator: DropTarget | null;
+  setDropIndicator: (t: DropTarget | null) => void;
+  reorderMode: boolean;
+  setReorderMode: (v: boolean) => void;
 
   toasts: string[];
   addToast: (msg: string) => void;
@@ -356,7 +365,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [firstRunWalkthroughOpen, setFirstRunWalkthroughOpen] = useState(false);
   const [firstRunWalkthroughMode, setFirstRunWalkthroughMode] = useState<"firstRun" | "manual">("firstRun");
   const [initialized, setInitialized] = useState(false);
-  const [dragState, setDragState] = useState<{ userId: number; sourceGroup: string } | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<DropTarget | null>(null);
+  const [reorderMode, setReorderMode] = useState(false);
   const [toasts, setToasts] = useState<string[]>([]);
   const [modal, setModal] = useState<{ title: string; content: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -409,6 +420,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     );
   }, [accounts, searchQuery]);
 
+  const groupOrder = useMemo<string[]>(() => {
+    const raw = settings?.General?.GroupOrder;
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === "string") : [];
+    } catch {
+      return [];
+    }
+  }, [settings]);
+
   const groups = useMemo(() => {
     if (!showGroups) {
       return [
@@ -432,9 +454,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const { sortKey, displayName } = parseGroupName(key);
       parsed.push({ key, displayName, sortKey, accounts: accts });
     }
-    parsed.sort((a, b) => a.sortKey - b.sortKey || a.displayName.localeCompare(b.displayName));
+    const orderIndex = (key: string) => {
+      const i = groupOrder.indexOf(key);
+      return i === -1 ? Number.POSITIVE_INFINITY : i;
+    };
+    parsed.sort((a, b) => {
+      const oa = orderIndex(a.key);
+      const ob = orderIndex(b.key);
+      if (oa !== ob) return oa - ob;
+      return a.sortKey - b.sortKey || a.displayName.localeCompare(b.displayName);
+    });
     return parsed;
-  }, [filteredAccounts, showGroups]);
+  }, [filteredAccounts, showGroups, groupOrder]);
 
   const orderedUserIds = useMemo(() => {
     const ids: number[] = [];
@@ -742,25 +773,116 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addToast(tr("Sorted {{group}}", { group: parseGroupName(groupKey).displayName }));
   }
 
-  async function reorderAccounts(draggedUserId: number, targetUserId: number) {
-    if (draggedUserId === targetUserId) return;
+  async function moveAccounts(userIds: number[], target: DropTarget) {
+    if (userIds.length === 0) return;
+    const draggedSet = new Set(userIds);
+    const rest = accounts.filter((a) => !draggedSet.has(a.UserID));
+    const dragged = userIds
+      .map((id) => accounts.find((a) => a.UserID === id))
+      .filter((a): a is Account => !!a);
+    if (dragged.length === 0) return;
 
-    const next = [...accounts];
-    const from = next.findIndex((a) => a.UserID === draggedUserId);
-    const to = next.findIndex((a) => a.UserID === targetUserId);
-    if (from < 0 || to < 0) return;
+    if (target.kind === "group-end" && target.groupKey === "__all__") {
+      const next = [...rest, ...dragged];
+      setAccounts(next);
+      try {
+        await invoke("reorder_accounts", { userIds: next.map((a) => a.UserID) });
+      } catch (e) {
+        setError(String(e));
+      }
+      return;
+    }
 
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
+    let destGroup: string;
+    let insertIndex: number;
+    if (target.kind === "before-account" || target.kind === "after-account") {
+      const tIdx = rest.findIndex((a) => a.UserID === target.userId);
+      if (tIdx < 0) return;
+      destGroup = rest[tIdx].Group || "Default";
+      insertIndex = target.kind === "before-account" ? tIdx : tIdx + 1;
+    } else if (target.kind === "group-end") {
+      destGroup = target.groupKey;
+      let last = -1;
+      rest.forEach((a, i) => {
+        if ((a.Group || "Default") === destGroup) last = i;
+      });
+      insertIndex = last >= 0 ? last + 1 : rest.length;
+    } else {
+      return;
+    }
+
+    const movedWithGroup = dragged.map((a) =>
+      (a.Group || "Default") === destGroup ? a : { ...a, Group: destGroup }
+    );
+    const next = [
+      ...rest.slice(0, insertIndex),
+      ...movedWithGroup,
+      ...rest.slice(insertIndex),
+    ];
 
     setAccounts(next);
 
     try {
-      await invoke("reorder_accounts", {
-        userIds: next.map((a) => a.UserID),
-      });
+      await invoke("reorder_accounts", { userIds: next.map((a) => a.UserID) });
+      for (const a of movedWithGroup) {
+        const orig = accounts.find((o) => o.UserID === a.UserID);
+        if (orig && (orig.Group || "Default") !== (a.Group || "Default")) {
+          await invoke("update_account", { account: a }).catch(() => {});
+        }
+      }
     } catch (e) {
       setError(String(e));
+    }
+  }
+
+  async function reorderGroup(groupKey: string, target: DropTarget) {
+    if (target.kind !== "before-group" && target.kind !== "after-group") return;
+    if (groupKey === target.groupKey) return;
+    const order = groups.map((g) => g.key).filter((k) => k !== "__all__");
+    const from = order.indexOf(groupKey);
+    if (from < 0) return;
+    order.splice(from, 1);
+    const tIdx = order.indexOf(target.groupKey);
+    if (tIdx < 0) return;
+    order.splice(target.kind === "before-group" ? tIdx : tIdx + 1, 0, groupKey);
+
+    const value = JSON.stringify(order);
+    setSettings((prev) =>
+      prev ? { ...prev, General: { ...prev.General, GroupOrder: value } } : prev
+    );
+    try {
+      await invoke("update_setting", { section: "General", key: "GroupOrder", value });
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  function nudgeSelectionVertical(dir: "up" | "down") {
+    const sel = orderedUserIds.filter((id) => selectedIds.has(id));
+    if (sel.length === 0) return;
+    if (dir === "up") {
+      const topIdx = orderedUserIds.indexOf(sel[0]);
+      let n = topIdx - 1;
+      while (n >= 0 && selectedIds.has(orderedUserIds[n])) n--;
+      if (n < 0) return;
+      void moveAccounts(sel, { kind: "before-account", userId: orderedUserIds[n] });
+    } else {
+      const botIdx = orderedUserIds.indexOf(sel[sel.length - 1]);
+      let n = botIdx + 1;
+      while (n < orderedUserIds.length && selectedIds.has(orderedUserIds[n])) n++;
+      if (n >= orderedUserIds.length) return;
+      void moveAccounts(sel, { kind: "after-account", userId: orderedUserIds[n] });
+    }
+  }
+
+  function nudgeGroup(groupKey: string, dir: "up" | "down") {
+    const order = groups.map((g) => g.key).filter((k) => k !== "__all__");
+    const idx = order.indexOf(groupKey);
+    if (idx < 0) return;
+    if (dir === "up" && idx > 0) {
+      void reorderGroup(groupKey, { kind: "before-group", groupKey: order[idx - 1] });
+    } else if (dir === "down" && idx < order.length - 1) {
+      void reorderGroup(groupKey, { kind: "after-group", groupKey: order[idx + 1] });
     }
   }
 
@@ -1979,11 +2101,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     refreshCookie,
     moveToGroup,
     sortGroupAlphabetically,
-    reorderAccounts,
+    moveAccounts,
+    reorderGroup,
+    nudgeSelectionVertical,
+    nudgeGroup,
     joiningAccounts,
     launchProgress,
     dragState,
     setDragState,
+    dropIndicator,
+    setDropIndicator,
+    reorderMode,
+    setReorderMode,
     toasts,
     addToast,
     actionStatus,

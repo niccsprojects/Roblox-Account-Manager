@@ -224,6 +224,29 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
       />
 
       <Divider />
+      <SectionLabel>Account List</SectionLabel>
+      <div className="flex items-center gap-3 py-2 px-1">
+        <div className="min-w-0">
+          <div className="text-[13px] text-zinc-300">{t("Reordering style")}</div>
+          <div className="mt-0.5 text-[11px] text-zinc-500">
+            {t("Drag the grip handle on each row and group, or switch to a reorder mode you toggle on and off")}
+          </div>
+        </div>
+        <div className="ml-auto min-w-[180px]">
+          <Select
+            value={s.get("General", "ReorderStyle", "handle") === "mode" ? "mode" : "handle"}
+            options={[
+              { value: "handle", label: t("Drag handles") },
+              { value: "mode", label: t("Reorder mode toggle") },
+            ]}
+            onChange={(value) =>
+              s.set("General", "ReorderStyle", value === "mode" ? "mode" : "handle")
+            }
+          />
+        </div>
+      </div>
+
+      <Divider />
       <SectionLabel>Login Browser</SectionLabel>
       <Toggle
         checked={s.get("Login", "PersistentProfile", "true") !== "false"}

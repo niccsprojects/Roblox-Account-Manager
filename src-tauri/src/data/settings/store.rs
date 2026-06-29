@@ -38,6 +38,8 @@ impl SettingsStore {
                 Some("Visit http://ip-api.com/json/1.1.1.1 to see available format options"),
             ),
             ("MaxRecentGames", "8", None),
+            ("ReorderStyle", "handle", None),
+            ("GroupOrder", "", None),
             ("Language", "en", None),
             ("AutoCookieRefresh", "true", None),
             ("AutoCloseLastProcess", "false", None),

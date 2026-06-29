@@ -5,7 +5,7 @@ import { usePrompt } from "../../hooks/usePrompt";
 import { Tooltip } from "../ui/Tooltip";
 import { tr, useTr } from "../../i18n/text";
 import { ENABLE_NEXUS } from "../../featureFlags";
-import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare, Sparkles, Package } from "lucide-react";
+import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare, Sparkles, Package, ArrowUpDown } from "lucide-react";
 
 export function Toolbar() {
   const t = useTr();
@@ -138,6 +138,20 @@ export function Toolbar() {
         >
           {store.hideUsernames ? t("Hidden") : t("Names")}
         </button>
+
+        {store.settings?.General?.ReorderStyle === "mode" && (
+          <Tooltip content={store.reorderMode ? t("Done reordering") : t("Reorder accounts")} side="bottom">
+            <button
+              onClick={() => store.setReorderMode(!store.reorderMode)}
+              aria-pressed={store.reorderMode}
+              className={`p-1.5 rounded-lg border transition-colors ${
+                store.reorderMode ? activeToggleStyle : "theme-btn-ghost"
+              }`}
+            >
+              <ArrowUpDown size={16} strokeWidth={1.5} />
+            </button>
+          </Tooltip>
+        )}
 
         <Tooltip content={store.sidebarOpen ? t("Hide panel") : t("Show panel")} side="bottom">
           <button
