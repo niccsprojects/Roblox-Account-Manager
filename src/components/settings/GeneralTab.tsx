@@ -239,9 +239,11 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
               { value: "handle", label: t("Drag handles") },
               { value: "mode", label: t("Reorder mode toggle") },
             ]}
-            onChange={(value) =>
-              s.set("General", "ReorderStyle", value === "mode" ? "mode" : "handle")
-            }
+            onChange={(value) => {
+              const next = value === "mode" ? "mode" : "handle";
+              s.set("General", "ReorderStyle", next);
+              if (next !== "mode") store.setReorderMode(false);
+            }}
           />
         </div>
       </div>

@@ -827,26 +827,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       for (const a of movedWithGroup) {
         const orig = accounts.find((o) => o.UserID === a.UserID);
         if (orig && (orig.Group || "Default") !== (a.Group || "Default")) {
-          await invoke("update_account", { account: a }).catch(() => {});
+          await invoke("update_account", { account: a });
         }
       }
     } catch (e) {
       setError(String(e));
+      await loadAccounts().catch(() => {});
     }
   }
 
   async function reorderGroup(groupKey: string, target: DropTarget) {
     if (target.kind !== "before-group" && target.kind !== "after-group") return;
     if (groupKey === target.groupKey) return;
-    const order = groups.map((g) => g.key).filter((k) => k !== "__all__");
-    const from = order.indexOf(groupKey);
-    if (from < 0) return;
-    order.splice(from, 1);
-    const tIdx = order.indexOf(target.groupKey);
-    if (tIdx < 0) return;
-    order.splice(target.kind === "before-group" ? tIdx : tIdx + 1, 0, groupKey);
 
-    const value = JSON.stringify(order);
+    const allKeys = [...new Set(accounts.map((a) => a.Group || "Default"))];
+    const orderIdx = (k: string) => {
+      const i = groupOrder.indexOf(k);
+      return i === -1 ? Number.POSITIVE_INFINITY : i;
+    };
+    allKeys.sort((a, b) => {
+      const oa = orderIdx(a);
+      const ob = orderIdx(b);
+      if (oa !== ob) return oa - ob;
+      const pa = parseGroupName(a);
+      const pb = parseGroupName(b);
+      return pa.sortKey - pb.sortKey || pa.displayName.localeCompare(pb.displayName);
+    });
+
+    const from = allKeys.indexOf(groupKey);
+    if (from < 0 || allKeys.indexOf(target.groupKey) < 0) return;
+    allKeys.splice(from, 1);
+    const tIdx = allKeys.indexOf(target.groupKey);
+    allKeys.splice(target.kind === "before-group" ? tIdx : tIdx + 1, 0, groupKey);
+
+    const value = JSON.stringify(allKeys);
+    const prevValue = settings?.General?.GroupOrder ?? "";
     setSettings((prev) =>
       prev ? { ...prev, General: { ...prev.General, GroupOrder: value } } : prev
     );
@@ -854,6 +869,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await invoke("update_setting", { section: "General", key: "GroupOrder", value });
     } catch (e) {
       setError(String(e));
+      setSettings((prev) =>
+        prev ? { ...prev, General: { ...prev.General, GroupOrder: prevValue } } : prev
+      );
     }
   }
 

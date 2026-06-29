@@ -106,6 +106,7 @@ export function AccountRow({ account }: { account: Account }) {
     store.setDragState(null);
     store.setDropIndicator(null);
     if (ds?.kind !== "accounts") return;
+    if (ds.userIds.includes(account.UserID)) return;
     if (target && (target.kind === "before-account" || target.kind === "after-account")) {
       void store.moveAccounts(ds.userIds, target);
     } else {

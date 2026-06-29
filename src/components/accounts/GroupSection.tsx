@@ -109,7 +109,9 @@ export function GroupSection({
         <div
           data-group-header="true"
           data-group-key={group.key}
+          role="button"
           tabIndex={0}
+          aria-expanded={!collapsed}
           onFocus={onHeaderFocus}
           onBlur={onHeaderBlur}
           draggable={headerDraggable}
@@ -119,6 +121,12 @@ export function GroupSection({
             store.dragState ? "hover:bg-[var(--accent-soft)] hover:pl-4" : "hover:bg-[var(--row-hover)]"
           }`}
           onClick={onToggle}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggle();
+            }
+          }}
           onDragOver={handleHeaderDragOver}
           onDrop={handleHeaderDrop}
         >
@@ -127,6 +135,7 @@ export function GroupSection({
               draggable
               onDragStart={startGroupDrag}
               onDragEnd={handleDragEnd}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
               title={t("Drag to reorder")}
               aria-label={t("Drag to reorder group")}
@@ -166,6 +175,7 @@ export function GroupSection({
       )}
 
       <div
+        data-group-key={group.key}
         className={`overflow-hidden transition-all duration-200 ${
           showHeader && collapsed ? "max-h-0 opacity-0" : "max-h-[9999px] opacity-100"
         }`}

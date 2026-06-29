@@ -142,8 +142,10 @@ export function Toolbar() {
         {store.settings?.General?.ReorderStyle === "mode" && (
           <Tooltip content={store.reorderMode ? t("Done reordering") : t("Reorder accounts")} side="bottom">
             <button
+              type="button"
               onClick={() => store.setReorderMode(!store.reorderMode)}
               aria-pressed={store.reorderMode}
+              aria-label={store.reorderMode ? t("Done reordering") : t("Reorder accounts")}
               className={`p-1.5 rounded-lg border transition-colors ${
                 store.reorderMode ? activeToggleStyle : "theme-btn-ghost"
               }`}
