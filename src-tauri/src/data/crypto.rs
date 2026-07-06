@@ -88,18 +88,27 @@ fn read_machine_guid(access: u32) -> Option<String> {
 }
 
 #[cfg(target_os = "windows")]
-fn machine_identifier() -> String {
+fn machine_identifier_candidates() -> Vec<String> {
     use windows_sys::Win32::System::Registry::{KEY_READ, KEY_WOW64_64KEY};
 
-    read_machine_guid(KEY_READ)
-        .or_else(|| read_machine_guid(KEY_READ | KEY_WOW64_64KEY))
-        .or_else(|| std::env::var("COMPUTERNAME").ok())
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "ram-device".to_string())
+    let mut candidates = Vec::new();
+    if let Some(guid) =
+        read_machine_guid(KEY_READ).or_else(|| read_machine_guid(KEY_READ | KEY_WOW64_64KEY))
+    {
+        candidates.push(guid);
+    }
+    if let Ok(name) = std::env::var("COMPUTERNAME") {
+        if !name.trim().is_empty() {
+            candidates.push(name);
+        }
+    }
+    candidates.push("ram-device".to_string());
+    candidates
 }
 
 #[cfg(target_os = "macos")]
-fn machine_identifier() -> String {
+fn machine_identifier_candidates() -> Vec<String> {
+    let mut candidates = Vec::new();
     let uuid = std::process::Command::new("ioreg")
         .args(["-rd1", "-c", "IOPlatformExpertDevice"])
         .output()
@@ -112,35 +121,61 @@ fn machine_identifier() -> String {
             Some(stdout[start..start + end].trim().to_string())
         })
         .filter(|value| !value.is_empty());
-
-    uuid.or_else(|| std::env::var("HOSTNAME").ok())
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "ram-device".to_string())
+    if let Some(uuid) = uuid {
+        candidates.push(uuid);
+    }
+    if let Ok(name) = std::env::var("HOSTNAME") {
+        if !name.trim().is_empty() {
+            candidates.push(name);
+        }
+    }
+    candidates.push("ram-device".to_string());
+    candidates
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-fn machine_identifier() -> String {
-    std::env::var("HOSTNAME")
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "ram-device".to_string())
+fn machine_identifier_candidates() -> Vec<String> {
+    let mut candidates = Vec::new();
+    if let Ok(name) = std::env::var("HOSTNAME") {
+        if !name.trim().is_empty() {
+            candidates.push(name);
+        }
+    }
+    candidates.push("ram-device".to_string());
+    candidates
 }
 
+fn device_user() -> String {
+    #[cfg(target_os = "windows")]
+    let user = std::env::var("USERNAME");
+    #[cfg(not(target_os = "windows"))]
+    let user = std::env::var("USER");
+    user.ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "user".to_string())
+}
+
+fn device_hash_for_identifier(identifier: &str) -> Vec<u8> {
+    hash_password(&format!("{}|{}|ram-default-v1", identifier, device_user()))
+}
+
+static DEVICE_HASH_CANDIDATES: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| {
+    let mut hashes: Vec<Vec<u8>> = Vec::new();
+    for identifier in machine_identifier_candidates() {
+        let hash = device_hash_for_identifier(&identifier);
+        if !hashes.contains(&hash) {
+            hashes.push(hash);
+        }
+    }
+    hashes
+});
+
 pub fn device_password_hash() -> Vec<u8> {
-    static DEVICE_PASSWORD_HASH: LazyLock<Vec<u8>> = LazyLock::new(|| {
-        #[cfg(target_os = "windows")]
-        let user = std::env::var("USERNAME");
-        #[cfg(not(target_os = "windows"))]
-        let user = std::env::var("USER");
-        let user = user
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| "user".to_string());
+    DEVICE_HASH_CANDIDATES[0].clone()
+}
 
-        hash_password(&format!("{}|{}|ram-default-v1", machine_identifier(), user))
-    });
-
-    DEVICE_PASSWORD_HASH.clone()
+pub fn device_password_hash_fallbacks() -> Vec<Vec<u8>> {
+    DEVICE_HASH_CANDIDATES[1..].to_vec()
 }
 
 pub fn derive_key(password_hash: &[u8], salt: &[u8]) -> Result<secretbox::Key, CryptoError> {

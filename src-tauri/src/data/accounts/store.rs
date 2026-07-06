@@ -59,24 +59,42 @@ impl AccountStore {
         }
 
         let device_hash = crypto::device_password_hash();
-        match crypto::decrypt(&data, &device_hash) {
-            Ok(decrypted) => {
-                let accounts = Self::parse_accounts_json(&decrypted)?;
-                let mut store = self.accounts.lock().map_err(|e| e.to_string())?;
-                *store = accounts;
-                drop(store);
-                let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
-                *password_hash = Some(device_hash);
-                drop(password_hash);
-                let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
-                *user_locked = false;
-                drop(user_locked);
-                let mut loaded = self.loaded.lock().map_err(|e| e.to_string())?;
-                *loaded = true;
-                Ok(false)
+        let decrypted = match crypto::decrypt(&data, &device_hash) {
+            Ok(decrypted) => Some((decrypted, false)),
+            Err(_) => crypto::device_password_hash_fallbacks()
+                .iter()
+                .find_map(|fallback| crypto::decrypt(&data, fallback).ok())
+                .map(|decrypted| (decrypted, true)),
+        };
+
+        let Some((decrypted, used_fallback)) = decrypted else {
+            return Ok(true);
+        };
+
+        let accounts = Self::parse_accounts_json(&decrypted)?;
+        let mut store = self.accounts.lock().map_err(|e| e.to_string())?;
+        *store = accounts;
+        drop(store);
+        let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
+        *password_hash = Some(device_hash);
+        drop(password_hash);
+        let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+        *user_locked = false;
+        drop(user_locked);
+        let mut loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+        *loaded = true;
+        drop(loaded);
+
+        if used_fallback {
+            if let Err(e) = self.save() {
+                eprintln!(
+                    "Warning: Failed to re-encrypt account file with primary device key: {}",
+                    e
+                );
             }
-            Err(_) => Ok(true),
         }
+
+        Ok(false)
     }
 
     pub fn load(&self) -> Result<(), String> {
