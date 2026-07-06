@@ -4,6 +4,7 @@ import { PromptProvider } from "./hooks/usePrompt";
 import { PasswordScreen } from "./components/layout/PasswordScreen";
 import { EncryptionSetupScreen } from "./components/layout/EncryptionSetupScreen";
 import { FirstRunWalkthrough } from "./components/layout/FirstRunWalkthrough";
+import { AppErrorBoundary } from "./components/layout/AppErrorBoundary";
 import { TitleBar } from "./components/layout/TitleBar";
 import { ModalWindowControls } from "./components/layout/ModalWindowControls";
 import { UpdateBanner } from "./components/layout/UpdateBanner";
@@ -232,11 +233,13 @@ function AppContent() {
 
 function App() {
   return (
-    <StoreProvider>
-      <PromptProvider>
-        <AppContent />
-      </PromptProvider>
-    </StoreProvider>
+    <AppErrorBoundary>
+      <StoreProvider>
+        <PromptProvider>
+          <AppContent />
+        </PromptProvider>
+      </StoreProvider>
+    </AppErrorBoundary>
   );
 }
 

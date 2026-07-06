@@ -6,6 +6,8 @@ mod data;
 #[cfg(feature = "nexus")]
 mod nexus;
 mod platform;
+#[cfg(target_os = "windows")]
+mod webview_recovery;
 
 use api::batch::ImageCache;
 use data::accounts::{get_account_data_path, AccountStore};
@@ -80,7 +82,16 @@ fn cleanup_multi_roblox_on_exit(app: &AppHandle<Wry>) {
     let _ = platform::macos::disable_multi_roblox();
 }
 
+#[tauri::command]
+fn frontend_ready() {
+    #[cfg(target_os = "windows")]
+    webview_recovery::mark_ready();
+}
+
 pub fn run() {
+    #[cfg(target_os = "windows")]
+    webview_recovery::prepare_environment();
+
     crypto::init();
 
     let account_store = AccountStore::new(get_account_data_path());
@@ -128,6 +139,9 @@ pub fn run() {
         .manage(UpdaterRuntimeState::default())
         .manage(chromium::ChromiumManager::new())
         .setup(|app| {
+            #[cfg(target_os = "windows")]
+            webview_recovery::start_watchdog(app.handle().clone());
+
             #[cfg(target_os = "windows")]
             {
                 let custom = app
@@ -218,6 +232,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            frontend_ready,
             data::accounts::get_accounts,
             data::accounts::save_accounts,
             data::accounts::add_account,
