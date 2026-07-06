@@ -53,8 +53,8 @@ pub fn unlock_accounts(
 }
 
 #[tauri::command]
-pub fn is_accounts_encrypted(state: tauri::State<'_, AccountStore>) -> Result<bool, String> {
-    state.is_encrypted()
+pub fn is_pass_lock_enabled(state: tauri::State<'_, AccountStore>) -> Result<bool, String> {
+    state.is_user_locked()
 }
 
 #[tauri::command]

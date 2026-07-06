@@ -1,6 +1,8 @@
 pub struct AccountStore {
     accounts: Mutex<Vec<Account>>,
     password_hash: Mutex<Option<Vec<u8>>>,
+    user_locked: Mutex<bool>,
+    loaded: Mutex<bool>,
     file_path: PathBuf,
 }
 
@@ -20,6 +22,8 @@ impl AccountStore {
         Self {
             accounts: Mutex::new(Vec::new()),
             password_hash: Mutex::new(None),
+            user_locked: Mutex::new(false),
+            loaded: Mutex::new(false),
             file_path,
         }
     }
@@ -36,14 +40,71 @@ impl AccountStore {
     }
 
     pub fn needs_password(&self) -> Result<bool, String> {
-        let password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
-        if password_hash.is_some() {
+        {
+            let password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
+            if password_hash.is_some() {
+                return Ok(false);
+            }
+        }
+
+        if !self.file_path.exists() {
             return Ok(false);
         }
-        self.is_encrypted()
+
+        let data =
+            fs::read(&self.file_path).map_err(|e| format!("Failed to read account file: {}", e))?;
+
+        if data.is_empty() || !crypto::is_encrypted(&data) {
+            return Ok(false);
+        }
+
+        let device_hash = crypto::device_password_hash();
+        let decrypted = match crypto::decrypt(&data, &device_hash) {
+            Ok(decrypted) => Some((decrypted, false)),
+            Err(_) => crypto::device_password_hash_fallbacks()
+                .iter()
+                .find_map(|fallback| crypto::decrypt(&data, fallback).ok())
+                .map(|decrypted| (decrypted, true)),
+        };
+
+        let Some((decrypted, used_fallback)) = decrypted else {
+            return Ok(true);
+        };
+
+        let accounts = Self::parse_accounts_json(&decrypted)?;
+        let mut store = self.accounts.lock().map_err(|e| e.to_string())?;
+        *store = accounts;
+        drop(store);
+        let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
+        *password_hash = Some(device_hash);
+        drop(password_hash);
+        let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+        *user_locked = false;
+        drop(user_locked);
+        let mut loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+        *loaded = true;
+        drop(loaded);
+
+        if used_fallback {
+            if let Err(e) = self.save() {
+                eprintln!(
+                    "Warning: Failed to re-encrypt account file with primary device key: {}",
+                    e
+                );
+            }
+        }
+
+        Ok(false)
     }
 
     pub fn load(&self) -> Result<(), String> {
+        {
+            let loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+            if *loaded {
+                return Ok(());
+            }
+        }
+
         if !self.file_path.exists() {
             return Ok(());
         }
@@ -55,10 +116,26 @@ impl AccountStore {
             return Ok(());
         }
 
+        let was_encrypted = crypto::is_encrypted(&data);
         let accounts = self.decode_accounts_for_load(&data)?;
+        let should_migrate = !was_encrypted && !accounts.is_empty();
 
         let mut store = self.accounts.lock().map_err(|e| e.to_string())?;
         *store = accounts;
+        drop(store);
+
+        let mut loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+        *loaded = true;
+        drop(loaded);
+
+        if should_migrate {
+            if let Err(e) = self.save() {
+                eprintln!(
+                    "Warning: Failed to migrate account file to encrypted storage: {}",
+                    e
+                );
+            }
+        }
 
         Ok(())
     }
@@ -68,6 +145,9 @@ impl AccountStore {
         if !self.file_path.exists() {
             let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
             *password_hash = Some(hash);
+            drop(password_hash);
+            let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+            *user_locked = true;
             return Ok(());
         }
 
@@ -80,6 +160,9 @@ impl AccountStore {
             drop(accounts);
             let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
             *password_hash = Some(hash);
+            drop(password_hash);
+            let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+            *user_locked = true;
             return Ok(());
         }
 
@@ -97,6 +180,12 @@ impl AccountStore {
 
         let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
         *password_hash = Some(hash);
+        drop(password_hash);
+        let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+        *user_locked = true;
+        drop(user_locked);
+        let mut loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+        *loaded = true;
         Ok(())
     }
 
@@ -107,12 +196,13 @@ impl AccountStore {
             .map_err(|e| format!("Failed to serialize accounts: {}", e))?;
 
         let password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
+        let hash = password_hash
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(crypto::device_password_hash);
+        drop(password_hash);
 
-        let data = if let Some(hash) = password_hash.as_ref() {
-            crypto::encrypt(&json, hash).map_err(|e| format!("Failed to encrypt: {}", e))?
-        } else {
-            json.into_bytes()
-        };
+        let data = crypto::encrypt(&json, &hash).map_err(|e| format!("Failed to encrypt: {}", e))?;
 
         fs::write(&self.file_path, data)
             .map_err(|e| format!("Failed to write account file: {}", e))?;
@@ -133,7 +223,15 @@ impl AccountStore {
         let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
         *password_hash = password.map(|p| crypto::hash_password(p.trim()));
         drop(password_hash);
+        let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+        *user_locked = password.is_some();
+        drop(user_locked);
         self.save()
+    }
+
+    pub fn is_user_locked(&self) -> Result<bool, String> {
+        let user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+        Ok(*user_locked)
     }
 
     pub fn get_all(&self) -> Result<Vec<Account>, String> {
@@ -228,11 +326,14 @@ impl AccountStore {
 
         if crypto::is_encrypted(data) {
             let password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
-            let hash = password_hash
-                .as_ref()
-                .ok_or_else(|| "Password required for encrypted file".to_string())?;
-            let decrypted =
-                crypto::decrypt(data, hash).map_err(|e| format!("Failed to decrypt: {}", e))?;
+            let hash = password_hash.as_ref().cloned();
+            drop(password_hash);
+            let decrypted = if let Some(hash) = hash {
+                crypto::decrypt(data, &hash).map_err(|e| format!("Failed to decrypt: {}", e))?
+            } else {
+                crypto::decrypt(data, &crypto::device_password_hash())
+                    .map_err(|_| "Password required for encrypted file".to_string())?
+            };
             return Self::parse_accounts_json(&decrypted);
         }
 

@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use sodiumoxide::crypto::hash::sha512;
 use sodiumoxide::crypto::pwhash::argon2i13;
 use sodiumoxide::crypto::secretbox;
@@ -30,6 +32,150 @@ impl std::error::Error for CryptoError {}
 pub fn hash_password(password: &str) -> Vec<u8> {
     let digest = sha512::hash(password.as_bytes());
     digest.as_ref().to_vec()
+}
+
+#[cfg(target_os = "windows")]
+fn encode_wide(s: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
+    use std::os::windows::ffi::OsStrExt;
+
+    s.as_ref().encode_wide().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(target_os = "windows")]
+fn read_machine_guid(access: u32) -> Option<String> {
+    use windows_sys::Win32::System::Registry::{
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ,
+    };
+
+    let sub_key = encode_wide("SOFTWARE\\Microsoft\\Cryptography");
+    let value_name = encode_wide("MachineGuid");
+
+    unsafe {
+        let mut hkey = std::ptr::null_mut();
+        if RegOpenKeyExW(
+            HKEY_LOCAL_MACHINE,
+            sub_key.as_ptr(),
+            0,
+            access | KEY_READ,
+            &mut hkey,
+        ) != 0
+        {
+            return None;
+        }
+
+        let mut buf = [0u16; 256];
+        let mut buf_size = (buf.len() * 2) as u32;
+        let mut value_type = 0u32;
+        let result = RegQueryValueExW(
+            hkey,
+            value_name.as_ptr(),
+            std::ptr::null_mut(),
+            &mut value_type,
+            buf.as_mut_ptr() as *mut u8,
+            &mut buf_size,
+        );
+
+        RegCloseKey(hkey);
+
+        if result != 0 || value_type != REG_SZ {
+            return None;
+        }
+
+        let len = (buf_size as usize / 2).saturating_sub(1);
+        let value = String::from_utf16_lossy(&buf[..len]).trim().to_string();
+        (!value.is_empty()).then_some(value)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn machine_identifier_candidates() -> Vec<String> {
+    use windows_sys::Win32::System::Registry::{KEY_READ, KEY_WOW64_64KEY};
+
+    let mut candidates = Vec::new();
+    if let Some(guid) =
+        read_machine_guid(KEY_READ).or_else(|| read_machine_guid(KEY_READ | KEY_WOW64_64KEY))
+    {
+        candidates.push(guid);
+    }
+    if let Ok(name) = std::env::var("COMPUTERNAME") {
+        if !name.trim().is_empty() {
+            candidates.push(name);
+        }
+    }
+    candidates.push("ram-device".to_string());
+    candidates
+}
+
+#[cfg(target_os = "macos")]
+fn machine_identifier_candidates() -> Vec<String> {
+    let mut candidates = Vec::new();
+    let uuid = std::process::Command::new("ioreg")
+        .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+        .output()
+        .ok()
+        .and_then(|output| {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let marker = "\"IOPlatformUUID\" = \"";
+            let start = stdout.find(marker)? + marker.len();
+            let end = stdout[start..].find('"')?;
+            Some(stdout[start..start + end].trim().to_string())
+        })
+        .filter(|value| !value.is_empty());
+    if let Some(uuid) = uuid {
+        candidates.push(uuid);
+    }
+    if let Ok(name) = std::env::var("HOSTNAME") {
+        if !name.trim().is_empty() {
+            candidates.push(name);
+        }
+    }
+    candidates.push("ram-device".to_string());
+    candidates
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn machine_identifier_candidates() -> Vec<String> {
+    let mut candidates = Vec::new();
+    if let Ok(name) = std::env::var("HOSTNAME") {
+        if !name.trim().is_empty() {
+            candidates.push(name);
+        }
+    }
+    candidates.push("ram-device".to_string());
+    candidates
+}
+
+fn device_user() -> String {
+    #[cfg(target_os = "windows")]
+    let user = std::env::var("USERNAME");
+    #[cfg(not(target_os = "windows"))]
+    let user = std::env::var("USER");
+    user.ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "user".to_string())
+}
+
+fn device_hash_for_identifier(identifier: &str) -> Vec<u8> {
+    hash_password(&format!("{}|{}|ram-default-v1", identifier, device_user()))
+}
+
+static DEVICE_HASH_CANDIDATES: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| {
+    let mut hashes: Vec<Vec<u8>> = Vec::new();
+    for identifier in machine_identifier_candidates() {
+        let hash = device_hash_for_identifier(&identifier);
+        if !hashes.contains(&hash) {
+            hashes.push(hash);
+        }
+    }
+    hashes
+});
+
+pub fn device_password_hash() -> Vec<u8> {
+    DEVICE_HASH_CANDIDATES[0].clone()
+}
+
+pub fn device_password_hash_fallbacks() -> Vec<Vec<u8>> {
+    DEVICE_HASH_CANDIDATES[1..].to_vec()
 }
 
 pub fn derive_key(password_hash: &[u8], salt: &[u8]) -> Result<secretbox::Key, CryptoError> {
