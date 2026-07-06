@@ -6,8 +6,12 @@ export class AppErrorBoundary extends React.Component<{ children: ReactNode }, {
     this.state = { error: null };
   }
 
-  static getDerivedStateFromError(error: Error) {
-    return { error };
+  static getDerivedStateFromError(error: unknown) {
+    return { error: error instanceof Error ? error : new Error(String(error)) };
+  }
+
+  componentDidCatch(error: unknown, errorInfo: React.ErrorInfo) {
+    console.error("App crashed:", error, errorInfo.componentStack);
   }
 
   render() {

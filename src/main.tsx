@@ -5,4 +5,8 @@ import "./i18n";
 import "./index.css";
 
 createRoot(document.getElementById("root")!).render(<App />);
-void invoke("frontend_ready").catch(() => {});
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    void invoke("frontend_ready").catch(() => {});
+  });
+});
