@@ -239,7 +239,7 @@ pub fn run() {
             data::accounts::remove_account,
             data::accounts::update_account,
             data::accounts::unlock_accounts,
-            data::accounts::is_accounts_encrypted,
+            data::accounts::is_pass_lock_enabled,
             data::accounts::needs_password,
             data::accounts::set_encryption_password,
             data::accounts::reorder_accounts,

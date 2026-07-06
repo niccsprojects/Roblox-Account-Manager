@@ -1414,7 +1414,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const refreshEncryptionState = useCallback(async () => {
     try {
-      const encrypted = await invoke<boolean>("is_accounts_encrypted");
+      const encrypted = await invoke<boolean>("is_pass_lock_enabled");
       setAccountsEncrypted(encrypted);
     } catch {}
   }, []);
