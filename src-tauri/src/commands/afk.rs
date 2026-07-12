@@ -176,7 +176,10 @@ fn run_afk_cycle_blocking(
         ));
     }
 
-    if !previous_foreground.is_null() && windows::window_exists(previous_foreground) {
+    let stopped = stop_flag
+        .map(|f| f.load(std::sync::atomic::Ordering::Relaxed))
+        .unwrap_or(false);
+    if !stopped && !previous_foreground.is_null() && windows::window_exists(previous_foreground) {
         windows::focus_window(previous_foreground);
     }
 
