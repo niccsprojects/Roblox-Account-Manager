@@ -989,15 +989,23 @@ pub fn apply_pre_launch(
     if !running.is_empty() {
         let _ = tracker().cleanup_dead_processes();
         let tracked = tracker().get_tracked_pids();
-        let protected = running.iter().filter(|pid| tracked.contains(pid)).count();
+        let untracked: Vec<u32> = running
+            .iter()
+            .copied()
+            .filter(|pid| !tracked.contains(pid))
+            .collect();
+        let protected = running.len() - untracked.len();
         if protected > 0 {
             eprintln!(
-                "[isolation] skipping pre-launch cleanup: {} tracked / {} running Roblox process(es)",
+                "[isolation] {} tracked Roblox process(es) live; closing {} untracked, skipping file cleanup",
                 protected,
-                running.len()
+                untracked.len()
             );
+            for pid in &untracked {
+                let _ = kill_process(*pid);
+            }
             report.skipped_reason = Some(format!(
-                "{} account(s) launched by this app are still running. Isolation skipped to protect them.",
+                "{} account(s) launched by this app are still running. Cleanup skipped to protect them.",
                 protected
             ));
             emit_isolation_progress(

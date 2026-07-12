@@ -28,6 +28,7 @@ struct AfkSession {
 #[cfg(target_os = "windows")]
 struct AfkManager {
     session: std::sync::Mutex<Option<AfkSession>>,
+    task: std::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
     next_id: std::sync::atomic::AtomicU64,
 }
 
@@ -36,6 +37,7 @@ impl AfkManager {
     fn new() -> Self {
         Self {
             session: std::sync::Mutex::new(None),
+            task: std::sync::Mutex::new(None),
             next_id: std::sync::atomic::AtomicU64::new(1),
         }
     }
@@ -52,6 +54,22 @@ impl AfkManager {
     fn replace_session(&self, session: Option<AfkSession>) {
         if let Ok(mut guard) = self.session.lock() {
             *guard = session;
+        }
+    }
+
+    fn set_task(&self, handle: tokio::task::JoinHandle<()>) {
+        if let Ok(mut guard) = self.task.lock() {
+            if let Some(previous) = guard.replace(handle) {
+                previous.abort();
+            }
+        }
+    }
+
+    fn abort_task(&self) {
+        if let Ok(mut guard) = self.task.lock() {
+            if let Some(previous) = guard.take() {
+                previous.abort();
+            }
         }
     }
 }
@@ -264,7 +282,8 @@ async fn start_afk_mode(
     };
 
     AFK_MANAGER.replace_session(Some(session.clone()));
-    tokio::spawn(run_afk_session(app.clone(), session));
+    let handle = tokio::spawn(run_afk_session(app.clone(), session));
+    AFK_MANAGER.set_task(handle);
 
     let status = current_afk_status();
     emit_afk_status(&app);
@@ -283,6 +302,7 @@ async fn stop_afk_mode(app: tauri::AppHandle) -> Result<(), String> {
             session.stopped_notify.notified(),
         )
         .await;
+        AFK_MANAGER.abort_task();
     }
     emit_afk_status(&app);
     Ok(())
