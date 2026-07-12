@@ -10,7 +10,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 
 use windows_sys::Win32::Foundation::{
-    CloseHandle, GENERIC_READ, GENERIC_WRITE, HANDLE, HWND, RECT,
+    CloseHandle, GetLastError, ERROR_ALREADY_EXISTS, GENERIC_READ, GENERIC_WRITE, HANDLE, HWND,
+    RECT,
 };
 use windows_sys::Win32::Storage::FileSystem::{CreateFileW, FILE_ATTRIBUTE_NORMAL, OPEN_EXISTING};
 use windows_sys::Win32::System::Diagnostics::ToolHelp::{
@@ -23,9 +24,16 @@ use windows_sys::Win32::System::Threading::{
     CreateMutexW, OpenProcess, ReleaseMutex, TerminateProcess, WaitForSingleObject,
     PROCESS_QUERY_INFORMATION, PROCESS_TERMINATE, PROCESS_VM_READ,
 };
+use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+    MapVirtualKeyW, SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP,
+    MAPVK_VK_TO_VSC,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetForegroundWindow, GetWindowRect, GetWindowTextLengthW, GetWindowTextW,
-    GetWindowThreadProcessId, IsWindowVisible, MoveWindow, SetForegroundWindow, ShowWindow,
+    EnumWindows, GetForegroundWindow, GetSystemMetrics, GetWindowRect, GetWindowTextLengthW,
+    GetWindowTextW, GetWindowThreadProcessId, IsWindow, IsWindowVisible, MoveWindow,
+    SetForegroundWindow, ShowWindow, SystemParametersInfoW, SM_CXSCREEN, SM_CYSCREEN,
+    SPI_GETWORKAREA,
 };
 
 const WAIT_OBJECT_0: u32 = 0;
@@ -41,6 +49,8 @@ include!("windows/launch.rs");
 include!("windows/client_settings.rs");
 include!("windows/optimization.rs");
 include!("windows/windowing.rs");
+include!("windows/arrange.rs");
+include!("windows/input.rs");
 include!("windows/tracker.rs");
 include!("windows/isolation.rs");
 include!("windows/versions.rs");

@@ -261,6 +261,22 @@ async fn launch_roblox(
             tokio::spawn(async move {
                 minimize_new_roblox_windows(baseline, std::time::Duration::from_secs(14)).await;
             });
+        } else if settings.get_bool("WindowArrange", "AutoArrangeOnLaunch") {
+            let padding = settings.get_int("WindowArrange", "Padding").unwrap_or(0) as i32;
+            let target_pid = pid;
+            tokio::spawn(async move {
+                for _ in 0..45 {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    if windows::find_main_window(target_pid).is_some() {
+                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        let _ = tauri::async_runtime::spawn_blocking(move || {
+                            windows::arrange_roblox_windows_grid(padding)
+                        })
+                        .await;
+                        break;
+                    }
+                }
+            });
         }
     }
 
@@ -428,6 +444,7 @@ async fn launch_multiple(
     let auto_close_last_process = settings.get_bool("General", "AutoCloseLastProcess");
     let auto_close_multi_conflicts = settings.get_bool("General", "AutoCloseRobloxForMultiRbx");
     let start_minimized = settings.get_bool("General", "StartRobloxMinimized");
+    let mut last_launched_pid: Option<u32> = None;
     let tracker = windows::tracker();
     tracker.reset_launch_cancelled();
 
@@ -681,6 +698,7 @@ async fn launch_multiple(
             tracker.clear_pending_launch(acct_pending_id);
         }
         if let Some(pid) = acct_detected_pid {
+            last_launched_pid = Some(pid);
             tracker.clear_pending_launch(acct_pending_id);
             tracker.track_with_version(uid, pid, browser_tracker_id, acct_version_id.clone());
             if let Some(version_id) = acct_version_id.as_deref() {
@@ -716,6 +734,25 @@ async fn launch_multiple(
             } else {
                 tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
             }
+        }
+    }
+
+    if !start_minimized && settings.get_bool("WindowArrange", "AutoArrangeOnLaunch") {
+        if let Some(target_pid) = last_launched_pid {
+            let padding = settings.get_int("WindowArrange", "Padding").unwrap_or(0) as i32;
+            tokio::spawn(async move {
+                for _ in 0..45 {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    if windows::find_main_window(target_pid).is_some() {
+                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        let _ = tauri::async_runtime::spawn_blocking(move || {
+                            windows::arrange_roblox_windows_grid(padding)
+                        })
+                        .await;
+                        break;
+                    }
+                }
+            });
         }
     }
 

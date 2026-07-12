@@ -64,6 +64,22 @@ pub fn release_multi_roblox_handle() {
     }
 }
 
+pub fn multi_roblox_mutex_exists() -> bool {
+    if this_process_holds_multi_roblox() {
+        return true;
+    }
+    let name = encode_wide("ROBLOX_singletonMutex");
+    unsafe {
+        let h = CreateMutexW(std::ptr::null(), 0, name.as_ptr());
+        if h.is_null() {
+            return false;
+        }
+        let existed = GetLastError() == ERROR_ALREADY_EXISTS;
+        CloseHandle(h);
+        existed
+    }
+}
+
 pub fn this_process_holds_multi_roblox() -> bool {
     MULTI_ROBLOX_HANDLE
         .lock()

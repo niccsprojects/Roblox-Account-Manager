@@ -8,7 +8,7 @@ import { useStore } from "../../store";
 import { ENABLE_WEBSERVER } from "../../featureFlags";
 
 interface MutexDiagnosis {
-  holder: "free" | "thisProcess" | "roblox" | "legacyRam";
+  holder: "free" | "thisProcess" | "roblox" | "legacyRam" | "otherTool";
   robloxPids: number[];
   legacyRamPids: number[];
   thisProcessHolds: boolean;
@@ -60,6 +60,8 @@ export function DeveloperTab({ s }: { s: UseSettingsReturn }) {
         return t("Legacy Roblox Account Manager: PID {{pids}}", {
           pids: d.legacyRamPids.join(", "),
         });
+      case "otherTool":
+        return t("Another program holds the Roblox singleton mutex");
     }
   }
 

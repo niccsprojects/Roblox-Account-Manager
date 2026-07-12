@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 type TooltipSide = "top" | "bottom";
@@ -26,6 +26,7 @@ export function Tooltip({
   showArrow?: boolean;
 }) {
   const anchorRef = useRef<HTMLSpanElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ x: number; y: number; side: TooltipSide } | null>(null);
   const openTimerRef = useRef<number | null>(null);
@@ -89,6 +90,18 @@ export function Tooltip({
     };
   }, [open, side]);
 
+  useLayoutEffect(() => {
+    if (!open || !pos) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const w = panel.getBoundingClientRect().width;
+    const vw = window.innerWidth;
+    const clamped = clamp(pos.x, 12 + w / 2, vw - 12 - w / 2);
+    if (Math.abs(clamped - pos.x) > 0.5) {
+      setPos({ ...pos, x: clamped });
+    }
+  }, [open, pos]);
+
   useEffect(() => {
     return () => {
       clearOpenTimer();
@@ -134,6 +147,7 @@ export function Tooltip({
               }}
             >
               <div
+                ref={panelRef}
                 className={[
                   "relative theme-panel border theme-border rounded-lg px-2.5 py-2 shadow-2xl text-[11px] text-[var(--panel-fg)]",
                   "animate-tooltip-pop",
@@ -141,6 +155,7 @@ export function Tooltip({
                 ].join(" ")}
                 style={{
                   maxWidth,
+                  width: "max-content",
                   willChange: "transform, opacity",
                   ["--tt-from-y" as never]: pos.side === "top" ? "6px" : "-6px",
                 }}

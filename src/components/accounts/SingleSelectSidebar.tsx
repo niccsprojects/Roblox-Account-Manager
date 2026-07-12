@@ -9,6 +9,7 @@ import { ArgumentsForm } from "../dialogs/ArgumentsForm";
 import { Tooltip } from "../ui/Tooltip";
 import { Select } from "../ui/Select";
 import { RecentGamesPopover } from "../server-list/RecentGamesPopover";
+import { RecentJobsPopover } from "../server-list/RecentJobsPopover";
 import { tr, useTr } from "../../i18n/text";
 import { User, Shuffle, Save, Settings, History, Package } from "lucide-react";
 
@@ -32,12 +33,14 @@ export function SingleSelectSidebar() {
   const [followUser, setFollowUser] = useState("");
   const [argsOpen, setArgsOpen] = useState(false);
   const [recentsOpen, setRecentsOpen] = useState(false);
+  const [recentJobsOpen, setRecentJobsOpen] = useState(false);
   const [installedVersions, setInstalledVersions] = useState<
     { channel: string; versionHash: string; displayVersion: string | null; userLabel: string | null; exists: boolean }[]
   >([]);
   const [versionsLoaded, setVersionsLoaded] = useState(false);
   const argsRef = useRef<HTMLButtonElement>(null);
   const recentsRef = useRef<HTMLButtonElement>(null);
+  const recentJobsRef = useRef<HTMLButtonElement>(null);
   const maxRecent = parseInt(store.settings?.General?.MaxRecentGames || "8") || 8;
 
   useEffect(() => {
@@ -118,10 +121,34 @@ export function SingleSelectSidebar() {
     if (!followUser.trim()) return;
     try {
       const user = await invoke<{ id: number }>("lookup_user", { username: followUser.trim() });
-      const presence = await invoke<{ userPresenceType?: number; user_presence_type?: number }[]>("get_presence", {
+      const presence = await invoke<
+        {
+          userPresenceType?: number;
+          user_presence_type?: number;
+          placeId?: number | null;
+          rootPlaceId?: number | null;
+          gameId?: string | null;
+        }[]
+      >("get_presence", {
         userIds: [user.id],
       });
       const followPresenceType = presence[0]?.userPresenceType ?? presence[0]?.user_presence_type ?? 0;
+      const directPlaceId = presence[0]?.rootPlaceId ?? presence[0]?.placeId ?? null;
+      const directJobId = presence[0]?.gameId ?? "";
+      if (followPresenceType === 2 && directPlaceId && directJobId) {
+        await invoke("launch_roblox", {
+          userId: account.UserID,
+          placeId: directPlaceId,
+          jobId: directJobId,
+          launchData: "",
+          followUser: false,
+          joinVip: false,
+          linkCode: "",
+          shuffleJob: false,
+        });
+        store.addToast(tr("Joining {{name}}...", { name: followUser }));
+        return;
+      }
       if (followPresenceType < 2) {
         if (!(await confirm(tr("{{name}} is not in a game. Try anyway?", { name: followUser })))) return;
       }
@@ -311,6 +338,24 @@ export function SingleSelectSidebar() {
                   <Shuffle size={14} strokeWidth={1.5} />
                 </button>
               </Tooltip>
+              <Tooltip content={t("Recent servers")}>
+                <button
+                  ref={recentJobsRef}
+                  onClick={() => setRecentJobsOpen((v) => !v)}
+                  aria-label={t("Recent servers")}
+                  aria-expanded={recentJobsOpen}
+                  aria-haspopup="menu"
+                  className="theme-muted p-1 rounded hover:text-[var(--panel-fg)]"
+                >
+                  <History size={14} strokeWidth={1.5} />
+                </button>
+              </Tooltip>
+              <RecentJobsPopover
+                open={recentJobsOpen}
+                onClose={() => setRecentJobsOpen(false)}
+                anchorRef={recentJobsRef}
+                onSelect={(raw) => store.setJobId(raw)}
+              />
             </div>
             <div className="flex items-center gap-1.5">
               <label className="theme-label text-[10px] w-10 shrink-0">{t("Data")}</label>

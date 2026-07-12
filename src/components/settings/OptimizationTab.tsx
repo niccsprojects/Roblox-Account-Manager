@@ -387,6 +387,25 @@ export function OptimizationTab({ s }: { s: UseSettingsReturn }) {
         ) : null}
       </div>
 
+      <div className="rounded-xl border border-zinc-800/70 bg-zinc-950/35 px-4 py-4">
+        <SectionLabel>{t("Window Arrangement")}</SectionLabel>
+        <div className="mt-3 space-y-3">
+          <Toggle
+            checked={s.getBool("WindowArrange", "AutoArrangeOnLaunch")}
+            onChange={(v) => s.setBool("WindowArrange", "AutoArrangeOnLaunch", v)}
+            label="Auto-arrange after launch"
+            description="Arranges all Roblox windows in a grid on the primary monitor after each launch. Skipped while Start Roblox Minimized is enabled"
+          />
+          <NumberField
+            value={s.getNumber("WindowArrange", "Padding", 0)}
+            onChange={(v) => s.setNumber("WindowArrange", "Padding", v)}
+            label="Grid Padding"
+            min={0}
+            max={64}
+          />
+        </div>
+      </div>
+
       <OptimizationProfileSection
         s={s}
         title={t("Normal")}

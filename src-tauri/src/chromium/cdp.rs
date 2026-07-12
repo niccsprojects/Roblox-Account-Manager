@@ -60,25 +60,43 @@ pub struct CdpClient {
 
 impl CdpClient {
     pub async fn connect(port: u16) -> Result<Self, String> {
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .map_err(|e| format!("Could not attach to the browser: {}", e))?;
+
         let mut ws_url = None;
-        for _ in 0..40 {
-            if let Ok(resp) = reqwest::get(format!("http://127.0.0.1:{}/json", port)).await {
-                if let Ok(targets) = resp.json::<Value>().await {
-                    ws_url = targets.as_array().and_then(|arr| {
-                        arr.iter()
-                            .find(|t| t.get("type").and_then(Value::as_str) == Some("page"))
-                            .and_then(|t| t.get("webSocketDebuggerUrl").and_then(Value::as_str))
-                            .map(|s| s.to_string())
-                    });
-                    if ws_url.is_some() {
-                        break;
+        let mut last_error = String::new();
+        for _ in 0..80 {
+            match client.get(format!("http://127.0.0.1:{}/json", port)).send().await {
+                Ok(resp) => match resp.json::<Value>().await {
+                    Ok(targets) => {
+                        ws_url = targets.as_array().and_then(|arr| {
+                            arr.iter()
+                                .find(|t| t.get("type").and_then(Value::as_str) == Some("page"))
+                                .and_then(|t| t.get("webSocketDebuggerUrl").and_then(Value::as_str))
+                                .map(|s| s.to_string())
+                        });
+                        if ws_url.is_some() {
+                            break;
+                        }
+                        last_error = "no debuggable page yet".to_string();
                     }
-                }
+                    Err(e) => last_error = e.to_string(),
+                },
+                Err(e) => last_error = e.to_string(),
             }
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
-        let ws_url = ws_url.ok_or("Could not attach to the browser")?;
+        let ws_url = ws_url.ok_or_else(|| {
+            if last_error.is_empty() {
+                "Could not attach to the browser".to_string()
+            } else {
+                format!("Could not attach to the browser: {}", last_error)
+            }
+        })?;
         let (socket, _) = connect_async(ws_url.as_str())
             .await
             .map_err(|e| format!("Could not attach to the browser: {}", e))?;

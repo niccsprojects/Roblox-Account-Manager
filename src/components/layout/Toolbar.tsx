@@ -5,7 +5,7 @@ import { usePrompt } from "../../hooks/usePrompt";
 import { Tooltip } from "../ui/Tooltip";
 import { tr, useTr } from "../../i18n/text";
 import { ENABLE_NEXUS } from "../../featureFlags";
-import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare, Sparkles, Package, ArrowUpDown } from "lucide-react";
+import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare, Sparkles, Package, ArrowUpDown, LayoutGrid, Keyboard } from "lucide-react";
 
 export function Toolbar() {
   const t = useTr();
@@ -263,6 +263,26 @@ export function Toolbar() {
             className="theme-btn-ghost p-1.5 rounded-lg transition-colors"
           >
             <TerminalSquare size={16} strokeWidth={1.5} />
+          </button>
+        </Tooltip>
+
+        <Tooltip content={t("Arrange Roblox windows")} side="bottom">
+          <button
+            onClick={() => store.arrangeRobloxWindows()}
+            className="theme-btn-ghost p-1.5 rounded-lg transition-colors"
+          >
+            <LayoutGrid size={16} strokeWidth={1.5} />
+          </button>
+        </Tooltip>
+
+        <Tooltip content={t("AFK mode")} side="bottom">
+          <button
+            onClick={() => store.setAfkDialogOpen(true)}
+            className={`p-1.5 rounded-lg transition-colors ${
+              store.afkStatus?.active ? activeToggleStyle : "theme-btn-ghost"
+            }`}
+          >
+            <Keyboard size={16} strokeWidth={1.5} />
           </button>
         </Tooltip>
 

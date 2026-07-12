@@ -58,6 +58,8 @@ pub struct IsolationOptions {
     pub preserve_fast_flags: bool,
     #[serde(default = "default_true")]
     pub preserve_basic_settings: bool,
+    #[serde(default)]
+    pub create_restore_point: bool,
 }
 
 fn default_true() -> bool {
@@ -705,6 +707,20 @@ fn build_spoof_script(
     let mut script = String::new();
     script.push_str("$ErrorActionPreference = 'Stop'\n");
 
+    if opts.create_restore_point {
+        script.push_str("try {\n");
+        script.push_str("  Enable-ComputerRestore -Drive $env:SystemDrive -ErrorAction SilentlyContinue\n");
+        script.push_str("  $srKey = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SystemRestore'\n");
+        script.push_str("  $srPrev = (Get-ItemProperty -Path $srKey -Name 'SystemRestorePointCreationFrequency' -ErrorAction SilentlyContinue).SystemRestorePointCreationFrequency\n");
+        script.push_str("  New-ItemProperty -Path $srKey -Name 'SystemRestorePointCreationFrequency' -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null\n");
+        script.push_str("  try {\n");
+        script.push_str("    Checkpoint-Computer -Description 'Roblox Account Manager pre-spoof' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop\n");
+        script.push_str("  } finally {\n");
+        script.push_str("    if ($null -eq $srPrev) { Remove-ItemProperty -Path $srKey -Name 'SystemRestorePointCreationFrequency' -ErrorAction SilentlyContinue } else { Set-ItemProperty -Path $srKey -Name 'SystemRestorePointCreationFrequency' -Value $srPrev -ErrorAction SilentlyContinue }\n");
+        script.push_str("  }\n");
+        script.push_str("} catch {}\n");
+    }
+
     if let (true, Some(guid)) = (opts.spoof_machine_guid, new_machine_guid) {
         if !is_valid_machine_guid(guid) {
             return Err("Refusing to run spoof script: generated MachineGuid is not a valid GUID".into());
@@ -971,11 +987,47 @@ pub fn apply_pre_launch(
 
     let running = find_roblox_pids_all();
     if !running.is_empty() {
+        let _ = tracker().cleanup_dead_processes();
+        let tracked = tracker().get_tracked_pids();
+        let untracked: Vec<u32> = running
+            .iter()
+            .copied()
+            .filter(|pid| !tracked.contains(pid))
+            .collect();
+        let protected = running.len() - untracked.len();
+        if protected > 0 {
+            eprintln!(
+                "[isolation] {} tracked Roblox process(es) live; closing {} untracked, skipping file cleanup",
+                protected,
+                untracked.len()
+            );
+            for pid in &untracked {
+                if let Err(e) = kill_process(*pid) {
+                    eprintln!("[isolation] failed to close untracked Roblox pid {}: {}", pid, e);
+                }
+            }
+            report.skipped_reason = Some(format!(
+                "{} account(s) launched by this app are still running. Cleanup skipped to protect them.",
+                protected
+            ));
+            emit_isolation_progress(
+                app,
+                "skipped",
+                report.skipped_reason.as_deref().unwrap_or("Isolation skipped"),
+                &report,
+                true,
+            );
+            return Ok(report);
+        }
+        eprintln!(
+            "[isolation] closing {} untracked Roblox process(es) before launch",
+            running.len()
+        );
         emit_isolation_progress(
             app,
             "closing-roblox",
             &format!(
-                "Closing {} Roblox process(es) (player, launcher, crash handler)",
+                "Closing {} untracked Roblox process(es) (player, launcher, crash handler)",
                 running.len()
             ),
             &report,

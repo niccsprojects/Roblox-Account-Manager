@@ -35,6 +35,8 @@ include!("commands/launch_shared.rs");
 include!("commands/botting.rs");
 include!("commands/generators.rs");
 include!("commands/launch.rs");
+include!("commands/window_arrange.rs");
+include!("commands/afk.rs");
 include!("commands/diagnostics.rs");
 include!("commands/isolation.rs");
 include!("commands/versions.rs");
@@ -323,6 +325,11 @@ pub fn run() {
             generator_test_key,
             cmd_kill_roblox,
             focus_roblox_window,
+            arrange_roblox_windows,
+            start_afk_mode,
+            stop_afk_mode,
+            get_afk_mode_status,
+            afk_trigger_now,
             cmd_kill_all_roblox,
             get_running_instances,
             cmd_enable_multi_roblox,

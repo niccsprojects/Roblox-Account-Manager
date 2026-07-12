@@ -43,6 +43,8 @@ fn diagnose_mutex_holder() -> Result<MutexDiagnosis, String> {
             "roblox"
         } else if !legacy_ram_pids.is_empty() {
             "legacyRam"
+        } else if platform::windows::multi_roblox_mutex_exists() {
+            "otherTool"
         } else {
             "free"
         };

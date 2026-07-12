@@ -24,6 +24,7 @@ import { UpdateDialog } from "./components/dialogs/UpdateDialog";
 import { NexusDialog } from "./components/dialogs/NexusDialog";
 import { BottingDialog } from "./components/dialogs/BottingDialog";
 import { GeneratorDialog } from "./components/dialogs/GeneratorDialog";
+import { AfkDialog } from "./components/dialogs/AfkDialog";
 import { VersionsDialog } from "./components/dialogs/VersionsDialog";
 import { IsolationProgressOverlay } from "./components/IsolationProgressOverlay";
 import { ScriptsDialog } from "./components/dialogs/ScriptsDialog";
@@ -39,6 +40,7 @@ function AppContent() {
     errorLower.includes("failed to enable multi roblox") ||
     (errorLower.includes("multi roblox") && errorLower.includes("close all roblox process"));
   const anyModalOpen =
+    store.afkDialogOpen ||
     store.settingsOpen ||
     store.serverListOpen ||
     store.importDialogOpen ||
@@ -176,6 +178,11 @@ function AppContent() {
       <GeneratorDialog
         open={store.generatorDialogOpen}
         onClose={() => store.setGeneratorDialogOpen(false)}
+      />
+
+      <AfkDialog
+        open={store.afkDialogOpen}
+        onClose={() => store.setAfkDialogOpen(false)}
       />
 
       <VersionsDialog

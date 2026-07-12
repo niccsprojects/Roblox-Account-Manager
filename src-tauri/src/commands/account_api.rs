@@ -74,6 +74,10 @@ where
             if !is_auth_session_error(&error) {
                 return Err(error);
             }
+            eprintln!(
+                "[session-retry] user {}: auth session error, attempting refresh: {}",
+                user_id, error
+            );
 
             let refreshed_cookie = refresh_account_session(state, user_id)
                 .await
