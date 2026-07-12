@@ -303,6 +303,7 @@ async fn stop_afk_mode(app: tauri::AppHandle) -> Result<(), String> {
         )
         .await;
         AFK_MANAGER.abort_task();
+        AFK_MANAGER.replace_session(None);
     }
     emit_afk_status(&app);
     Ok(())

@@ -1002,7 +1002,9 @@ pub fn apply_pre_launch(
                 untracked.len()
             );
             for pid in &untracked {
-                let _ = kill_process(*pid);
+                if let Err(e) = kill_process(*pid) {
+                    eprintln!("[isolation] failed to close untracked Roblox pid {}: {}", pid, e);
+                }
             }
             report.skipped_reason = Some(format!(
                 "{} account(s) launched by this app are still running. Cleanup skipped to protect them.",
