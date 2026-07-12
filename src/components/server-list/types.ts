@@ -58,8 +58,77 @@ export interface ServerRegion {
   loading: boolean;
 }
 
+export type RecentJobKind = "job" | "vip" | "link";
+
+export interface RecentJobEntry {
+  kind: RecentJobKind;
+  raw: string;
+  placeId: number | null;
+  label: string;
+  lastUsed: number;
+  pinned?: boolean;
+}
+
 const STORAGE_KEY_FAVORITES = "ram_favorite_games";
 const STORAGE_KEY_RECENT = "ram_recent_games";
+const STORAGE_KEY_RECENT_JOBS = "ram_recent_jobs";
+
+export function classifyJobInput(raw: string): RecentJobKind {
+  if (/^vip:\s*.+$/i.test(raw)) return "vip";
+  if (/(?:privateServerLinkCode|linkCode|code)=([^&\s]+)/i.test(raw)) return "link";
+  return "job";
+}
+
+export function loadRecentJobs(): RecentJobEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY_RECENT_JOBS) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveRecentJobs(entries: RecentJobEntry[]) {
+  localStorage.setItem(STORAGE_KEY_RECENT_JOBS, JSON.stringify(entries));
+}
+
+export function addRecentJob(raw: string, placeId: number | null, maxCount: number) {
+  const trimmed = raw.trim();
+  if (!trimmed) return;
+  const kind = classifyJobInput(trimmed);
+  const entries = loadRecentJobs();
+  const existing = entries.find((e) => e.kind === kind && e.raw === trimmed);
+  const rest = entries.filter((e) => !(e.kind === kind && e.raw === trimmed));
+  const entry: RecentJobEntry = {
+    kind,
+    raw: trimmed,
+    placeId: existing?.placeId ?? placeId,
+    label: existing?.label || "",
+    lastUsed: Date.now(),
+    pinned: existing?.pinned,
+  };
+  rest.unshift(entry);
+  const pinned = rest.filter((e) => e.pinned);
+  const unpinned = rest.filter((e) => !e.pinned).slice(0, Math.max(1, maxCount));
+  saveRecentJobs(
+    [...pinned, ...unpinned].sort((a, b) => b.lastUsed - a.lastUsed)
+  );
+}
+
+export function updateRecentJob(
+  raw: string,
+  kind: RecentJobKind,
+  patch: Partial<Pick<RecentJobEntry, "label" | "pinned">>
+) {
+  const entries = loadRecentJobs();
+  const idx = entries.findIndex((e) => e.kind === kind && e.raw === raw);
+  if (idx < 0) return;
+  entries[idx] = { ...entries[idx], ...patch };
+  saveRecentJobs(entries);
+}
+
+export function removeRecentJob(raw: string, kind: RecentJobKind) {
+  saveRecentJobs(loadRecentJobs().filter((e) => !(e.kind === kind && e.raw === raw)));
+}
 
 export function loadFavorites(): FavoriteGame[] {
   try {

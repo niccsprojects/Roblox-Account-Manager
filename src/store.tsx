@@ -30,7 +30,7 @@ import {
   normalizeUpdaterFeatureChannel,
   getUpdaterSkipVersionKey,
 } from "./updaterChannels";
-import { recordRecentGame } from "./components/server-list/types";
+import { addRecentJob, recordRecentGame } from "./components/server-list/types";
 
 interface PresenceEntry {
   userId?: number;
@@ -119,6 +119,25 @@ export interface GeneratorStatus {
   lastGeneratedAtMs: number | null;
 }
 
+export interface AfkStatus {
+  active: boolean;
+  startedAtMs: number | null;
+  intervalSeconds: number;
+  key: string;
+  interWindowDelayMs: number;
+  lastCycleAtMs: number | null;
+  nextCycleAtMs: number | null;
+  lastWindowCount: number;
+  totalCycles: number;
+  lastError: string | null;
+}
+
+export interface AfkStartConfig {
+  intervalSeconds: number;
+  key: string;
+  interWindowDelayMs: number;
+}
+
 export interface GeneratorStartConfig {
   provider: string;
   endpoint: string;
@@ -205,6 +224,10 @@ export interface StoreValue {
   startGenerator: (config: GeneratorStartConfig) => Promise<GeneratorStatus>;
   stopGenerator: () => Promise<void>;
   refreshGeneratorStatus: () => Promise<void>;
+  arrangeRobloxWindows: () => Promise<void>;
+  startAfkMode: (config: AfkStartConfig) => Promise<void>;
+  stopAfkMode: () => Promise<void>;
+  refreshAfkStatus: () => Promise<void>;
   refreshCookie: (userId: number) => Promise<boolean>;
   moveToGroup: (userIds: number[], group: string) => Promise<void>;
   sortGroupAlphabetically: (groupKey: string) => void;
@@ -277,6 +300,9 @@ export interface StoreValue {
   generatorDialogOpen: boolean;
   setGeneratorDialogOpen: (open: boolean) => void;
   generatorStatus: GeneratorStatus | null;
+  afkDialogOpen: boolean;
+  setAfkDialogOpen: (open: boolean) => void;
+  afkStatus: AfkStatus | null;
   versionsDialogOpen: boolean;
   setVersionsDialogOpen: (open: boolean) => void;
   setDefaultVersion: (versionId: string | null) => void;
@@ -393,6 +419,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [bottingStatus, setBottingStatus] = useState<BottingStatus | null>(null);
   const [generatorDialogOpen, setGeneratorDialogOpen] = useState(false);
   const [generatorStatus, setGeneratorStatus] = useState<GeneratorStatus | null>(null);
+  const [afkDialogOpen, setAfkDialogOpen] = useState(false);
+  const [afkStatus, setAfkStatus] = useState<AfkStatus | null>(null);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
   const [missingAssets, setMissingAssets] = useState<{ userId: number; username: string; assetIds: number[] } | null>(null);
   const [nexusOpen, setNexusOpen] = useState(false);
@@ -1115,6 +1143,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
       await loadAccounts();
       void recordRecentGame(pid, userId, parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
+      if (rawJobId) {
+        try {
+          addRecentJob(rawJobId, pid, parseInt(settings?.General?.MaxRecentJobs || "12") || 12);
+        } catch {}
+      }
       addToast(tr("Launching game..."));
     } catch (e) {
       setJoiningAccounts((prev) => {
@@ -1172,6 +1205,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
       await loadAccounts();
       void recordRecentGame(pid, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
+      if (jobId.trim()) {
+        try {
+          addRecentJob(jobId.trim(), pid, parseInt(settings?.General?.MaxRecentJobs || "12") || 12);
+        } catch {}
+      }
       addToast(tr("Launching {{count}} accounts...", { count: userIds.length }));
     } catch (e) {
       setJoiningAccounts(new Set());
@@ -1198,6 +1236,54 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   async function focusRobloxClient(userId: number): Promise<boolean> {
     try {
       return await invoke<boolean>("focus_roblox_window", { userId });
+    } catch (e) {
+      setError(String(e));
+      throw e;
+    }
+  }
+
+  async function arrangeRobloxWindows() {
+    try {
+      const arranged = await invoke<number>("arrange_roblox_windows");
+      addToast(arranged > 0
+        ? tr(arranged === 1 ? "Arranged {{count}} Roblox window" : "Arranged {{count}} Roblox windows", { count: arranged })
+        : tr("No open Roblox windows found"));
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+      setActionStatusMessage(tr("Failed to arrange windows: {{error}}", { error: String(e) }), "error", 5000);
+    }
+  }
+
+  async function refreshAfkStatus() {
+    try {
+      const status = await invoke<AfkStatus>("get_afk_mode_status");
+      setAfkStatus(status);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function startAfkMode(config: AfkStartConfig) {
+    try {
+      const status = await invoke<AfkStatus>("start_afk_mode", {
+        intervalSeconds: config.intervalSeconds,
+        key: config.key,
+        interWindowDelayMs: config.interWindowDelayMs,
+      });
+      setAfkStatus(status);
+      addToast(tr("AFK mode started"));
+    } catch (e) {
+      setError(String(e));
+      throw e;
+    }
+  }
+
+  async function stopAfkMode() {
+    try {
+      await invoke("stop_afk_mode");
+      await refreshAfkStatus();
+      addToast(tr("AFK mode stopped"));
     } catch (e) {
       setError(String(e));
       throw e;
@@ -1864,6 +1950,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     refreshBottingStatus();
     refreshGeneratorStatus();
+    refreshAfkStatus();
     const unsubs: Array<() => void> = [];
     const listeners = [
       listen<BottingStatus>("botting-status", (e) => {
@@ -1871,6 +1958,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }),
       listen<GeneratorStatus>("generator-status", (e) => {
         setGeneratorStatus(e.payload);
+      }),
+      listen<AfkStatus>("afk-status", (e) => {
+        setAfkStatus(e.payload);
+      }),
+      listen("afk-stopped", () => {
+        setAfkStatus((prev) => (prev ? { ...prev, active: false } : prev));
       }),
       listen("generator-account-added", () => {
         loadAccounts();
@@ -2262,6 +2355,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     startGenerator,
     stopGenerator,
     refreshGeneratorStatus,
+    arrangeRobloxWindows,
+    startAfkMode,
+    stopAfkMode,
+    refreshAfkStatus,
     refreshCookie,
     moveToGroup,
     sortGroupAlphabetically,
@@ -2328,6 +2425,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     generatorDialogOpen,
     setGeneratorDialogOpen,
     generatorStatus,
+    afkDialogOpen,
+    setAfkDialogOpen,
+    afkStatus,
     versionsDialogOpen,
     setVersionsDialogOpen,
     setDefaultVersion,

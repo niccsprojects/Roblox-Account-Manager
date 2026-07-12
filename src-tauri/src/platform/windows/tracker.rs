@@ -133,7 +133,6 @@ impl ProcessTracker {
             .and_then(|i| i.get(&user_id).map(|p| p.pid))
     }
 
-    #[allow(dead_code)]
     pub fn get_tracked_pids(&self) -> Vec<u32> {
         self.instances
             .lock()

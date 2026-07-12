@@ -474,10 +474,16 @@ async fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), S
 
     let roblox_pids = platform::windows::get_roblox_pids();
     let legacy_pids = platform::windows::find_legacy_ram_pids();
+    eprintln!(
+        "[multi-roblox] mutex not acquired: {} roblox pid(s), {} legacy ram pid(s)",
+        roblox_pids.len(),
+        legacy_pids.len()
+    );
 
     if !roblox_pids.is_empty() {
         if auto_close_conflicts {
             let killed = platform::windows::kill_all_roblox();
+            eprintln!("[multi-roblox] auto-close killed {} roblox process(es)", killed);
             if killed > 0 {
                 tokio::time::sleep(std::time::Duration::from_millis(700)).await;
             }
@@ -499,14 +505,16 @@ async fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), S
     }
 
     platform::windows::release_multi_roblox_handle();
-    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-    let enabled_retry = platform::windows::enable_multi_roblox()?;
-    if enabled_retry {
-        return Ok(());
+    for attempt in 0..3u32 {
+        tokio::time::sleep(std::time::Duration::from_millis(if attempt == 0 { 150 } else { 500 })).await;
+        let enabled_retry = platform::windows::enable_multi_roblox()?;
+        if enabled_retry {
+            return Ok(());
+        }
     }
 
     Err(
-        "Could not acquire the Roblox singleton mutex. Another program may be holding it. Close any Roblox-related tools and try again.".into(),
+        "Another program is holding the Roblox singleton mutex. Start Roblox Account Manager before other Roblox tools, or close them and try again.".into(),
     )
 }
 

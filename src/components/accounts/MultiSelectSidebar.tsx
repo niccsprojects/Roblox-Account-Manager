@@ -9,6 +9,7 @@ import { SidebarSection } from "./SidebarSection";
 import { AccountChip } from "./AccountChip";
 import { Tooltip } from "../ui/Tooltip";
 import { RecentGamesPopover } from "../server-list/RecentGamesPopover";
+import { RecentJobsPopover } from "../server-list/RecentJobsPopover";
 import { tr, useTr } from "../../i18n/text";
 
 export function MultiSelectSidebar() {
@@ -26,6 +27,8 @@ export function MultiSelectSidebar() {
   const [settingDisplayName, setSettingDisplayName] = useState(false);
   const [recentsOpen, setRecentsOpen] = useState(false);
   const recentsRef = useRef<HTMLButtonElement>(null);
+  const recentJobsRef = useRef<HTMLButtonElement>(null);
+  const [recentJobsOpen, setRecentJobsOpen] = useState(false);
   const maxRecent = parseInt(store.settings?.General?.MaxRecentGames || "8") || 8;
 
   const previewAccounts = accounts.slice(0, 5);
@@ -312,6 +315,24 @@ export function MultiSelectSidebar() {
                   <Shuffle size={14} strokeWidth={1.5} />
                 </button>
               </Tooltip>
+              <Tooltip content={t("Recent servers")}>
+                <button
+                  ref={recentJobsRef}
+                  onClick={() => setRecentJobsOpen((v) => !v)}
+                  aria-label={t("Recent servers")}
+                  aria-expanded={recentJobsOpen}
+                  aria-haspopup="menu"
+                  className="theme-muted p-1 rounded hover:text-[var(--panel-fg)]"
+                >
+                  <History size={14} strokeWidth={1.5} />
+                </button>
+              </Tooltip>
+              <RecentJobsPopover
+                open={recentJobsOpen}
+                onClose={() => setRecentJobsOpen(false)}
+                anchorRef={recentJobsRef}
+                onSelect={(raw) => store.setJobId(raw)}
+              />
             </div>
             <div className="flex items-center gap-1.5">
               <label className="theme-label text-[10px] w-10 shrink-0">{t("Data")}</label>

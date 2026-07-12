@@ -15,6 +15,7 @@ fn isolation_options_from_settings(settings: &SettingsStore) -> platform::window
             .flatten()
             .map(|v| v == "true")
             .unwrap_or(true),
+        create_restore_point: settings.get_bool("Isolation", "CreateRestorePoint"),
         preserve_basic_settings: settings
             .get("Isolation", "PreserveBasicSettings")
             .ok()
@@ -290,6 +291,7 @@ fn isolation_dry_run(
             include_studio,
             preserve_fast_flags,
             preserve_basic_settings,
+            create_restore_point: false,
         };
         let report = platform::windows::dry_run(&opts)?;
         Ok(serde_json::json!({

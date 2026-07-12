@@ -144,6 +144,45 @@ pub async fn get_email_info(security_token: &str) -> Result<serde_json::Value, S
         .map_err(|e| format!("Failed to parse email info: {}", e))
 }
 
+fn body_snippet(body: &str) -> String {
+    body.chars().take(220).collect()
+}
+
+fn friend_request_captcha_error() -> String {
+    "Roblox requires a captcha before this account can send friend requests. Open the account in the browser, send one friend request there to clear the check, then try again.".to_string()
+}
+
+fn map_friend_request_failure(status: u16, body: &str, challenged: bool) -> String {
+    let parsed: serde_json::Value = serde_json::from_str(body).unwrap_or(serde_json::Value::Null);
+    let first_error = parsed
+        .get("errors")
+        .and_then(serde_json::Value::as_array)
+        .and_then(|errors| errors.first());
+    let code = first_error
+        .and_then(|e| e.get("code"))
+        .and_then(serde_json::Value::as_i64);
+    let message = first_error
+        .and_then(|e| e.get("message"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+
+    if challenged || code == Some(14) || message.to_ascii_lowercase().contains("captcha") {
+        return friend_request_captcha_error();
+    }
+
+    match code {
+        Some(0) => friend_request_captcha_error(),
+        Some(2) => "This account is not allowed to send friend requests right now (restricted or banned).".to_string(),
+        Some(3) => "You cannot send a friend request to this user (one of you blocked the other).".to_string(),
+        Some(5) => "A friend request to this user is already pending.".to_string(),
+        Some(6) => "You are already friends with this user.".to_string(),
+        Some(7) => "This account has reached the maximum number of friends.".to_string(),
+        Some(10) => "This user has reached the maximum number of friends.".to_string(),
+        _ if !message.is_empty() => format!("Failed to send friend request: {}", message),
+        _ => format!("Failed to send friend request (status {})", status),
+    }
+}
+
 pub async fn send_friend_request(security_token: &str, target_user_id: i64) -> Result<(), String> {
     let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = reqwest::Client::new();
@@ -153,16 +192,50 @@ pub async fn send_friend_request(security_token: &str, target_user_id: i64) -> R
         .header(COOKIE, cookie_header(security_token))
         .header("X-CSRF-TOKEN", &csrf)
         .header("Content-Type", "application/json")
+        .header("Origin", "https://www.roblox.com")
+        .header("Referer", format!("https://www.roblox.com/users/{}/profile", target_user_id))
+        .json(&serde_json::json!({ "friendshipOriginSourceType": "UserProfile" }))
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
 
-    if response.status().is_success() {
-        Ok(())
-    } else {
-        let body = response.text().await.unwrap_or_default();
-        Err(format!("Failed to send friend request: {}", body))
+    let status = response.status().as_u16();
+    let challenged = response.headers().contains_key("rblx-challenge-id");
+    let body = response.text().await.unwrap_or_default();
+
+    if (200..300).contains(&status) {
+        let parsed: serde_json::Value =
+            serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
+        let captcha_required = parsed
+            .get("isCaptchaRequired")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        let success = parsed
+            .get("success")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(!captcha_required);
+        if success && !captcha_required {
+            return Ok(());
+        }
+        eprintln!(
+            "[friends] request-friendship not accepted despite 200: captcha_required={} body={}",
+            captcha_required,
+            body_snippet(&body)
+        );
+        return Err(friend_request_captcha_error());
     }
+
+    if status == 401 {
+        return Err("Failed to send friend request [401]: unauthorized".to_string());
+    }
+
+    eprintln!(
+        "[friends] request-friendship failed: status={} challenged={} body={}",
+        status,
+        challenged,
+        body_snippet(&body)
+    );
+    Err(map_friend_request_failure(status, &body, challenged))
 }
 
 pub async fn block_user(security_token: &str, target_user_id: i64) -> Result<(), String> {

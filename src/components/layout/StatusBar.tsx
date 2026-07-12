@@ -31,12 +31,19 @@ export function StatusBar() {
     bottingCountdown === null
       ? "-"
       : `${Math.floor(bottingCountdown / 60)}:${String(bottingCountdown % 60).padStart(2, "0")}`;
+  const afkActive = store.afkStatus?.active === true;
+  const afkNextMs = afkActive ? store.afkStatus?.nextCycleAtMs ?? null : null;
+  const afkCountdown = afkNextMs ? Math.max(0, Math.ceil((afkNextMs - tickNow) / 1000)) : null;
+  const afkLabel =
+    afkCountdown === null
+      ? "-"
+      : `${Math.floor(afkCountdown / 60)}:${String(afkCountdown % 60).padStart(2, "0")}`;
 
   useEffect(() => {
-    if (!bottingActive) return;
+    if (!bottingActive && !afkActive) return;
     const timer = window.setInterval(() => setTickNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [bottingActive]);
+  }, [bottingActive, afkActive]);
 
   return (
     <div data-tour="status-bar" className="theme-surface theme-border flex items-center justify-between gap-3 px-4 py-2 border-t text-[12px] shrink-0">
@@ -91,6 +98,13 @@ export function StatusBar() {
               <span className="w-2 h-2 rounded-full bg-fuchsia-400 animate-pulse" />
               <span className="text-fuchsia-300/90">{t("botting")}</span>
               <span className="text-fuchsia-200/90">{t("next")} {bottingLabel}</span>
+            </span>
+          )}
+          {afkActive && (
+            <span className="theme-muted inline-flex items-center gap-1 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="text-cyan-300/90">{t("afk")}</span>
+              <span className="text-cyan-200/90">{t("next")} {afkLabel}</span>
             </span>
           )}
         </div>

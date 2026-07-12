@@ -324,6 +324,7 @@ impl SettingsStore {
             ("Mode", "Off"),
             ("SpoofMachineGuid", "false"),
             ("SpoofMacAddress", "false"),
+            ("CreateRestorePoint", "false"),
             ("TargetAdapter", ""),
             ("IncludeStudio", "false"),
             ("ReinstallRoblox", "true"),

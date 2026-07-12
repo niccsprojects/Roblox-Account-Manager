@@ -34,6 +34,7 @@ export function IsolationTab({ s }: { s: UseSettingsReturn }) {
   const fullActive = s.get("Isolation", "Mode", "Off").trim().toLowerCase() !== "off";
   const spoofGuid = s.getBool("Isolation", "SpoofMachineGuid");
   const spoofMac = s.getBool("Isolation", "SpoofMacAddress");
+  const createRestorePoint = s.getBool("Isolation", "CreateRestorePoint");
   const targetAdapter = s.get("Isolation", "TargetAdapter", "");
   const includeStudio = s.getBool("Isolation", "IncludeStudio");
   const reinstallRoblox = s.get("Isolation", "ReinstallRoblox", "true") !== "false";
@@ -211,6 +212,19 @@ export function IsolationTab({ s }: { s: UseSettingsReturn }) {
         }
         description="Sets NetworkAddress on the selected adapter and toggles it"
       />
+      {(spoofGuid || spoofMac) && (
+        <Toggle
+          checked={createRestorePoint}
+          onChange={(v) => s.setBool("Isolation", "CreateRestorePoint", v)}
+          label={
+            <>
+              {t("Create a restore point before spoofing")}
+              <WarningBadge>Requires UAC</WarningBadge>
+            </>
+          }
+          description="Creates a Windows System Restore point right before identifiers are rotated, so you can roll the machine back if needed"
+        />
+      )}
 
       <Divider />
       <button
