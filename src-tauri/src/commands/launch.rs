@@ -269,7 +269,10 @@ async fn launch_roblox(
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     if windows::find_main_window(target_pid).is_some() {
                         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                        windows::arrange_roblox_windows_grid(padding);
+                        let _ = tauri::async_runtime::spawn_blocking(move || {
+                            windows::arrange_roblox_windows_grid(padding)
+                        })
+                        .await;
                         break;
                     }
                 }
@@ -742,7 +745,10 @@ async fn launch_multiple(
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     if windows::find_main_window(target_pid).is_some() {
                         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                        windows::arrange_roblox_windows_grid(padding);
+                        let _ = tauri::async_runtime::spawn_blocking(move || {
+                            windows::arrange_roblox_windows_grid(padding)
+                        })
+                        .await;
                         break;
                     }
                 }

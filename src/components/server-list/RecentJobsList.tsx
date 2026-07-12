@@ -34,6 +34,12 @@ export function RecentJobsList({ onSelect }: RecentJobsListProps) {
     setEntries(loadRecentJobs());
   }
 
+  function commitEdit(raw: string, kind: RecentJobKind) {
+    updateRecentJob(raw, kind, { label: editValue.trim() });
+    setEditing(null);
+    refresh();
+  }
+
   function handleClear() {
     saveRecentJobs(loadRecentJobs().filter((e) => e.pinned));
     refresh();
@@ -126,11 +132,7 @@ export function RecentJobsList({ onSelect }: RecentJobsListProps) {
                       autoFocus
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          updateRecentJob(entry.raw, entry.kind, { label: editValue.trim() });
-                          setEditing(null);
-                          refresh();
-                        }
+                        if (e.key === "Enter") commitEdit(entry.raw, entry.kind);
                         if (e.key === "Escape") setEditing(null);
                       }}
                       placeholder={t("Name")}
@@ -138,11 +140,7 @@ export function RecentJobsList({ onSelect }: RecentJobsListProps) {
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        updateRecentJob(entry.raw, entry.kind, { label: editValue.trim() });
-                        setEditing(null);
-                        refresh();
-                      }}
+                      onClick={() => commitEdit(entry.raw, entry.kind)}
                       className="shrink-0 p-1 rounded text-emerald-400 hover:bg-emerald-500/10"
                       aria-label={t("Save name")}
                     >

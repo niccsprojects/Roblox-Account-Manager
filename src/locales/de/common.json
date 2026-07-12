@@ -881,7 +881,7 @@
   "No open Roblox windows found": "Keine offenen Roblox-Fenster gefunden",
   "No recent servers": "Keine letzten Server",
   "Pin": "Anpinnen",
-  "Press every": "Drücken alle",
+  "Press every": "Alle",
   "Private server": "Privater Server",
   "Recent servers": "Letzte Server",
   "Save name": "Namen speichern",
@@ -895,5 +895,6 @@
   "Windows": "Fenster",
   "Each cycle briefly focuses every Roblox window to send the key, then returns to the window you were using": "Jeder Durchlauf fokussiert kurz jedes Roblox-Fenster, um die Taste zu senden, und kehrt danach zu deinem vorherigen Fenster zurück",
   "Create a restore point before spoofing": "Vor dem Spoofen einen Wiederherstellungspunkt erstellen",
-  "Creates a Windows System Restore point right before identifiers are rotated, so you can roll the machine back if needed": "Erstellt direkt vor dem Rotieren der Kennungen einen Windows-Wiederherstellungspunkt, damit du das System bei Bedarf zurücksetzen kannst"
+  "Creates a Windows System Restore point right before identifiers are rotated, so you can roll the machine back if needed": "Erstellt direkt vor dem Rotieren der Kennungen einen Windows-Wiederherstellungspunkt, damit du das System bei Bedarf zurücksetzen kannst",
+  "Another program holds the Roblox singleton mutex": "Ein anderes Programm hält den Roblox-Singleton-Mutex"
 }

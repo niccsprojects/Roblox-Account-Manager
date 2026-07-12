@@ -59,6 +59,10 @@ impl AfkManager {
 #[cfg(target_os = "windows")]
 static AFK_MANAGER: std::sync::LazyLock<AfkManager> = std::sync::LazyLock::new(AfkManager::new);
 
+#[cfg(target_os = "windows")]
+static AFK_CYCLE_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+    std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
 #[derive(Debug, Clone, serde::Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct AfkStatusPayload {
@@ -182,9 +186,12 @@ async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
         }
 
         let cycle_config = config.clone();
-        let result = tokio::task::spawn_blocking(move || run_afk_cycle_blocking(&cycle_config))
-            .await
-            .unwrap_or_else(|e| Err(format!("AFK cycle failed: {}", e)));
+        let result = {
+            let _guard = AFK_CYCLE_LOCK.lock().await;
+            tokio::task::spawn_blocking(move || run_afk_cycle_blocking(&cycle_config))
+                .await
+                .unwrap_or_else(|e| Err(format!("AFK cycle failed: {}", e)))
+        };
 
         if let Ok(mut runtime) = session.runtime.lock() {
             runtime.last_cycle_at_ms = Some(now_ms());
@@ -295,6 +302,7 @@ async fn afk_trigger_now(key: String, inter_window_delay_ms: u64) -> Result<u32,
         key,
         inter_window_delay_ms: inter_window_delay_ms.clamp(50, 5000),
     };
+    let _guard = AFK_CYCLE_LOCK.lock().await;
     tokio::task::spawn_blocking(move || run_afk_cycle_blocking(&config))
         .await
         .unwrap_or_else(|e| Err(format!("AFK cycle failed: {}", e)))

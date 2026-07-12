@@ -710,8 +710,14 @@ fn build_spoof_script(
     if opts.create_restore_point {
         script.push_str("try {\n");
         script.push_str("  Enable-ComputerRestore -Drive $env:SystemDrive -ErrorAction SilentlyContinue\n");
-        script.push_str("  New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SystemRestore' -Name 'SystemRestorePointCreationFrequency' -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null\n");
-        script.push_str("  Checkpoint-Computer -Description 'Roblox Account Manager pre-spoof' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop\n");
+        script.push_str("  $srKey = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SystemRestore'\n");
+        script.push_str("  $srPrev = (Get-ItemProperty -Path $srKey -Name 'SystemRestorePointCreationFrequency' -ErrorAction SilentlyContinue).SystemRestorePointCreationFrequency\n");
+        script.push_str("  New-ItemProperty -Path $srKey -Name 'SystemRestorePointCreationFrequency' -Value 0 -PropertyType DWord -Force -ErrorAction SilentlyContinue | Out-Null\n");
+        script.push_str("  try {\n");
+        script.push_str("    Checkpoint-Computer -Description 'Roblox Account Manager pre-spoof' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop\n");
+        script.push_str("  } finally {\n");
+        script.push_str("    if ($null -eq $srPrev) { Remove-ItemProperty -Path $srKey -Name 'SystemRestorePointCreationFrequency' -ErrorAction SilentlyContinue } else { Set-ItemProperty -Path $srKey -Name 'SystemRestorePointCreationFrequency' -Value $srPrev -ErrorAction SilentlyContinue }\n");
+        script.push_str("  }\n");
         script.push_str("} catch {}\n");
     }
 

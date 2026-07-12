@@ -40,6 +40,7 @@ function AppContent() {
     errorLower.includes("failed to enable multi roblox") ||
     (errorLower.includes("multi roblox") && errorLower.includes("close all roblox process"));
   const anyModalOpen =
+    store.afkDialogOpen ||
     store.settingsOpen ||
     store.serverListOpen ||
     store.importDialogOpen ||
