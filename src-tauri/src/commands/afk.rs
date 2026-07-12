@@ -137,7 +137,10 @@ fn emit_afk_status(app: &tauri::AppHandle) {
 }
 
 #[cfg(target_os = "windows")]
-fn run_afk_cycle_blocking(config: &AfkConfig) -> Result<u32, String> {
+fn run_afk_cycle_blocking(
+    config: &AfkConfig,
+    stop_flag: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<u32, String> {
     use platform::windows;
 
     let (vk, scan) =
@@ -148,6 +151,11 @@ fn run_afk_cycle_blocking(config: &AfkConfig) -> Result<u32, String> {
 
     let mut hit = 0u32;
     for pid in pids {
+        if let Some(flag) = stop_flag {
+            if flag.load(std::sync::atomic::Ordering::Relaxed) {
+                break;
+            }
+        }
         let hwnd = match windows::find_main_window(pid) {
             Some(hwnd) => hwnd,
             None => continue,
@@ -204,11 +212,14 @@ async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
         }
 
         let cycle_config = config.clone();
+        let cycle_stop = session.stop_flag.clone();
         let result = {
             let _guard = AFK_CYCLE_LOCK.lock().await;
-            tokio::task::spawn_blocking(move || run_afk_cycle_blocking(&cycle_config))
-                .await
-                .unwrap_or_else(|e| Err(format!("AFK cycle failed: {}", e)))
+            tokio::task::spawn_blocking(move || {
+                run_afk_cycle_blocking(&cycle_config, Some(&cycle_stop))
+            })
+            .await
+            .unwrap_or_else(|e| Err(format!("AFK cycle failed: {}", e)))
         };
 
         if let Ok(mut runtime) = session.runtime.lock() {
@@ -324,7 +335,7 @@ async fn afk_trigger_now(key: String, inter_window_delay_ms: u64) -> Result<u32,
         inter_window_delay_ms: inter_window_delay_ms.clamp(50, 5000),
     };
     let _guard = AFK_CYCLE_LOCK.lock().await;
-    tokio::task::spawn_blocking(move || run_afk_cycle_blocking(&config))
+    tokio::task::spawn_blocking(move || run_afk_cycle_blocking(&config, None))
         .await
         .unwrap_or_else(|e| Err(format!("AFK cycle failed: {}", e)))
 }
