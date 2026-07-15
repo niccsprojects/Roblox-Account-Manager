@@ -1,51 +1,54 @@
 pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) -> Result<Vec<i64>, String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = reqwest::Client::new();
     let mut invalid_assets = Vec::new();
 
     if let Some(avatar_type) = avatar_json.get("playerAvatarType") {
-        client
-            .post("https://avatar.roblox.com/v1/avatar/set-player-avatar-type")
-            .header(COOKIE, cookie_header(security_token))
-            .header("X-CSRF-TOKEN", &csrf)
-            .json(&serde_json::json!({ "playerAvatarType": avatar_type }))
-            .send()
-            .await
-            .map_err(|e| format!("Failed to set avatar type: {}", e))?;
+        crate::api::auth::send_authenticated(security_token, |csrf| {
+            client
+                .post("https://avatar.roblox.com/v1/avatar/set-player-avatar-type")
+                .header(COOKIE, cookie_header(security_token))
+                .header("X-CSRF-TOKEN", csrf)
+                .json(&serde_json::json!({ "playerAvatarType": avatar_type }))
+        })
+        .await
+        .map_err(|e| format!("Failed to set avatar type: {}", e))?;
     }
 
     let scales = avatar_json.get("scales").or_else(|| avatar_json.get("scale"));
     if let Some(scale_obj) = scales {
-        client
-            .post("https://avatar.roblox.com/v1/avatar/set-scales")
-            .header(COOKIE, cookie_header(security_token))
-            .header("X-CSRF-TOKEN", &csrf)
-            .json(scale_obj)
-            .send()
-            .await
-            .map_err(|e| format!("Failed to set scales: {}", e))?;
+        crate::api::auth::send_authenticated(security_token, |csrf| {
+            client
+                .post("https://avatar.roblox.com/v1/avatar/set-scales")
+                .header(COOKIE, cookie_header(security_token))
+                .header("X-CSRF-TOKEN", csrf)
+                .json(scale_obj)
+        })
+        .await
+        .map_err(|e| format!("Failed to set scales: {}", e))?;
     }
 
     if let Some(body_colors) = avatar_json.get("bodyColors") {
-        client
-            .post("https://avatar.roblox.com/v1/avatar/set-body-colors")
-            .header(COOKIE, cookie_header(security_token))
-            .header("X-CSRF-TOKEN", &csrf)
-            .json(body_colors)
-            .send()
-            .await
-            .map_err(|e| format!("Failed to set body colors: {}", e))?;
+        crate::api::auth::send_authenticated(security_token, |csrf| {
+            client
+                .post("https://avatar.roblox.com/v1/avatar/set-body-colors")
+                .header(COOKIE, cookie_header(security_token))
+                .header("X-CSRF-TOKEN", csrf)
+                .json(body_colors)
+        })
+        .await
+        .map_err(|e| format!("Failed to set body colors: {}", e))?;
     }
 
     if let Some(assets) = avatar_json.get("assets") {
-        let response = client
-            .post("https://avatar.roblox.com/v2/avatar/set-wearing-assets")
-            .header(COOKIE, cookie_header(security_token))
-            .header("X-CSRF-TOKEN", &csrf)
-            .json(&serde_json::json!({ "assets": assets }))
-            .send()
-            .await
-            .map_err(|e| format!("Failed to set wearing assets: {}", e))?;
+        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+            client
+                .post("https://avatar.roblox.com/v2/avatar/set-wearing-assets")
+                .header(COOKIE, cookie_header(security_token))
+                .header("X-CSRF-TOKEN", csrf)
+                .json(&serde_json::json!({ "assets": assets }))
+        })
+        .await
+        .map_err(|e| format!("Failed to set wearing assets: {}", e))?;
 
         if response.status().is_success() {
             if let Ok(body) = response.json::<serde_json::Value>().await {
@@ -226,7 +229,6 @@ pub async fn join_game_instance(
     game_id: &str,
     is_teleport: bool,
 ) -> Result<serde_json::Value, String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = game_join_client();
 
     let mut body = serde_json::json!({
@@ -238,15 +240,15 @@ pub async fn join_game_instance(
         body["isTeleport"] = serde_json::json!(true);
     }
 
-    let response = client
-        .post("https://gamejoin.roblox.com/v1/join-game-instance")
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .post("https://gamejoin.roblox.com/v1/join-game-instance")
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/json")
+            .json(&body)
+    })
+    .await?;
 
     if !response.status().is_success() {
         let text = response.text().await.unwrap_or_default();
@@ -257,18 +259,17 @@ pub async fn join_game_instance(
 }
 
 pub async fn join_game(security_token: &str, place_id: i64) -> Result<serde_json::Value, String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = game_join_client();
 
-    let response = client
-        .post("https://gamejoin.roblox.com/v1/join-game")
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({ "placeId": place_id }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .post("https://gamejoin.roblox.com/v1/join-game")
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({ "placeId": place_id }))
+    })
+    .await?;
 
     response.json().await.map_err(|e| format!("Failed to parse join response: {}", e))
 }

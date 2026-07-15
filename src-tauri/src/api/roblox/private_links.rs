@@ -3,7 +3,6 @@ pub async fn parse_private_server_link_code(
     place_id: i64,
     link_code: &str,
 ) -> Result<String, String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = game_join_client();
 
     let normalized_link_code = normalize_private_server_link_code(link_code);
@@ -37,14 +36,14 @@ pub async fn parse_private_server_link_code(
     ];
 
     for url in candidates {
-        let response = client
-            .get(&url)
-            .header(COOKIE, cookie_header(security_token))
-            .header("X-CSRF-TOKEN", &csrf)
-            .header("Referer", &referer)
-            .send()
-            .await
-            .map_err(|e| format!("Request failed: {}", e))?;
+        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+            client
+                .get(&url)
+                .header(COOKIE, cookie_header(security_token))
+                .header("X-CSRF-TOKEN", csrf)
+                .header("Referer", &referer)
+        })
+        .await?;
 
         if response.status().is_success() {
             let body = response
@@ -64,7 +63,6 @@ pub async fn resolve_share_server_link(
     security_token: &str,
     link_id: &str,
 ) -> Result<(Option<i64>, String), String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = game_join_client();
 
     let normalized_link_id = extract_query_param_value_recursive(link_id, "code")
@@ -74,20 +72,20 @@ pub async fn resolve_share_server_link(
         return Err("Missing share link code".to_string());
     }
 
-    let response = client
-        .post("https://apis.roblox.com/sharelinks/v1/resolve-link")
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/json")
-        .header("Origin", "https://www.roblox.com")
-        .header("Referer", "https://www.roblox.com/share-links")
-        .json(&serde_json::json!({
-            "linkId": normalized_link_id,
-            "linkType": "Server",
-        }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .post("https://apis.roblox.com/sharelinks/v1/resolve-link")
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/json")
+            .header("Origin", "https://www.roblox.com")
+            .header("Referer", "https://www.roblox.com/share-links")
+            .json(&serde_json::json!({
+                "linkId": normalized_link_id,
+                "linkType": "Server",
+            }))
+    })
+    .await?;
 
     if !response.status().is_success() {
         let status = response.status().as_u16();

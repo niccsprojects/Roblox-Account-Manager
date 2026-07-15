@@ -1,16 +1,15 @@
 pub async fn join_group(security_token: &str, group_id: i64) -> Result<(), String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = reqwest::Client::new();
 
-    let response = client
-        .post(format!("https://groups.roblox.com/v1/groups/{}/users", group_id))
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/json")
-        .body("{}")
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .post(format!("https://groups.roblox.com/v1/groups/{}/users", group_id))
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/json")
+            .body("{}")
+    })
+    .await?;
 
     if response.status().is_success() {
         Ok(())
