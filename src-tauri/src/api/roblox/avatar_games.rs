@@ -3,7 +3,7 @@ pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) ->
     let mut invalid_assets = Vec::new();
 
     if let Some(avatar_type) = avatar_json.get("playerAvatarType") {
-        crate::api::auth::send_authenticated(security_token, |csrf| {
+        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
             client
                 .post("https://avatar.roblox.com/v1/avatar/set-player-avatar-type")
                 .header(COOKIE, cookie_header(security_token))
@@ -12,11 +12,15 @@ pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) ->
         })
         .await
         .map_err(|e| format!("Failed to set avatar type: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!("Failed to set avatar type (status {})", response.status().as_u16()));
+        }
     }
 
     let scales = avatar_json.get("scales").or_else(|| avatar_json.get("scale"));
     if let Some(scale_obj) = scales {
-        crate::api::auth::send_authenticated(security_token, |csrf| {
+        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
             client
                 .post("https://avatar.roblox.com/v1/avatar/set-scales")
                 .header(COOKIE, cookie_header(security_token))
@@ -25,10 +29,14 @@ pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) ->
         })
         .await
         .map_err(|e| format!("Failed to set scales: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!("Failed to set scales (status {})", response.status().as_u16()));
+        }
     }
 
     if let Some(body_colors) = avatar_json.get("bodyColors") {
-        crate::api::auth::send_authenticated(security_token, |csrf| {
+        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
             client
                 .post("https://avatar.roblox.com/v1/avatar/set-body-colors")
                 .header(COOKIE, cookie_header(security_token))
@@ -37,6 +45,10 @@ pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) ->
         })
         .await
         .map_err(|e| format!("Failed to set body colors: {}", e))?;
+
+        if !response.status().is_success() {
+            return Err(format!("Failed to set body colors (status {})", response.status().as_u16()));
+        }
     }
 
     if let Some(assets) = avatar_json.get("assets") {
@@ -50,13 +62,15 @@ pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) ->
         .await
         .map_err(|e| format!("Failed to set wearing assets: {}", e))?;
 
-        if response.status().is_success() {
-            if let Ok(body) = response.json::<serde_json::Value>().await {
-                if let Some(ids) = body.get("invalidAssetIds").and_then(|v| v.as_array()) {
-                    for id in ids {
-                        if let Some(n) = id.as_i64() {
-                            invalid_assets.push(n);
-                        }
+        if !response.status().is_success() {
+            return Err(format!("Failed to set wearing assets (status {})", response.status().as_u16()));
+        }
+
+        if let Ok(body) = response.json::<serde_json::Value>().await {
+            if let Some(ids) = body.get("invalidAssetIds").and_then(|v| v.as_array()) {
+                for id in ids {
+                    if let Some(n) = id.as_i64() {
+                        invalid_assets.push(n);
                     }
                 }
             }
@@ -270,6 +284,11 @@ pub async fn join_game(security_token: &str, place_id: i64) -> Result<serde_json
             .json(&serde_json::json!({ "placeId": place_id }))
     })
     .await?;
+
+    if !response.status().is_success() {
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!("Failed to join game: {}", text));
+    }
 
     response.json().await.map_err(|e| format!("Failed to parse join response: {}", e))
 }

@@ -141,7 +141,7 @@ where
                     continue;
                 }
 
-                if !refreshed_csrf {
+                if !refreshed_csrf && attempt < 2 {
                     if let Some(fresh) = next_csrf_from_403(status, response.headers(), &csrf) {
                         csrf = fresh;
                         refreshed_csrf = true;
