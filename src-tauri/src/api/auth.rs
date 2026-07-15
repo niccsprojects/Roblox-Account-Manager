@@ -122,17 +122,27 @@ fn next_csrf_from_403(
 
 pub(crate) async fn send_authenticated<F>(
     security_token: &str,
-    mut make_request: F,
+    make_request: F,
 ) -> Result<reqwest::Response, String>
 where
     F: FnMut(&str) -> reqwest::RequestBuilder,
 {
     let mut csrf = get_csrf_token(security_token).await?;
+    send_with_csrf(&mut csrf, make_request).await
+}
+
+pub(crate) async fn send_with_csrf<F>(
+    csrf: &mut String,
+    mut make_request: F,
+) -> Result<reqwest::Response, String>
+where
+    F: FnMut(&str) -> reqwest::RequestBuilder,
+{
     let mut refreshed_csrf = false;
     let mut last_error = String::new();
 
     for attempt in 0..3 {
-        match make_request(&csrf).send().await {
+        match make_request(csrf.as_str()).send().await {
             Ok(response) => {
                 let status = response.status();
 
@@ -142,8 +152,8 @@ where
                 }
 
                 if !refreshed_csrf && attempt < 2 {
-                    if let Some(fresh) = next_csrf_from_403(status, response.headers(), &csrf) {
-                        csrf = fresh;
+                    if let Some(fresh) = next_csrf_from_403(status, response.headers(), csrf.as_str()) {
+                        *csrf = fresh;
                         refreshed_csrf = true;
                         continue;
                     }

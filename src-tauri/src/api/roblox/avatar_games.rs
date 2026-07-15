@@ -1,9 +1,10 @@
 pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) -> Result<Vec<i64>, String> {
     let client = reqwest::Client::new();
     let mut invalid_assets = Vec::new();
+    let mut csrf = crate::api::auth::get_csrf_token(security_token).await?;
 
     if let Some(avatar_type) = avatar_json.get("playerAvatarType") {
-        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        let response = crate::api::auth::send_with_csrf(&mut csrf, |csrf| {
             client
                 .post("https://avatar.roblox.com/v1/avatar/set-player-avatar-type")
                 .header(COOKIE, cookie_header(security_token))
@@ -20,7 +21,7 @@ pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) ->
 
     let scales = avatar_json.get("scales").or_else(|| avatar_json.get("scale"));
     if let Some(scale_obj) = scales {
-        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        let response = crate::api::auth::send_with_csrf(&mut csrf, |csrf| {
             client
                 .post("https://avatar.roblox.com/v1/avatar/set-scales")
                 .header(COOKIE, cookie_header(security_token))
@@ -36,7 +37,7 @@ pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) ->
     }
 
     if let Some(body_colors) = avatar_json.get("bodyColors") {
-        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        let response = crate::api::auth::send_with_csrf(&mut csrf, |csrf| {
             client
                 .post("https://avatar.roblox.com/v1/avatar/set-body-colors")
                 .header(COOKIE, cookie_header(security_token))
@@ -52,7 +53,7 @@ pub async fn set_avatar(security_token: &str, avatar_json: serde_json::Value) ->
     }
 
     if let Some(assets) = avatar_json.get("assets") {
-        let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        let response = crate::api::auth::send_with_csrf(&mut csrf, |csrf| {
             client
                 .post("https://avatar.roblox.com/v2/avatar/set-wearing-assets")
                 .header(COOKIE, cookie_header(security_token))
