@@ -116,8 +116,8 @@ fn next_csrf_from_403(
     headers
         .get("x-csrf-token")
         .and_then(|value| value.to_str().ok())
+        .filter(|token| !token.is_empty() && *token != current)
         .map(|token| token.to_string())
-        .filter(|token| !token.is_empty() && token != current)
 }
 
 pub(crate) async fn send_authenticated<F>(
