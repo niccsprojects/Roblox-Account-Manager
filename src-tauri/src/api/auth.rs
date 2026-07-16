@@ -1,5 +1,7 @@
 use reqwest::header::{COOKIE, REFERER};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+use tokio::time::sleep;
 
 const REFERER_URL: &str = "https://www.roblox.com/games/2753915549/Blox-Fruits";
 
@@ -102,22 +104,90 @@ pub async fn get_csrf_token(security_token: &str) -> Result<String, String> {
     ))
 }
 
-pub async fn get_auth_ticket(security_token: &str) -> Result<String, String> {
-    let csrf = get_csrf_token(security_token).await?;
+fn next_csrf_from_403(
+    status: reqwest::StatusCode,
+    headers: &reqwest::header::HeaderMap,
+    current: &str,
+) -> Option<String> {
+    if status.as_u16() != 403 {
+        return None;
+    }
 
+    headers
+        .get("x-csrf-token")
+        .and_then(|value| value.to_str().ok())
+        .filter(|token| !token.is_empty() && *token != current)
+        .map(|token| token.to_string())
+}
+
+pub(crate) async fn send_authenticated<F>(
+    security_token: &str,
+    make_request: F,
+) -> Result<reqwest::Response, String>
+where
+    F: FnMut(&str) -> reqwest::RequestBuilder,
+{
+    let mut csrf = get_csrf_token(security_token).await?;
+    send_with_csrf(&mut csrf, make_request).await
+}
+
+pub(crate) async fn send_with_csrf<F>(
+    csrf: &mut String,
+    mut make_request: F,
+) -> Result<reqwest::Response, String>
+where
+    F: FnMut(&str) -> reqwest::RequestBuilder,
+{
+    let mut refreshed_csrf = false;
+    let mut last_error = String::new();
+
+    for attempt in 0..3 {
+        match make_request(csrf.as_str()).send().await {
+            Ok(response) => {
+                let status = response.status();
+
+                if status.as_u16() == 429 && attempt < 2 {
+                    sleep(Duration::from_millis(400 * 2_u64.pow(attempt as u32))).await;
+                    continue;
+                }
+
+                if !refreshed_csrf && attempt < 2 {
+                    if let Some(fresh) = next_csrf_from_403(status, response.headers(), csrf.as_str()) {
+                        *csrf = fresh;
+                        refreshed_csrf = true;
+                        continue;
+                    }
+                }
+
+                return Ok(response);
+            }
+            Err(error) => {
+                last_error = error.to_string();
+                if attempt < 2 {
+                    sleep(Duration::from_millis(400 * 2_u64.pow(attempt as u32))).await;
+                    continue;
+                }
+            }
+        }
+    }
+
+    Err(format!("Request failed: {}", last_error))
+}
+
+pub async fn get_auth_ticket(security_token: &str) -> Result<String, String> {
     let client = build_client();
 
-    let response = client
-        .post("https://auth.roblox.com/v1/authentication-ticket/")
-        .header(COOKIE, cookie_header(security_token))
-        .header("x-csrf-token", &csrf)
-        .header(REFERER, REFERER_URL)
-        .header("RBXAuthenticationNegotiation", "1")
-        .header("Content-Type", "application/json")
-        .body("")
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = send_authenticated(security_token, |csrf| {
+        client
+            .post("https://auth.roblox.com/v1/authentication-ticket/")
+            .header(COOKIE, cookie_header(security_token))
+            .header("x-csrf-token", csrf)
+            .header(REFERER, REFERER_URL)
+            .header("RBXAuthenticationNegotiation", "1")
+            .header("Content-Type", "application/json")
+            .body("")
+    })
+    .await?;
 
     if let Some(ticket) = response
         .headers()
@@ -186,20 +256,18 @@ pub async fn unlock_pin(security_token: &str, pin: &str) -> Result<bool, String>
         return Err("Pin must be 4 digits".to_string());
     }
 
-    let csrf = get_csrf_token(security_token).await?;
-
     let client = build_client();
 
-    let response = client
-        .post("https://auth.roblox.com/v1/account/pin/unlock")
-        .header(COOKIE, cookie_header(security_token))
-        .header(REFERER, "https://www.roblox.com/")
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(format!("pin={}", pin))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = send_authenticated(security_token, |csrf| {
+        client
+            .post("https://auth.roblox.com/v1/account/pin/unlock")
+            .header(COOKIE, cookie_header(security_token))
+            .header(REFERER, "https://www.roblox.com/")
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(format!("pin={}", pin))
+    })
+    .await?;
 
     if !response.status().is_success() {
         return Ok(false);
@@ -220,19 +288,17 @@ pub struct RefreshResult {
 }
 
 pub async fn log_out_other_sessions(security_token: &str) -> Result<RefreshResult, String> {
-    let csrf = get_csrf_token(security_token).await?;
-
     let client = build_client();
 
-    let response = client
-        .post("https://www.roblox.com/authentication/signoutfromallsessionsandreauthenticate")
-        .header(COOKIE, cookie_header(security_token))
-        .header(REFERER, "https://www.roblox.com/")
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = send_authenticated(security_token, |csrf| {
+        client
+            .post("https://www.roblox.com/authentication/signoutfromallsessionsandreauthenticate")
+            .header(COOKIE, cookie_header(security_token))
+            .header(REFERER, "https://www.roblox.com/")
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+    })
+    .await?;
 
     // Roblox may return redirects for this endpoint while still setting cookies.
     if !(response.status().is_success() || response.status().is_redirection()) {
@@ -271,24 +337,22 @@ pub async fn change_password(
     current_password: &str,
     new_password: &str,
 ) -> Result<Option<String>, String> {
-    let csrf = get_csrf_token(security_token).await?;
-
     let client = build_client();
 
-    let response = client
-        .post("https://auth.roblox.com/v2/user/passwords/change")
-        .header(COOKIE, cookie_header(security_token))
-        .header(REFERER, "https://www.roblox.com/")
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(format!(
-            "currentPassword={}&newPassword={}",
-            urlencoding::encode(current_password),
-            urlencoding::encode(new_password)
-        ))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = send_authenticated(security_token, |csrf| {
+        client
+            .post("https://auth.roblox.com/v2/user/passwords/change")
+            .header(COOKIE, cookie_header(security_token))
+            .header(REFERER, "https://www.roblox.com/")
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(format!(
+                "currentPassword={}&newPassword={}",
+                urlencoding::encode(current_password),
+                urlencoding::encode(new_password)
+            ))
+    })
+    .await?;
 
     if !response.status().is_success() {
         return Err("Failed to change password".to_string());
@@ -317,24 +381,22 @@ pub async fn change_email(
     password: &str,
     new_email: &str,
 ) -> Result<(), String> {
-    let csrf = get_csrf_token(security_token).await?;
-
     let client = build_client();
 
-    let response = client
-        .post("https://accountsettings.roblox.com/v1/email")
-        .header(COOKIE, cookie_header(security_token))
-        .header(REFERER, "https://www.roblox.com/")
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(format!(
-            "password={}&emailAddress={}",
-            urlencoding::encode(password),
-            urlencoding::encode(new_email)
-        ))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = send_authenticated(security_token, |csrf| {
+        client
+            .post("https://accountsettings.roblox.com/v1/email")
+            .header(COOKIE, cookie_header(security_token))
+            .header(REFERER, "https://www.roblox.com/")
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(format!(
+                "password={}&emailAddress={}",
+                urlencoding::encode(password),
+                urlencoding::encode(new_email)
+            ))
+    })
+    .await?;
 
     if response.status().is_success() {
         Ok(())
@@ -352,17 +414,16 @@ pub async fn quick_login_enter_code(
         return Err("Code must be 6 digits".to_string());
     }
 
-    let csrf = get_csrf_token(security_token).await?;
     let client = build_client();
 
-    let response = client
-        .post("https://apis.roblox.com/auth-token-service/v1/login/enterCode")
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .json(&serde_json::json!({ "code": normalized_code }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = send_authenticated(security_token, |csrf| {
+        client
+            .post("https://apis.roblox.com/auth-token-service/v1/login/enterCode")
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .json(&serde_json::json!({ "code": normalized_code }))
+    })
+    .await?;
 
     if !response.status().is_success() {
         let body = response.text().await.unwrap_or_default();
@@ -381,17 +442,16 @@ pub async fn quick_login_validate_code(security_token: &str, code: &str) -> Resu
         return Err("Code must be 6 digits".to_string());
     }
 
-    let csrf = get_csrf_token(security_token).await?;
     let client = build_client();
 
-    let response = client
-        .post("https://apis.roblox.com/auth-token-service/v1/login/validateCode")
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .json(&serde_json::json!({ "code": normalized_code }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = send_authenticated(security_token, |csrf| {
+        client
+            .post("https://apis.roblox.com/auth-token-service/v1/login/validateCode")
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .json(&serde_json::json!({ "code": normalized_code }))
+    })
+    .await?;
 
     if response.status().is_success() {
         Ok(())
@@ -405,21 +465,19 @@ pub async fn set_display_name(
     user_id: i64,
     display_name: &str,
 ) -> Result<(), String> {
-    let csrf = get_csrf_token(security_token).await?;
-
     let client = build_client();
 
-    let response = client
-        .patch(&format!(
-            "https://users.roblox.com/v1/users/{}/display-names",
-            user_id
-        ))
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .json(&serde_json::json!({ "newDisplayName": display_name }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = send_authenticated(security_token, |csrf| {
+        client
+            .patch(&format!(
+                "https://users.roblox.com/v1/users/{}/display-names",
+                user_id
+            ))
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .json(&serde_json::json!({ "newDisplayName": display_name }))
+    })
+    .await?;
 
     if response.status().is_success() {
         Ok(())
@@ -431,5 +489,53 @@ pub async fn set_display_name(
             }
         }
         Err(format!("Failed to set display name: {}", body))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::next_csrf_from_403;
+    use reqwest::header::{HeaderMap, HeaderValue};
+    use reqwest::StatusCode;
+
+    fn headers_with_token(token: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-csrf-token", HeaderValue::from_str(token).unwrap());
+        headers
+    }
+
+    #[test]
+    fn refreshes_on_403_with_new_token() {
+        let headers = headers_with_token("fresh-token");
+        assert_eq!(
+            next_csrf_from_403(StatusCode::FORBIDDEN, &headers, "stale-token"),
+            Some("fresh-token".to_string())
+        );
+    }
+
+    #[test]
+    fn ignores_non_403_status() {
+        let headers = headers_with_token("fresh-token");
+        assert_eq!(
+            next_csrf_from_403(StatusCode::OK, &headers, "stale-token"),
+            None
+        );
+    }
+
+    #[test]
+    fn ignores_403_without_token_header() {
+        assert_eq!(
+            next_csrf_from_403(StatusCode::FORBIDDEN, &HeaderMap::new(), "stale-token"),
+            None
+        );
+    }
+
+    #[test]
+    fn ignores_403_with_unchanged_token() {
+        let headers = headers_with_token("same-token");
+        assert_eq!(
+            next_csrf_from_403(StatusCode::FORBIDDEN, &headers, "same-token"),
+            None
+        );
     }
 }

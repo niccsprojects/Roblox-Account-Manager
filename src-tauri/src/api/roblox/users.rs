@@ -184,20 +184,19 @@ fn map_friend_request_failure(status: u16, body: &str, challenged: bool) -> Stri
 }
 
 pub async fn send_friend_request(security_token: &str, target_user_id: i64) -> Result<(), String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = reqwest::Client::new();
 
-    let response = client
-        .post(format!("https://friends.roblox.com/v1/users/{}/request-friendship", target_user_id))
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/json")
-        .header("Origin", "https://www.roblox.com")
-        .header("Referer", format!("https://www.roblox.com/users/{}/profile", target_user_id))
-        .json(&serde_json::json!({ "friendshipOriginSourceType": "UserProfile" }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .post(format!("https://friends.roblox.com/v1/users/{}/request-friendship", target_user_id))
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/json")
+            .header("Origin", "https://www.roblox.com")
+            .header("Referer", format!("https://www.roblox.com/users/{}/profile", target_user_id))
+            .json(&serde_json::json!({ "friendshipOriginSourceType": "UserProfile" }))
+    })
+    .await?;
 
     let status = response.status().as_u16();
     let challenged = response.headers().contains_key("rblx-challenge-id");
@@ -239,16 +238,15 @@ pub async fn send_friend_request(security_token: &str, target_user_id: i64) -> R
 }
 
 pub async fn block_user(security_token: &str, target_user_id: i64) -> Result<(), String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = reqwest::Client::new();
 
-    let response = client
-        .post(format!("https://apis.roblox.com/user-blocking-api/v1/users/{}/block-user", target_user_id))
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .post(format!("https://apis.roblox.com/user-blocking-api/v1/users/{}/block-user", target_user_id))
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+    })
+    .await?;
 
     if response.status().is_success() {
         Ok(())
@@ -258,16 +256,15 @@ pub async fn block_user(security_token: &str, target_user_id: i64) -> Result<(),
 }
 
 pub async fn unblock_user(security_token: &str, target_user_id: i64) -> Result<(), String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = reqwest::Client::new();
 
-    let response = client
-        .post(format!("https://apis.roblox.com/user-blocking-api/v1/users/{}/unblock-user", target_user_id))
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .post(format!("https://apis.roblox.com/user-blocking-api/v1/users/{}/unblock-user", target_user_id))
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+    })
+    .await?;
 
     if response.status().is_success() {
         Ok(())
@@ -376,19 +373,18 @@ pub async fn unblock_all_users(security_token: &str) -> Result<i32, String> {
 }
 
 pub async fn set_follow_privacy(security_token: &str, privacy: &str) -> Result<(), String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = reqwest::Client::new();
 
-    let response = client
-        .post("https://www.roblox.com/account/settings/follow-me-privacy")
-        .header(COOKIE, cookie_header(security_token))
-        .header("Referer", "https://www.roblox.com/my/account")
-        .header("X-CSRF-TOKEN", &csrf)
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(format!("FollowMePrivacy={}", privacy))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .post("https://www.roblox.com/account/settings/follow-me-privacy")
+            .header(COOKIE, cookie_header(security_token))
+            .header("Referer", "https://www.roblox.com/my/account")
+            .header("X-CSRF-TOKEN", csrf)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(format!("FollowMePrivacy={}", privacy))
+    })
+    .await?;
 
     if response.status().is_success() {
         Ok(())
@@ -424,19 +420,18 @@ pub async fn get_private_server_invite_privacy(security_token: &str) -> Result<S
 }
 
 pub async fn set_private_server_invite_privacy(security_token: &str, privacy: &str) -> Result<(), String> {
-    let csrf = crate::api::auth::get_csrf_token(security_token).await?;
     let client = reqwest::Client::new();
 
-    let response = client
-        .patch("https://accountsettings.roblox.com/v1/privacy")
-        .header(COOKIE, cookie_header(security_token))
-        .header("X-CSRF-TOKEN", &csrf)
-        .json(&serde_json::json!({
-            "privateServerInvitePrivacy": privacy
-        }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let response = crate::api::auth::send_authenticated(security_token, |csrf| {
+        client
+            .patch("https://accountsettings.roblox.com/v1/privacy")
+            .header(COOKIE, cookie_header(security_token))
+            .header("X-CSRF-TOKEN", csrf)
+            .json(&serde_json::json!({
+                "privateServerInvitePrivacy": privacy
+            }))
+    })
+    .await?;
 
     if response.status().is_success() {
         Ok(())
