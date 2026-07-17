@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { enable, disable } from "@tauri-apps/plugin-autostart";
 import type { UseSettingsReturn } from "../../hooks/useSettings";
 import { Toggle } from "../ui/Toggle";
@@ -35,6 +36,30 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
   const updaterFeatureChannel = normalizeUpdaterFeatureChannel(
     s.get("General", "UpdaterFeatureChannel", "standard")
   );
+
+  const [browserReady, setBrowserReady] = useState<boolean | null>(null);
+  const browserDownload = store.browserDownload;
+  const browserBusy = browserDownload?.active === true;
+
+  useEffect(() => {
+    let cancelled = false;
+    void invoke<boolean>("is_browser_ready")
+      .then((ready) => {
+        if (!cancelled) setBrowserReady(ready);
+      })
+      .catch(() => {
+        if (!cancelled) setBrowserReady(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [browserBusy]);
+
+  const handleBrowserDownload = async () => {
+    if (browserBusy) return;
+    const ok = await store.ensureBrowserDownload(browserReady === true);
+    if (ok) setBrowserReady(true);
+  };
 
   const handleManualUpdateCheck = async () => {
     if (checkingUpdate) return;
@@ -237,6 +262,66 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
         label="Reduce automation signals"
         description="Hide browser automation flags Roblox can detect during login. Helps lower captcha prompts but is not a complete solution"
       />
+
+      <div className="px-1 py-3">
+        <div className="rounded-lg border border-zinc-800/70 bg-zinc-900/35 px-3 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[13px] text-zinc-200">{t("Bundled Browser")}</div>
+              <div className="mt-0.5 text-[11px] text-zinc-500">
+                {browserReady === true
+                  ? t("Chrome for Testing is installed and used for browser logins")
+                  : browserReady === false
+                    ? t("Not installed yet. Downloads automatically on first browser login, or download it now")
+                    : t("Used for browser logins and the account browser")}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void handleBrowserDownload();
+              }}
+              disabled={browserBusy}
+              className="shrink-0 rounded-lg border border-zinc-700/70 bg-zinc-800 px-3 py-1.5 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {browserBusy
+                ? t("Downloading...")
+                : browserDownload?.stage === "error"
+                  ? t("Retry Download")
+                  : browserReady === true
+                    ? t("Reinstall")
+                    : t("Download")}
+            </button>
+          </div>
+          {browserBusy && (
+            <div className="mt-2">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                <div
+                  className="h-full rounded-full bg-emerald-500/70 transition-all duration-300"
+                  style={{
+                    width:
+                      browserDownload?.stage === "downloading" && browserDownload.percent !== null
+                        ? `${browserDownload.percent}%`
+                        : "100%",
+                  }}
+                />
+              </div>
+              <div className="mt-1 text-[11px] text-zinc-500">
+                {browserDownload?.stage === "downloading" && browserDownload.percent !== null
+                  ? t("Downloading browser ({{percent}}%)", { percent: browserDownload.percent })
+                  : browserDownload?.stage === "extracting"
+                    ? t("Preparing browser...")
+                    : t("Contacting download service...")}
+              </div>
+            </div>
+          )}
+          {!browserBusy && browserDownload?.stage === "error" && browserDownload.error && (
+            <div className="mt-2 text-[11px] leading-snug text-red-400">
+              {browserDownload.error}
+            </div>
+          )}
+        </div>
+      </div>
 
       <Divider />
       <SectionLabel>Hidden Names</SectionLabel>

@@ -65,6 +65,13 @@ interface ActionStatusState {
   at: number;
 }
 
+export interface BrowserDownloadState {
+  active: boolean;
+  stage: "resolving" | "downloading" | "extracting" | "ready" | "error";
+  percent: number | null;
+  error: string | null;
+}
+
 export interface BottingAccountStatus {
   userId: number;
   isPlayer: boolean;
@@ -332,6 +339,8 @@ export interface StoreValue {
 
   openLoginBrowser: () => Promise<void>;
   openAccountBrowser: (userId: number) => Promise<void>;
+  browserDownload: BrowserDownloadState | null;
+  ensureBrowserDownload: (force?: boolean) => Promise<boolean>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -437,6 +446,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [joiningAccounts, setJoiningAccounts] = useState<Set<number>>(new Set());
   const [launchProgress, setLaunchProgress] = useState<LaunchProgressState | null>(null);
   const [actionStatus, setActionStatus] = useState<ActionStatusState | null>(null);
+  const [browserDownload, setBrowserDownload] = useState<BrowserDownloadState | null>(null);
 
   const avatarLoadingRef = useRef<Set<number>>(new Set());
   const launchClearTimeoutRef = useRef<number | null>(null);
@@ -1083,6 +1093,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await invoke("open_login_browser");
     } catch (e) {
       setError(String(e));
+    }
+  }
+
+  async function ensureBrowserDownload(force?: boolean): Promise<boolean> {
+    setBrowserDownload({ active: true, stage: "resolving", percent: null, error: null });
+    try {
+      await invoke("ensure_browser", { force: force === true });
+      setBrowserDownload({ active: false, stage: "ready", percent: 100, error: null });
+      return true;
+    } catch (e) {
+      setBrowserDownload({ active: false, stage: "error", percent: null, error: String(e) });
+      return false;
     }
   }
 
@@ -1870,22 +1892,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let lastPercent = -1;
     const unlisten = listen<{ stage: string; downloaded: number; total: number }>(
       "chromium-download-progress",
       (e) => {
         const { stage, downloaded, total } = e.payload;
-        if (stage === "downloading") {
+        if (stage === "resolving") {
+          lastPercent = -1;
+          setBrowserDownload({ active: true, stage: "resolving", percent: null, error: null });
+        } else if (stage === "downloading") {
           const pct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
+          if (pct === lastPercent) return;
+          lastPercent = pct;
+          setBrowserDownload({ active: true, stage: "downloading", percent: pct, error: null });
           setActionStatusMessage(tr("Downloading browser ({{percent}}%)", { percent: pct }), "info", 4000);
         } else if (stage === "extracting") {
+          setBrowserDownload({ active: true, stage: "extracting", percent: null, error: null });
           setActionStatusMessage(tr("Preparing browser..."), "info", 4000);
         } else if (stage === "ready") {
+          setBrowserDownload({ active: false, stage: "ready", percent: 100, error: null });
           setActionStatusMessage(tr("Browser ready"), "success", 3000);
+        } else if (stage === "error") {
+          setBrowserDownload((prev) => ({
+            active: false,
+            stage: "error",
+            percent: null,
+            error: prev?.error ?? null,
+          }));
         }
+      }
+    );
+    const unlistenFallback = listen<{ browser: string; error: string }>(
+      "chromium-fallback",
+      (e) => {
+        setActionStatusMessage(
+          tr("Browser download failed, using {{browser}} instead. Some login features may behave differently. You can install the bundled browser from Settings > General.", {
+            browser: e.payload.browser,
+          }),
+          "warn",
+          10000
+        );
       }
     );
     return () => {
       unlisten.then((fn) => fn());
+      unlistenFallback.then((fn) => fn());
     };
   }, [setActionStatusMessage]);
 
@@ -2444,6 +2495,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     openUpdatePreviewDialog,
     openLoginBrowser,
     openAccountBrowser,
+    browserDownload,
+    ensureBrowserDownload,
   };
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

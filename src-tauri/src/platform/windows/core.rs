@@ -184,7 +184,10 @@ fn scan_versions_dir(dir: &std::path::Path) -> Option<(SystemTime, String)> {
 fn candidate_versions_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
-        dirs.push(PathBuf::from(local).join("Roblox").join("Versions"));
+        let local = PathBuf::from(local);
+        for root in ["Roblox", "Bloxstrap", "Fishstrap", "Voidstrap"] {
+            dirs.push(local.join(root).join("Versions"));
+        }
     }
     if let Ok(pf86) = std::env::var("ProgramFiles(x86)") {
         dirs.push(PathBuf::from(pf86).join("Roblox").join("Versions"));

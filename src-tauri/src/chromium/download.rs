@@ -78,6 +78,135 @@ pub fn is_installed(app: &AppHandle) -> bool {
     cached_binary(app).is_some()
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FallbackNotice {
+    browser: String,
+    error: String,
+}
+
+#[cfg(target_os = "windows")]
+fn system_chromium_candidates() -> Vec<(PathBuf, &'static str)> {
+    let roots: Vec<PathBuf> = ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"]
+        .iter()
+        .filter_map(|var| std::env::var(var).ok())
+        .map(PathBuf::from)
+        .collect();
+
+    let relative: [(&[&str], &str); 4] = [
+        (&["Google", "Chrome", "Application", "chrome.exe"], "Google Chrome"),
+        (&["Chromium", "Application", "chrome.exe"], "Chromium"),
+        (
+            &["BraveSoftware", "Brave-Browser", "Application", "brave.exe"],
+            "Brave",
+        ),
+        (&["Microsoft", "Edge", "Application", "msedge.exe"], "Microsoft Edge"),
+    ];
+
+    let mut out = Vec::new();
+    for (parts, name) in relative {
+        for root in &roots {
+            let mut path = root.clone();
+            for part in parts {
+                path = path.join(part);
+            }
+            out.push((path, name));
+        }
+    }
+    out
+}
+
+#[cfg(target_os = "macos")]
+fn system_chromium_candidates() -> Vec<(PathBuf, &'static str)> {
+    [
+        (
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "Google Chrome",
+        ),
+        ("/Applications/Chromium.app/Contents/MacOS/Chromium", "Chromium"),
+        (
+            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+            "Brave",
+        ),
+        (
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "Microsoft Edge",
+        ),
+    ]
+    .iter()
+    .map(|(path, name)| (PathBuf::from(path), *name))
+    .collect()
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn system_chromium_candidates() -> Vec<(PathBuf, &'static str)> {
+    [
+        ("/usr/bin/google-chrome", "Google Chrome"),
+        ("/usr/bin/google-chrome-stable", "Google Chrome"),
+        ("/usr/bin/chromium", "Chromium"),
+        ("/usr/bin/chromium-browser", "Chromium"),
+        ("/usr/bin/brave-browser", "Brave"),
+        ("/usr/bin/microsoft-edge", "Microsoft Edge"),
+    ]
+    .iter()
+    .map(|(path, name)| (PathBuf::from(path), *name))
+    .collect()
+}
+
+pub fn find_system_chromium() -> Option<(PathBuf, String)> {
+    system_chromium_candidates()
+        .into_iter()
+        .find(|(path, _)| path.exists())
+        .map(|(path, name)| (path, name.to_string()))
+}
+
+pub async fn ensure_chromium_or_fallback(app: &AppHandle) -> Result<(PathBuf, bool), String> {
+    match ensure_chromium(app).await {
+        Ok(binary) => Ok((binary, false)),
+        Err(err) => {
+            let _ = app.emit(
+                "chromium-download-progress",
+                DownloadProgress {
+                    stage: "error".into(),
+                    downloaded: 0,
+                    total: 0,
+                },
+            );
+            if let Some((binary, browser)) = find_system_chromium() {
+                let _ = app.emit(
+                    "chromium-fallback",
+                    FallbackNotice {
+                        browser,
+                        error: err,
+                    },
+                );
+                Ok((binary, true))
+            } else {
+                Err(with_download_hint(err))
+            }
+        }
+    }
+}
+
+pub fn with_download_hint(err: String) -> String {
+    format!(
+        "{}. Check your internet connection or antivirus, then retry from Settings > General > Login browser.",
+        err
+    )
+}
+
+pub async fn reinstall_chromium(app: &AppHandle) -> Result<PathBuf, String> {
+    {
+        let _guard = ENSURE_LOCK.lock().await;
+        let dir = chromium_dir(app)?;
+        if dir.exists() {
+            std::fs::remove_dir_all(&dir)
+                .map_err(|e| format!("Could not remove the existing browser: {}", e))?;
+        }
+    }
+    ensure_chromium(app).await
+}
+
 pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
     if let Some(binary) = cached_binary(app) {
         return Ok(binary);
