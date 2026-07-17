@@ -31,6 +31,8 @@ export function StatusBar() {
     bottingCountdown === null
       ? "-"
       : `${Math.floor(bottingCountdown / 60)}:${String(bottingCountdown % 60).padStart(2, "0")}`;
+  const browserDownload = store.browserDownload;
+  const browserDownloading = browserDownload?.active === true;
   const afkActive = store.afkStatus?.active === true;
   const afkNextMs = afkActive ? store.afkStatus?.nextCycleAtMs ?? null : null;
   const afkCountdown = afkNextMs ? Math.max(0, Math.ceil((afkNextMs - tickNow) / 1000)) : null;
@@ -105,6 +107,27 @@ export function StatusBar() {
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
               <span className="text-cyan-300/90">{t("afk")}</span>
               <span className="text-cyan-200/90">{t("next")} {afkLabel}</span>
+            </span>
+          )}
+          {browserDownloading && (
+            <span className="theme-muted inline-flex items-center gap-2 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-emerald-300/90">
+                {browserDownload?.stage === "downloading" && browserDownload.percent !== null
+                  ? t("Downloading browser ({{percent}}%)", { percent: browserDownload.percent })
+                  : t("Preparing browser...")}
+              </span>
+              <span className="h-1 w-24 overflow-hidden rounded-full bg-zinc-800">
+                <span
+                  className="block h-full rounded-full bg-emerald-500/70 transition-all duration-300"
+                  style={{
+                    width:
+                      browserDownload?.stage === "downloading" && browserDownload.percent !== null
+                        ? `${browserDownload.percent}%`
+                        : "100%",
+                  }}
+                />
+              </span>
             </span>
           )}
         </div>
