@@ -8,7 +8,7 @@ use crate::data::accounts::{Account, AccountStore};
 use crate::data::settings::SettingsStore;
 
 use super::cdp::{spawn_chrome, CdpClient};
-use super::download::{ensure_chromium, is_installed};
+use super::download::{ensure_chromium, ensure_chromium_or_fallback, is_installed, with_download_hint};
 use super::manager::{ChromiumManager, LOGIN_KEY};
 
 const ROBLOX_LOGIN_URL: &str = "https://www.roblox.com/login";
@@ -34,7 +34,16 @@ pub fn is_browser_ready(app: AppHandle) -> bool {
 
 #[tauri::command]
 pub async fn ensure_browser(app: AppHandle) -> Result<(), String> {
-    ensure_chromium(&app).await.map(|_| ())
+    match ensure_chromium(&app).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            let _ = app.emit(
+                "chromium-download-progress",
+                serde_json::json!({ "stage": "error", "downloaded": 0, "total": 0 }),
+            );
+            Err(with_download_hint(e))
+        }
+    }
 }
 
 #[tauri::command]
@@ -58,7 +67,7 @@ pub async fn open_account_browser(
     }
 
     let stealth = settings.get_bool("Login", "StealthMode");
-    let binary = ensure_chromium(&app).await?;
+    let (binary, _) = ensure_chromium_or_fallback(&app).await?;
     let profile = ChromiumManager::account_profile(&app, user_id)?;
 
     let (child, port) = spawn_chrome(&binary, &profile, "about:blank", true, stealth).await?;
@@ -126,7 +135,7 @@ pub async fn open_login_browser(
     chromium: State<'_, ChromiumManager>,
     settings: State<'_, SettingsStore>,
 ) -> Result<(), String> {
-    let binary = ensure_chromium(&app).await?;
+    let (binary, _) = ensure_chromium_or_fallback(&app).await?;
     chromium.close_login_session();
 
     let persistent = settings.get_bool("Login", "PersistentProfile");
@@ -214,7 +223,7 @@ pub async fn import_userpass(
         return Err("Enter a username and password".into());
     }
 
-    let binary = ensure_chromium(&app).await?;
+    let (binary, _) = ensure_chromium_or_fallback(&app).await?;
     chromium.close_login_session();
 
     let persistent = settings.get_bool("Login", "PersistentProfile");
