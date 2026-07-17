@@ -140,7 +140,7 @@ jobs:
           releaseName: ${{ steps.meta.outputs.release_title }}
           releaseBody: ${{ steps.meta.outputs.release_body }}
           generateReleaseNotes: true
-          prerelease: ${{ steps.controls.outputs.channel == 'beta' }}
+          prerelease: false
           releaseDraft: false
 
       - name: Stage standard portable binary
