@@ -340,7 +340,7 @@ export interface StoreValue {
   openLoginBrowser: () => Promise<void>;
   openAccountBrowser: (userId: number) => Promise<void>;
   browserDownload: BrowserDownloadState | null;
-  ensureBrowserDownload: () => Promise<boolean>;
+  ensureBrowserDownload: (force?: boolean) => Promise<boolean>;
 }
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -1096,10 +1096,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function ensureBrowserDownload(): Promise<boolean> {
+  async function ensureBrowserDownload(force?: boolean): Promise<boolean> {
     setBrowserDownload({ active: true, stage: "resolving", percent: null, error: null });
     try {
-      await invoke("ensure_browser");
+      await invoke("ensure_browser", { force: force === true });
       setBrowserDownload({ active: false, stage: "ready", percent: 100, error: null });
       return true;
     } catch (e) {
@@ -1892,14 +1892,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let lastPercent = -1;
     const unlisten = listen<{ stage: string; downloaded: number; total: number }>(
       "chromium-download-progress",
       (e) => {
         const { stage, downloaded, total } = e.payload;
         if (stage === "resolving") {
+          lastPercent = -1;
           setBrowserDownload({ active: true, stage: "resolving", percent: null, error: null });
         } else if (stage === "downloading") {
           const pct = total > 0 ? Math.round((downloaded / total) * 100) : 0;
+          if (pct === lastPercent) return;
+          lastPercent = pct;
           setBrowserDownload({ active: true, stage: "downloading", percent: pct, error: null });
           setActionStatusMessage(tr("Downloading browser ({{percent}}%)", { percent: pct }), "info", 4000);
         } else if (stage === "extracting") {

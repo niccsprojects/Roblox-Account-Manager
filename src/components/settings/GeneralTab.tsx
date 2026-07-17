@@ -57,7 +57,7 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
 
   const handleBrowserDownload = async () => {
     if (browserBusy) return;
-    const ok = await store.ensureBrowserDownload();
+    const ok = await store.ensureBrowserDownload(browserReady === true);
     if (ok) setBrowserReady(true);
   };
 

@@ -195,6 +195,18 @@ pub fn with_download_hint(err: String) -> String {
     )
 }
 
+pub async fn reinstall_chromium(app: &AppHandle) -> Result<PathBuf, String> {
+    {
+        let _guard = ENSURE_LOCK.lock().await;
+        let dir = chromium_dir(app)?;
+        if dir.exists() {
+            std::fs::remove_dir_all(&dir)
+                .map_err(|e| format!("Could not remove the existing browser: {}", e))?;
+        }
+    }
+    ensure_chromium(app).await
+}
+
 pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
     if let Some(binary) = cached_binary(app) {
         return Ok(binary);

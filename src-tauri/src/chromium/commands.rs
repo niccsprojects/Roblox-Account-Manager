@@ -8,7 +8,10 @@ use crate::data::accounts::{Account, AccountStore};
 use crate::data::settings::SettingsStore;
 
 use super::cdp::{spawn_chrome, CdpClient};
-use super::download::{ensure_chromium, ensure_chromium_or_fallback, is_installed, with_download_hint};
+use super::download::{
+    ensure_chromium, ensure_chromium_or_fallback, is_installed, reinstall_chromium,
+    with_download_hint,
+};
 use super::manager::{ChromiumManager, LOGIN_KEY};
 
 const ROBLOX_LOGIN_URL: &str = "https://www.roblox.com/login";
@@ -33,8 +36,13 @@ pub fn is_browser_ready(app: AppHandle) -> bool {
 }
 
 #[tauri::command]
-pub async fn ensure_browser(app: AppHandle) -> Result<(), String> {
-    match ensure_chromium(&app).await {
+pub async fn ensure_browser(app: AppHandle, force: Option<bool>) -> Result<(), String> {
+    let result = if force.unwrap_or(false) {
+        reinstall_chromium(&app).await
+    } else {
+        ensure_chromium(&app).await
+    };
+    match result {
         Ok(_) => Ok(()),
         Err(e) => {
             let _ = app.emit(
