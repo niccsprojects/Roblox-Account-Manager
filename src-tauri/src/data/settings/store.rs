@@ -333,6 +333,7 @@ impl SettingsStore {
             ("BackupMachineGuid", ""),
             ("BackupNetworkAddress", ""),
             ("BackupAdapterId", ""),
+            ("MachineGuidHistory", ""),
         ];
 
         let isolation = ini.section("Isolation");

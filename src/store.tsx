@@ -268,6 +268,7 @@ export interface StoreValue {
   needsPassword: boolean;
   unlocking: boolean;
   unlock: (password: string) => Promise<void>;
+  retryAutoUnlock: () => Promise<boolean>;
   encryptionSetupOpen: boolean;
   encryptionSetupMode: "firstRun" | "settings";
   accountsEncrypted: boolean | null;
@@ -1743,6 +1744,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function retryAutoUnlock(): Promise<boolean> {
+    setUnlocking(true);
+    setError(null);
+    try {
+      const stillLocked = await invoke<boolean>("needs_password");
+      if (stillLocked) {
+        return false;
+      }
+      setNeedsPassword(false);
+      await loadAccounts();
+      await refreshEncryptionState();
+      return true;
+    } catch (e) {
+      setError(String(e));
+      return false;
+    } finally {
+      setUnlocking(false);
+    }
+  }
+
   useEffect(() => {
     (async () => {
       // Apply defaults immediately so the UI has a consistent baseline while we load persisted theme.
@@ -2440,6 +2461,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     needsPassword,
     unlocking,
     unlock,
+    retryAutoUnlock,
     encryptionSetupOpen,
     encryptionSetupMode,
     accountsEncrypted,

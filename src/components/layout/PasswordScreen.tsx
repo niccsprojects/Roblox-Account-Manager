@@ -684,7 +684,14 @@ export function PasswordScreen() {
   const t = useTr();
   const store = useStore();
   const [password, setPassword] = useState("");
+  const [retryFailed, setRetryFailed] = useState(false);
   const restrictedBackgroundStyle = normalizeRestrictedBackgroundStyle(store.settings?.General?.RestrictedBackgroundStyle);
+
+  const handleRetryAutoUnlock = async () => {
+    setRetryFailed(false);
+    const unlocked = await store.retryAutoUnlock();
+    if (!unlocked) setRetryFailed(true);
+  };
 
   return (
     <div className="theme-app relative flex h-screen flex-col items-center justify-center overflow-hidden px-6 py-8">
@@ -736,6 +743,21 @@ export function PasswordScreen() {
           >
             {store.unlocking ? t("Unlocking...") : t("Continue")}
           </button>
+          <button
+            onClick={handleRetryAutoUnlock}
+            disabled={store.unlocking}
+            className="theme-btn-ghost mt-3 w-full rounded-lg px-4 py-2 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {t("Try automatic unlock again")}
+          </button>
+          {retryFailed && (
+            <div className="mt-3 rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-2.5 text-xs text-amber-400 animate-fade-in">
+              {t("Automatic unlock is still not possible")}
+            </div>
+          )}
+          <p className="mt-4 text-xs theme-muted leading-relaxed">
+            {t("Never set a password? Your device identity may have changed, for example after MachineGuid spoofing. Restore your device identity in the Isolation settings, then retry the automatic unlock")}
+          </p>
         </div>
       </div>
     </div>

@@ -58,8 +58,11 @@ pub fn is_pass_lock_enabled(state: tauri::State<'_, AccountStore>) -> Result<boo
 }
 
 #[tauri::command]
-pub fn needs_password(state: tauri::State<'_, AccountStore>) -> Result<bool, String> {
-    state.needs_password()
+pub fn needs_password(
+    state: tauri::State<'_, AccountStore>,
+    settings: tauri::State<'_, SettingsStore>,
+) -> Result<bool, String> {
+    state.needs_password(&crate::data::vault_recovery_candidates(&settings))
 }
 
 #[tauri::command]

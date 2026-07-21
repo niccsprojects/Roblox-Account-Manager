@@ -83,6 +83,8 @@ pub struct IsolationReport {
     pub captured_machine_guid: Option<String>,
     pub captured_network_address: Option<String>,
     pub captured_adapter_subkey: Option<String>,
+    #[serde(skip_serializing)]
+    pub new_machine_guid: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize)]
@@ -1218,6 +1220,7 @@ pub fn apply_pre_launch(
 
         if will_rotate_guid {
             report.machine_guid_rotated = true;
+            report.new_machine_guid = read_machine_guid().or_else(|| new_guid.clone());
         }
         if will_rotate_mac {
             report.mac_rotated = true;
@@ -1259,4 +1262,8 @@ pub fn restore_network_identifiers(
 
 pub fn write_machine_guid_unelevated(value: &str) -> bool {
     write_machine_guid_directly(value)
+}
+
+pub fn current_machine_guid() -> Option<String> {
+    read_machine_guid()
 }
