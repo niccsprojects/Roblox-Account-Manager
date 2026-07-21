@@ -96,9 +96,11 @@ pub fn run() {
 
     crypto::init();
 
+    let settings_store = SettingsStore::new(get_settings_path());
     let account_store = AccountStore::new(get_account_data_path());
 
-    match account_store.needs_password() {
+    let recovery_candidates = data::vault_recovery_candidates(&settings_store);
+    match account_store.needs_password(&recovery_candidates) {
         Ok(true) => eprintln!("Encrypted account file detected, password required"),
         Ok(false) => {
             if let Err(e) = account_store.load() {
@@ -108,7 +110,6 @@ pub fn run() {
         Err(e) => eprintln!("Warning: Failed to check encryption: {}", e),
     }
 
-    let settings_store = SettingsStore::new(get_settings_path());
     let theme_store = ThemeStore::new(get_theme_path());
     let theme_preset_store = ThemePresetStore::new(get_theme_presets_path());
     let script_store = ScriptStore::new(get_scripts_path());

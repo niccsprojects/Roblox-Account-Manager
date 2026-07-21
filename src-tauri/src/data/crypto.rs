@@ -155,11 +155,11 @@ fn device_user() -> String {
         .unwrap_or_else(|| "user".to_string())
 }
 
-fn device_hash_for_identifier(identifier: &str) -> Vec<u8> {
+pub fn device_hash_for_identifier(identifier: &str) -> Vec<u8> {
     hash_password(&format!("{}|{}|ram-default-v1", identifier, device_user()))
 }
 
-static DEVICE_HASH_CANDIDATES: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| {
+fn machine_device_hashes() -> Vec<Vec<u8>> {
     let mut hashes: Vec<Vec<u8>> = Vec::new();
     for identifier in machine_identifier_candidates() {
         let hash = device_hash_for_identifier(&identifier);
@@ -168,7 +168,9 @@ static DEVICE_HASH_CANDIDATES: LazyLock<Vec<Vec<u8>>> = LazyLock::new(|| {
         }
     }
     hashes
-});
+}
+
+static DEVICE_HASH_CANDIDATES: LazyLock<Vec<Vec<u8>>> = LazyLock::new(machine_device_hashes);
 
 pub fn device_password_hash() -> Vec<u8> {
     DEVICE_HASH_CANDIDATES[0].clone()
@@ -176,6 +178,14 @@ pub fn device_password_hash() -> Vec<u8> {
 
 pub fn device_password_hash_fallbacks() -> Vec<Vec<u8>> {
     DEVICE_HASH_CANDIDATES[1..].to_vec()
+}
+
+pub fn fresh_device_hash_candidates() -> Vec<Vec<u8>> {
+    let mut hashes = machine_device_hashes();
+    if hashes.is_empty() {
+        hashes.push(device_password_hash());
+    }
+    hashes
 }
 
 pub fn derive_key(password_hash: &[u8], salt: &[u8]) -> Result<secretbox::Key, CryptoError> {

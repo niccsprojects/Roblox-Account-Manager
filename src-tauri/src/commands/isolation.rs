@@ -47,6 +47,35 @@ fn persist_isolation_backups(
 }
 
 #[cfg(target_os = "windows")]
+fn append_machine_guid_history(settings: &SettingsStore, guid: &str) {
+    let guid = guid.trim();
+    if guid.is_empty() {
+        return;
+    }
+    let existing = settings.get_string("Isolation", "MachineGuidHistory");
+    let mut entries: Vec<String> = vec![guid.to_string()];
+    for entry in existing.split(',') {
+        let entry = entry.trim();
+        if !entry.is_empty() && !entries.iter().any(|e| e.eq_ignore_ascii_case(entry)) {
+            entries.push(entry.to_string());
+        }
+    }
+    entries.truncate(10);
+    let _ = settings.set("Isolation", "MachineGuidHistory", &entries.join(","));
+}
+
+#[cfg(target_os = "windows")]
+fn rekey_vault_for_identifier(app: &tauri::AppHandle, identifier: &str, context: &str) {
+    let accounts = app.state::<AccountStore>();
+    if let Err(e) = accounts.rekey_after_identifier_change(identifier) {
+        eprintln!(
+            "Warning: Failed to rekey account vault after {}: {}",
+            context, e
+        );
+    }
+}
+
+#[cfg(target_os = "windows")]
 pub(crate) async fn run_pre_launch_isolation(
     app: &tauri::AppHandle,
     settings: &SettingsStore,
@@ -55,6 +84,25 @@ pub(crate) async fn run_pre_launch_isolation(
     if !opts.does_anything() {
         return Ok(None);
     }
+
+    if opts.spoof_machine_guid {
+        let accounts = app.state::<AccountStore>();
+        let recovery = data::vault_recovery_candidates(settings);
+        if accounts.needs_password(&recovery)? {
+            return Err(
+                "Cannot rotate the MachineGuid while the account vault is locked. Unlock or recover your accounts first, or disable MachineGuid spoofing in Isolation settings."
+                    .to_string(),
+            );
+        }
+        if let Some(current) = platform::windows::current_machine_guid() {
+            let existing = settings.get_string("Isolation", "BackupMachineGuid");
+            if existing.trim().is_empty() {
+                let _ = settings.set("Isolation", "BackupMachineGuid", &current);
+            }
+            append_machine_guid_history(settings, &current);
+        }
+    }
+
     let app_owned = app.clone();
     let opts_owned = opts;
     let outcome = tauri::async_runtime::spawn_blocking(move || {
@@ -66,6 +114,15 @@ pub(crate) async fn run_pre_launch_isolation(
     match outcome {
         Ok(report) => {
             persist_isolation_backups(settings, &report);
+            if report.machine_guid_rotated {
+                let new_guid = report
+                    .new_machine_guid
+                    .clone()
+                    .or_else(platform::windows::current_machine_guid);
+                if let Some(guid) = new_guid {
+                    rekey_vault_for_identifier(app, &guid, "MachineGuid rotation");
+                }
+            }
             Ok(Some(report))
         }
         Err(failure) => {
@@ -221,6 +278,7 @@ fn isolation_list_adapters() -> Result<Vec<serde_json::Value>, String> {
 
 #[tauri::command]
 async fn isolation_restore_network_identifiers(
+    app: tauri::AppHandle,
     settings: tauri::State<'_, SettingsStore>,
 ) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -249,15 +307,27 @@ async fn isolation_restore_network_identifiers(
             return Err("No backup values stored; nothing to restore".into());
         }
 
+        if guid_opt.is_some() {
+            if let Some(current) = platform::windows::current_machine_guid() {
+                append_machine_guid_history(&settings, &current);
+            }
+            append_machine_guid_history(&settings, &backup_guid);
+        }
+
+        let task_guid = guid_opt.clone();
         tauri::async_runtime::spawn_blocking(move || {
             platform::windows::restore_network_identifiers(
-                guid_opt.as_deref(),
+                task_guid.as_deref(),
                 adapter_opt.as_deref(),
                 mac_opt.as_deref(),
             )
         })
         .await
         .map_err(|e| format!("Restore task panicked: {}", e))??;
+
+        if let Some(guid) = guid_opt.as_deref() {
+            rekey_vault_for_identifier(&app, guid, "restoring the MachineGuid");
+        }
 
         let _ = settings.set("Isolation", "BackupMachineGuid", "");
         let _ = settings.set("Isolation", "BackupNetworkAddress", "");
@@ -266,6 +336,7 @@ async fn isolation_restore_network_identifiers(
     }
     #[cfg(not(target_os = "windows"))]
     {
+        let _ = app;
         let _ = settings;
         Err("Available on Windows only".into())
     }

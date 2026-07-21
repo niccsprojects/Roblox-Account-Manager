@@ -1,3 +1,4 @@
+#[cfg(target_os = "windows")]
 async fn launch_account_for_cycle(
     app: &tauri::AppHandle,
     user_id: i64,
@@ -21,7 +22,7 @@ async fn launch_account_for_cycle(
 
     let (
         is_teleport,
-        use_old_join,
+        configured_old_join,
         auto_close_last_process,
         multi_rbx,
         auto_close_multi_conflicts,
@@ -38,7 +39,36 @@ async fn launch_account_for_cycle(
         )
     };
 
+    let account_version_override = {
+        let state = app.state::<AccountStore>();
+        state
+            .get_all()?
+            .iter()
+            .find(|a| a.user_id == user_id)
+            .and_then(|a| a.fields.get("RobloxVersion").cloned())
+            .filter(|v| !v.trim().is_empty())
+    };
+    let (resolved_base_path, resolved_version_id) = {
+        let settings = app.state::<SettingsStore>();
+        let versions = app.state::<data::versions::VersionsCatalogStore>();
+        windows::resolve_roblox_install_path(
+            account_version_override.as_deref(),
+            &settings,
+            &versions,
+        )?
+    };
+    let use_old_join = configured_old_join || resolved_version_id.is_some();
+
     let resolved_launch = resolve_launch_job(job_id, false, "");
+
+    let tracker_check = windows::tracker();
+    let _ = tracker_check.cleanup_dead_processes();
+    let running_keys = tracker_check.running_version_keys();
+    if running_keys.iter().any(|k| k != &resolved_version_id) {
+        return Err(
+            "A Roblox client is already running on a different version; cannot launch this account on its configured Roblox version".into(),
+        );
+    }
 
     if multi_rbx {
         ensure_multi_roblox_enabled(auto_close_multi_conflicts).await?;
@@ -48,7 +78,7 @@ async fn launch_account_for_cycle(
 
     {
         let settings = app.state::<SettingsStore>();
-        patch_client_settings_for_launch(&settings, launch_profile);
+        patch_client_settings_for_launch(&settings, launch_profile, Some(&resolved_base_path));
     }
 
     let tracker = windows::tracker();
@@ -101,7 +131,8 @@ async fn launch_account_for_cycle(
     let pids_before = windows::get_roblox_pids();
 
     let launch_result = if use_old_join {
-        windows::launch_old_join(
+        windows::launch_old_join_from(
+            &resolved_base_path,
             &ticket,
             private_join.place_id,
             &resolved_launch.job_id,
@@ -137,7 +168,13 @@ async fn launch_account_for_cycle(
         return Err("Timed out waiting for Roblox process after launch".into());
     };
 
-    tracker.track(user_id, pid, browser_tracker_id);
+    tracker.track_with_version(user_id, pid, browser_tracker_id, resolved_version_id.clone());
+    if let Some(version_id) = resolved_version_id.as_deref() {
+        if let Some((channel, hash)) = version_id.split_once(':') {
+            let versions = app.state::<data::versions::VersionsCatalogStore>();
+            versions.touch_launched(channel, hash);
+        }
+    }
     {
         let settings_state = app.state::<SettingsStore>();
         apply_windows_post_launch_profile(Some(app), settings_state.inner(), launch_profile, pid)

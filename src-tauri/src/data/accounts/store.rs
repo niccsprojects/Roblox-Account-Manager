@@ -1,6 +1,7 @@
 pub struct AccountStore {
     accounts: Mutex<Vec<Account>>,
     password_hash: Mutex<Option<Vec<u8>>>,
+    master_key: Mutex<Option<Vec<u8>>>,
     user_locked: Mutex<bool>,
     loaded: Mutex<bool>,
     file_path: PathBuf,
@@ -22,9 +23,33 @@ impl AccountStore {
         Self {
             accounts: Mutex::new(Vec::new()),
             password_hash: Mutex::new(None),
+            master_key: Mutex::new(None),
             user_locked: Mutex::new(false),
             loaded: Mutex::new(false),
             file_path,
+        }
+    }
+
+    fn key_file_path(&self) -> PathBuf {
+        vault_key::key_file_path_for(&self.file_path)
+    }
+
+    fn set_session_key(&self, hash: Vec<u8>, master: Option<Vec<u8>>) -> Result<(), String> {
+        let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
+        *password_hash = Some(hash);
+        drop(password_hash);
+        let mut master_key = self.master_key.lock().map_err(|e| e.to_string())?;
+        *master_key = master;
+        Ok(())
+    }
+
+    fn backup_vault_file(&self) {
+        if !self.file_path.exists() {
+            return;
+        }
+        let backup = self.file_path.with_extension("json.bak");
+        if let Err(e) = fs::copy(&self.file_path, &backup) {
+            eprintln!("Warning: Failed to back up account file: {}", e);
         }
     }
 
@@ -39,7 +64,7 @@ impl AccountStore {
         Ok(crypto::is_encrypted(&data))
     }
 
-    pub fn needs_password(&self) -> Result<bool, String> {
+    pub fn needs_password(&self, recovery_hashes: &[Vec<u8>]) -> Result<bool, String> {
         {
             let password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
             if password_hash.is_some() {
@@ -58,16 +83,36 @@ impl AccountStore {
             return Ok(false);
         }
 
-        let device_hash = crypto::device_password_hash();
-        let decrypted = match crypto::decrypt(&data, &device_hash) {
-            Ok(decrypted) => Some((decrypted, false)),
-            Err(_) => crypto::device_password_hash_fallbacks()
-                .iter()
-                .find_map(|fallback| crypto::decrypt(&data, fallback).ok())
-                .map(|decrypted| (decrypted, true)),
-        };
+        let key_path = self.key_file_path();
+        let master = vault_key::load_master_key(&key_path, recovery_hashes);
+        let master_hash = master.as_ref().map(|m| vault_key::master_password_hash(m));
+        let device_candidates = crypto::fresh_device_hash_candidates();
 
-        let Some((decrypted, used_fallback)) = decrypted else {
+        let mut decrypted: Option<Vec<u8>> = None;
+        let mut used_master = false;
+        let mut used_primary_device = false;
+
+        if let Some(hash) = master_hash.as_ref() {
+            if let Ok(content) = crypto::decrypt(&data, hash) {
+                decrypted = Some(content);
+                used_master = true;
+            }
+        }
+        if decrypted.is_none() {
+            for (index, hash) in device_candidates
+                .iter()
+                .chain(recovery_hashes.iter())
+                .enumerate()
+            {
+                if let Ok(content) = crypto::decrypt(&data, hash) {
+                    decrypted = Some(content);
+                    used_primary_device = index == 0;
+                    break;
+                }
+            }
+        }
+
+        let Some(decrypted) = decrypted else {
             return Ok(true);
         };
 
@@ -75,9 +120,6 @@ impl AccountStore {
         let mut store = self.accounts.lock().map_err(|e| e.to_string())?;
         *store = accounts;
         drop(store);
-        let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
-        *password_hash = Some(device_hash);
-        drop(password_hash);
         let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
         *user_locked = false;
         drop(user_locked);
@@ -85,16 +127,82 @@ impl AccountStore {
         *loaded = true;
         drop(loaded);
 
-        if used_fallback {
+        if used_master {
+            self.set_session_key(
+                master_hash.expect("master hash present when used_master"),
+                master,
+            )?;
+            return Ok(false);
+        }
+
+        let primary_device_hash = device_candidates
+            .first()
+            .cloned()
+            .unwrap_or_else(crypto::device_password_hash);
+
+        #[cfg(target_os = "windows")]
+        let should_save = {
+            let master_bytes = master.unwrap_or_else(vault_key::generate_master_key);
+            match vault_key::store_master_key(&key_path, &master_bytes, &primary_device_hash) {
+                Ok(()) => {
+                    let new_hash = vault_key::master_password_hash(&master_bytes);
+                    self.set_session_key(new_hash, Some(master_bytes))?;
+                    true
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to write vault key file: {}", e);
+                    self.set_session_key(primary_device_hash, None)?;
+                    !used_primary_device
+                }
+            }
+        };
+        #[cfg(not(target_os = "windows"))]
+        let should_save = {
+            self.set_session_key(primary_device_hash, None)?;
+            !used_primary_device
+        };
+
+        if should_save {
+            self.backup_vault_file();
             if let Err(e) = self.save() {
                 eprintln!(
-                    "Warning: Failed to re-encrypt account file with primary device key: {}",
+                    "Warning: Failed to re-encrypt account file with current key: {}",
                     e
                 );
             }
         }
 
         Ok(false)
+    }
+
+    pub fn rekey_after_identifier_change(&self, new_identifier: &str) -> Result<(), String> {
+        {
+            let user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+            if *user_locked {
+                return Ok(());
+            }
+        }
+
+        let new_device_hash = crypto::device_hash_for_identifier(new_identifier);
+        let key_path = self.key_file_path();
+
+        let master = self.master_key.lock().map_err(|e| e.to_string())?.clone();
+        if let Some(master) = master {
+            return vault_key::store_master_key(&key_path, &master, &new_device_hash);
+        }
+
+        let loaded = *self.loaded.lock().map_err(|e| e.to_string())?;
+        if !loaded {
+            let existing_len = fs::metadata(&self.file_path).map(|m| m.len()).unwrap_or(0);
+            if existing_len > 0 {
+                return Err("Account vault is locked; cannot rekey it".to_string());
+            }
+            return self.set_session_key(new_device_hash, None);
+        }
+
+        self.backup_vault_file();
+        self.set_session_key(new_device_hash, None)?;
+        self.save()
     }
 
     pub fn load(&self) -> Result<(), String> {
@@ -106,6 +214,8 @@ impl AccountStore {
         }
 
         if !self.file_path.exists() {
+            let mut loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+            *loaded = true;
             return Ok(());
         }
 
@@ -113,6 +223,8 @@ impl AccountStore {
             fs::read(&self.file_path).map_err(|e| format!("Failed to read account file: {}", e))?;
 
         if data.is_empty() {
+            let mut loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+            *loaded = true;
             return Ok(());
         }
 
@@ -190,6 +302,19 @@ impl AccountStore {
     }
 
     pub fn save(&self) -> Result<(), String> {
+        {
+            let loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+            if !*loaded {
+                let existing_len = fs::metadata(&self.file_path).map(|m| m.len()).unwrap_or(0);
+                if existing_len > 0 {
+                    return Err(
+                        "Refusing to overwrite existing account data before it was unlocked"
+                            .to_string(),
+                    );
+                }
+            }
+        }
+
         let accounts = self.accounts.lock().map_err(|e| e.to_string())?;
 
         let json = serde_json::to_string_pretty(&*accounts)
@@ -207,6 +332,9 @@ impl AccountStore {
         fs::write(&self.file_path, data)
             .map_err(|e| format!("Failed to write account file: {}", e))?;
 
+        let mut loaded = self.loaded.lock().map_err(|e| e.to_string())?;
+        *loaded = true;
+
         Ok(())
     }
 
@@ -220,12 +348,50 @@ impl AccountStore {
                 return Err("Password must be at least 8 characters".to_string());
             }
         }
-        let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
-        *password_hash = password.map(|p| crypto::hash_password(p.trim()));
-        drop(password_hash);
+        let key_path = self.key_file_path();
+
+        if let Some(value) = password {
+            self.set_session_key(crypto::hash_password(value.trim()), None)?;
+            let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
+            *user_locked = true;
+            drop(user_locked);
+            self.save()?;
+            vault_key::remove_key_file(&key_path);
+            return Ok(());
+        }
+
         let mut user_locked = self.user_locked.lock().map_err(|e| e.to_string())?;
-        *user_locked = password.is_some();
+        *user_locked = false;
         drop(user_locked);
+
+        #[cfg(target_os = "windows")]
+        {
+            let master_bytes = vault_key::generate_master_key();
+            let primary_device_hash = crypto::fresh_device_hash_candidates()
+                .first()
+                .cloned()
+                .unwrap_or_else(crypto::device_password_hash);
+            match vault_key::store_master_key(&key_path, &master_bytes, &primary_device_hash) {
+                Ok(()) => {
+                    let hash = vault_key::master_password_hash(&master_bytes);
+                    self.set_session_key(hash, Some(master_bytes))?;
+                }
+                Err(e) => {
+                    eprintln!("Warning: Failed to write vault key file: {}", e);
+                    self.set_session_key(primary_device_hash, None)?;
+                }
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let mut password_hash = self.password_hash.lock().map_err(|e| e.to_string())?;
+            *password_hash = None;
+            drop(password_hash);
+            let mut master_key = self.master_key.lock().map_err(|e| e.to_string())?;
+            *master_key = None;
+            drop(master_key);
+        }
+
         self.save()
     }
 
@@ -518,6 +684,129 @@ mod tests {
         assert_eq!(imported[0].username, "CurrentUser");
 
         let _ = fs::remove_file(&store.file_path);
+    }
+
+    fn cleanup_store_files(store: &AccountStore) {
+        let _ = fs::remove_file(&store.file_path);
+        let _ = fs::remove_file(store.file_path.with_extension("json.bak"));
+        let _ = fs::remove_file(store.key_file_path());
+    }
+
+    fn encrypted_test_vault(hash: &[u8]) -> Vec<u8> {
+        let accounts = vec![Account::new(
+            "_|WARNING:-DO-NOT-SHARE".to_string(),
+            "VaultUser".to_string(),
+            13579,
+        )];
+        let json = serde_json::to_string(&accounts).unwrap();
+        crypto::encrypt(&json, hash).unwrap()
+    }
+
+    #[test]
+    fn needs_password_should_recover_with_extra_candidate_and_back_up() {
+        let store = new_test_store("recover-extra-candidate");
+        let old_hash = crypto::device_hash_for_identifier("11111111-1111-4111-8111-111111111111");
+        fs::write(&store.file_path, encrypted_test_vault(&old_hash)).unwrap();
+
+        let result = store.needs_password(&[old_hash]).unwrap();
+
+        assert!(!result);
+        assert_eq!(store.get_all().unwrap().len(), 1);
+        assert!(store.file_path.with_extension("json.bak").exists());
+        #[cfg(target_os = "windows")]
+        assert!(store.key_file_path().exists());
+
+        cleanup_store_files(&store);
+    }
+
+    #[test]
+    fn needs_password_should_stay_locked_and_keep_file_untouched() {
+        let store = new_test_store("stay-locked");
+        let unknown_hash = crypto::hash_password("some-unknown-device");
+        let original = encrypted_test_vault(&unknown_hash);
+        fs::write(&store.file_path, &original).unwrap();
+
+        let result = store.needs_password(&[]).unwrap();
+
+        assert!(result);
+        assert_eq!(fs::read(&store.file_path).unwrap(), original);
+        assert!(!store.file_path.with_extension("json.bak").exists());
+
+        cleanup_store_files(&store);
+    }
+
+    #[test]
+    fn save_should_refuse_overwriting_unloaded_vault() {
+        let store = new_test_store("save-guard");
+        let unknown_hash = crypto::hash_password("another-unknown-device");
+        let original = encrypted_test_vault(&unknown_hash);
+        fs::write(&store.file_path, &original).unwrap();
+
+        let result = store.save();
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&store.file_path).unwrap(), original);
+
+        cleanup_store_files(&store);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn rekey_after_identifier_change_should_keep_vault_unlockable() {
+        let store = new_test_store("rekey-identifier");
+        fs::write(
+            &store.file_path,
+            encrypted_test_vault(&crypto::device_password_hash()),
+        )
+        .unwrap();
+
+        assert!(!store.needs_password(&[]).unwrap());
+        store
+            .rekey_after_identifier_change("22222222-2222-4222-8222-222222222222")
+            .unwrap();
+
+        let reopened = AccountStore::new(store.file_path.clone());
+        assert!(!reopened.needs_password(&[]).unwrap());
+        assert_eq!(reopened.get_all().unwrap().len(), 1);
+
+        cleanup_store_files(&store);
+    }
+
+    #[test]
+    fn rekey_after_identifier_change_should_fail_on_locked_vault() {
+        let store = new_test_store("rekey-locked");
+        let unknown_hash = crypto::hash_password("locked-device");
+        let original = encrypted_test_vault(&unknown_hash);
+        fs::write(&store.file_path, &original).unwrap();
+
+        let result = store.rekey_after_identifier_change("33333333-3333-4333-8333-333333333333");
+
+        assert!(result.is_err());
+        assert_eq!(fs::read(&store.file_path).unwrap(), original);
+
+        cleanup_store_files(&store);
+    }
+
+    #[test]
+    fn set_password_should_remove_key_file_and_require_password() {
+        let store = new_test_store("set-password");
+        store
+            .add(Account::new(
+                "_|WARNING:-DO-NOT-SHARE".to_string(),
+                "PassUser".to_string(),
+                24680,
+            ))
+            .unwrap();
+        store.set_password(Some("super-secret-pass")).unwrap();
+
+        assert!(!store.key_file_path().exists());
+
+        let reopened = AccountStore::new(store.file_path.clone());
+        assert!(reopened.needs_password(&[]).unwrap());
+        reopened.load_with_password("super-secret-pass").unwrap();
+        assert_eq!(reopened.get_all().unwrap().len(), 1);
+
+        cleanup_store_files(&store);
     }
 
     #[test]
