@@ -289,6 +289,8 @@ export function Toolbar() {
         {store.bottingStatus?.active && (
           <Tooltip content={t("Open Botting Mode")} side="bottom">
             <button
+              type="button"
+              aria-label={t("Open Botting Mode")}
               onClick={() => store.setBottingDialogOpen(true)}
               className={`p-1.5 rounded-lg transition-colors ${activeToggleStyle}`}
             >

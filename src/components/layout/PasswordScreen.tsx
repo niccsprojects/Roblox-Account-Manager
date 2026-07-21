@@ -737,6 +737,7 @@ export function PasswordScreen() {
             autoFocus
           />
           <button
+            type="button"
             onClick={() => store.unlock(password)}
             disabled={store.unlocking || !password}
             className="restricted-auth-btn theme-btn w-full rounded-lg px-4 py-2.5 text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
@@ -744,6 +745,7 @@ export function PasswordScreen() {
             {store.unlocking ? t("Unlocking...") : t("Continue")}
           </button>
           <button
+            type="button"
             onClick={handleRetryAutoUnlock}
             disabled={store.unlocking}
             className="theme-btn-ghost mt-3 w-full rounded-lg px-4 py-2 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
