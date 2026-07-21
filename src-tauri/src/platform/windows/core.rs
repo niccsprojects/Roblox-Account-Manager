@@ -274,8 +274,11 @@ pub fn get_roblox_path() -> Result<String, String> {
 }
 
 fn get_client_settings_file() -> Result<PathBuf, String> {
-    let version_folder = get_roblox_path()?;
-    let settings_dir = std::path::Path::new(&version_folder).join("ClientSettings");
+    get_client_settings_file_in(&get_roblox_path()?)
+}
+
+fn get_client_settings_file_in(base_path: &str) -> Result<PathBuf, String> {
+    let settings_dir = std::path::Path::new(base_path).join("ClientSettings");
 
     if !settings_dir.exists() {
         std::fs::create_dir_all(&settings_dir)

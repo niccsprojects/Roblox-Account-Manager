@@ -214,6 +214,7 @@ fn windows_client_overrides(
 pub(crate) fn patch_client_settings_for_launch(
     settings: &SettingsStore,
     profile: LaunchClientProfile,
+    base_path: Option<&str>,
 ) {
     use platform::windows;
 
@@ -225,7 +226,7 @@ pub(crate) fn patch_client_settings_for_launch(
     // Legacy behavior: custom settings file overrides FPS unlock when valid.
     if !custom_settings.is_empty()
         && std::path::Path::new(custom_settings).exists()
-        && windows::copy_custom_client_settings(custom_settings).is_ok()
+        && windows::copy_custom_client_settings(base_path, custom_settings).is_ok()
     {
         custom_applied = true;
     }
@@ -235,6 +236,7 @@ pub(crate) fn patch_client_settings_for_launch(
         overrides.fast_flags = None;
     }
     let _ = windows::apply_runtime_client_settings(
+        base_path,
         overrides.max_fps,
         overrides.master_volume,
         overrides.graphics_level,
@@ -268,9 +270,14 @@ fn fps_unlock_target(settings: &SettingsStore, profile: LaunchClientProfile) -> 
 }
 
 #[cfg(target_os = "macos")]
-fn patch_client_settings_for_launch(settings: &SettingsStore, profile: LaunchClientProfile) {
+pub(crate) fn patch_client_settings_for_launch(
+    settings: &SettingsStore,
+    profile: LaunchClientProfile,
+    base_path: Option<&str>,
+) {
     use platform::macos;
 
+    let _ = base_path;
     let custom_settings = custom_client_settings_path(settings, profile);
     let custom_settings = custom_settings.trim();
 

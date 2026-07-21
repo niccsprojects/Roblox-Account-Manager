@@ -109,7 +109,7 @@ async fn launch_roblox(
         let _ = windows::disable_multi_roblox();
     }
 
-    patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal);
+    patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal, Some(&resolved_base_path));
 
     let tracker = windows::tracker();
     if auto_close_last_process && tracker.get_pid(user_id).is_some() {
@@ -319,7 +319,7 @@ async fn launch_roblox(
             let _ = macos::disable_multi_roblox();
         }
 
-        patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal);
+        patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal, None);
 
         let tracker = macos::tracker();
         if auto_close_last_process && tracker.get_pid(user_id).is_some() {
@@ -609,7 +609,7 @@ async fn launch_multiple(
             let _ = windows::disable_multi_roblox();
         }
 
-        patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal);
+        patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal, Some(&acct_base_path));
 
         if auto_close_last_process && tracker.get_pid(uid).is_some() {
             let closed = tracker.kill_for_user_graceful_async(uid, 4500).await;
@@ -845,7 +845,7 @@ async fn launch_multiple(
                 let _ = macos::disable_multi_roblox();
             }
 
-            patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal);
+            patch_client_settings_for_launch(&settings, LaunchClientProfile::Normal, None);
 
             if auto_close_last_process && tracker.get_pid(uid).is_some() {
                 tracker.kill_for_user(uid);
