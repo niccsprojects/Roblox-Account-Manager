@@ -16,6 +16,7 @@ import {
   normalizeUpdaterReleaseChannel,
   normalizeUpdaterFeatureChannel,
 } from "../../updaterChannels";
+import { ENABLE_FIRST_RUN_WALKTHROUGH } from "../../featureFlags";
 
 export function GeneralTab({ s }: { s: UseSettingsReturn }) {
   const t = useTr();
@@ -166,23 +167,25 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
         </div>
       </div>
 
-      <div className="px-1 py-3">
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800/70 bg-zinc-900/35 px-3 py-2">
-          <div className="min-w-0">
-            <div className="text-[13px] text-zinc-200">{t("First-Time Walkthrough")}</div>
-            <div className="mt-0.5 text-[11px] text-zinc-500">
-              {t("Replay the guided setup tour with launch and safety essentials")}
+      {ENABLE_FIRST_RUN_WALKTHROUGH && (
+        <div className="px-1 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800/70 bg-zinc-900/35 px-3 py-2">
+            <div className="min-w-0">
+              <div className="text-[13px] text-zinc-200">{t("First-Time Walkthrough")}</div>
+              <div className="mt-0.5 text-[11px] text-zinc-500">
+                {t("Replay the guided setup tour with launch and safety essentials")}
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={store.openFirstRunWalkthroughFromSettings}
+              className="shrink-0 rounded-lg border border-zinc-700/70 bg-zinc-800 px-3 py-1.5 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
+            >
+              {t("Open Walkthrough")}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={store.openFirstRunWalkthroughFromSettings}
-            className="shrink-0 rounded-lg border border-zinc-700/70 bg-zinc-800 px-3 py-1.5 text-[12px] font-medium text-zinc-200 transition-colors hover:bg-zinc-700"
-          >
-            {t("Open Walkthrough")}
-          </button>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center gap-3 py-2 px-1">
         <div className="min-w-0">

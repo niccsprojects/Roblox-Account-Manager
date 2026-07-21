@@ -10,6 +10,7 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { ENABLE_FIRST_RUN_WALKTHROUGH } from "./featureFlags";
 import type {
   Account,
   ThemeData,
@@ -1796,6 +1797,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
 
       if (
+        ENABLE_FIRST_RUN_WALKTHROUGH &&
         !needs &&
         loadedSettings?.General?.FirstRunWalkthroughState === "pending" &&
         loadedSettings?.General?.EncryptionOnboardingState !== "pending"
@@ -1813,6 +1815,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [applyThemePreview, refreshEncryptionState]);
 
   useEffect(() => {
+    if (!ENABLE_FIRST_RUN_WALKTHROUGH) return;
     if (!initialized || needsPassword) return;
     if (encryptionSetupOpen || firstRunWalkthroughOpen) return;
     if (settings?.General?.FirstRunWalkthroughState !== "pending") return;

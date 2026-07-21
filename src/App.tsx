@@ -29,7 +29,7 @@ import { VersionsDialog } from "./components/dialogs/VersionsDialog";
 import { IsolationProgressOverlay } from "./components/IsolationProgressOverlay";
 import { ScriptsDialog } from "./components/dialogs/ScriptsDialog";
 import { useTr } from "./i18n/text";
-import { ENABLE_NEXUS } from "./featureFlags";
+import { ENABLE_NEXUS, ENABLE_FIRST_RUN_WALKTHROUGH } from "./featureFlags";
 
 function AppContent() {
   const t = useTr();
@@ -206,7 +206,7 @@ function AppContent() {
 
       <UpdateDialog />
 
-      {store.firstRunWalkthroughOpen && <FirstRunWalkthrough />}
+      {ENABLE_FIRST_RUN_WALKTHROUGH && store.firstRunWalkthroughOpen && <FirstRunWalkthrough />}
 
       {store.modal && (
         <div
