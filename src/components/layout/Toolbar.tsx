@@ -5,7 +5,7 @@ import { usePrompt } from "../../hooks/usePrompt";
 import { Tooltip } from "../ui/Tooltip";
 import { tr, useTr } from "../../i18n/text";
 import { ENABLE_NEXUS } from "../../featureFlags";
-import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare, Sparkles, Package, ArrowUpDown, LayoutGrid, Keyboard } from "lucide-react";
+import { Search, X, SquareX, SquareCheckBig, PanelRight, Plus, ChevronDown, Globe, KeyRound, File, FileText, Palette, Layers, Settings, TerminalSquare, Sparkles, Package, ArrowUpDown, LayoutGrid, Keyboard, Bot } from "lucide-react";
 
 export function Toolbar() {
   const t = useTr();
@@ -285,6 +285,17 @@ export function Toolbar() {
             <Keyboard size={16} strokeWidth={1.5} />
           </button>
         </Tooltip>
+
+        {store.bottingStatus?.active && (
+          <Tooltip content={t("Open Botting Mode")} side="bottom">
+            <button
+              onClick={() => store.setBottingDialogOpen(true)}
+              className={`p-1.5 rounded-lg transition-colors ${activeToggleStyle}`}
+            >
+              <Bot size={16} strokeWidth={1.5} />
+            </button>
+          </Tooltip>
+        )}
 
         <Tooltip content={t("Settings")} side="bottom">
           <button
