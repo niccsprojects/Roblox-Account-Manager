@@ -120,6 +120,10 @@ const SCRIPT_INVOKE_COMMANDS = [
   "add_botting_accounts",
   "set_botting_player_accounts",
   "botting_account_action",
+  "start_afk_mode",
+  "stop_afk_mode",
+  "get_afk_mode_status",
+  "afk_trigger_now",
   "start_generator",
   "stop_generator",
   "get_generator_status",
@@ -2925,9 +2929,6 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
         <div className="px-5 py-3 border-b theme-border flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[15px] font-semibold text-zinc-100">{t("Scripts")}</div>
-            <div className="text-[11px] text-zinc-500 truncate">
-              {t("Trusted JavaScript automation with UI, modal, settings, and HTTP support")}
-            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -3095,9 +3096,6 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                       )}
                       <span className="ml-auto">{renderStatusChip(script)}</span>
                     </div>
-                    <div className="mt-1 text-[10px] text-zinc-500 truncate">
-                      {script.description || t("No description")}
-                    </div>
                     <div className="mt-1.5 flex items-center gap-1.5">
                       <span
                         className={`px-1.5 py-0.5 rounded border text-[10px] ${
@@ -3140,14 +3138,6 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                         updateDraft((prev) => ({ ...prev, name: event.target.value }))
                       }
                       className="w-full bg-transparent text-[15px] font-semibold text-zinc-100 outline-none"
-                    />
-                    <input
-                      value={draft.description}
-                      onChange={(event) =>
-                        updateDraft((prev) => ({ ...prev, description: event.target.value }))
-                      }
-                      placeholder={t("Description")}
-                      className="w-full mt-0.5 bg-transparent text-[12px] text-zinc-500 outline-none placeholder:text-zinc-600"
                     />
                   </div>
 
