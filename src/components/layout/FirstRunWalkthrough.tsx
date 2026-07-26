@@ -16,24 +16,24 @@ interface WalkthroughStep {
   onAction?: () => void;
 }
 
+const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "en", label: "English" },
+  { value: "de", label: "German" },
+];
+
 export function FirstRunWalkthrough() {
   const t = useTr();
   const store = useStore();
   const panelRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
-  const [languageSelected, setLanguageSelected] = useState(false);
   const [languageSaving, setLanguageSaving] = useState(false);
   const [panelPosition, setPanelPosition] = useState({ left: 16, top: 16 });
   const isFirstRunMode = store.firstRunWalkthroughMode === "firstRun";
   const currentLanguage = store.settings?.General?.Language || "en";
   const isLanguageStep = stepIndex === 0;
-
-  useEffect(() => {
-    setLanguageSelected(store.firstRunWalkthroughMode !== "firstRun");
-  }, [store.firstRunWalkthroughOpen, store.firstRunWalkthroughMode]);
+  const languageSelected = LANGUAGE_OPTIONS.some(({ value }) => value === currentLanguage);
 
   const handleLanguageChange = async (value: string) => {
-    setLanguageSelected(false);
     setLanguageSaving(true);
     try {
       await invoke("update_setting", {
@@ -42,9 +42,7 @@ export function FirstRunWalkthrough() {
         value,
       });
       await store.reloadSettings();
-      setLanguageSelected(true);
     } catch {
-      setLanguageSelected(false);
       store.addToast(t("Failed to change language"));
     } finally {
       setLanguageSaving(false);
@@ -418,10 +416,7 @@ export function FirstRunWalkthrough() {
               <div className="text-[11px] uppercase tracking-wide theme-muted mb-1.5">{t("Language")}</div>
               <Select
                 value={currentLanguage}
-                options={[
-                  { value: "en", label: "English" },
-                  { value: "de", label: "German" },
-                ]}
+                options={LANGUAGE_OPTIONS}
                 onChange={(value) => {
                   void handleLanguageChange(value);
                 }}
