@@ -838,7 +838,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                         <NumericInput
                           value={intervalMinutes}
                           min={10}
-                          max={120}
+                          max={480}
                           step={1}
                           integer
                           showStepper
@@ -1580,7 +1580,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                 <NumericInput
                   value={intervalMinutes}
                   min={10}
-                  max={120}
+                  max={480}
                   step={1}
                   integer
                   showStepper

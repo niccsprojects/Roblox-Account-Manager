@@ -622,7 +622,7 @@ async fn start_botting_mode(
         .unwrap_or(15)
         .clamp(1, 90);
 
-    let interval_minutes = interval_minutes.clamp(10, 120) as u64;
+    let interval_minutes = interval_minutes.clamp(10, 480) as u64;
     let launch_delay_seconds = launch_delay_seconds.clamp(5, 120) as u64;
     let player_grace_minutes = if player_grace_minutes <= 0 {
         default_player_grace_minutes as u64
