@@ -77,6 +77,21 @@ v4 is built on Rust + Tauri and the source is public, so behavior can be audited
 Only download from the official GitHub releases page, and avoid re-uploaded binaries from third-party sites.
 
 
+## **Q:** RAM opens to a black screen on Windows. How do I fix it?
+
+**A:** RAM v4 uses the Microsoft Edge WebView2 Runtime to draw its interface. Reinstalling RAM does not reinstall WebView2 or remove RAM's WebView profile, so a normal reinstall may leave a black screen unchanged.
+
+Try these steps in order:
+
+1. Install the [latest official v4 release](https://github.com/niccsprojects/Roblox-Account-Manager/releases?q=beta). Fully close RAM first, including its tray icon or process in Task Manager.
+2. Hold **Shift** while starting RAM. Keep it held until the window appears. This forces RAM's graphics safe mode. The same mode can be enabled by adding `--safe-mode` to the end of a RAM shortcut's **Target** field or setting `RAM_WEBVIEW_SAFE_MODE` to `1`, `true`, `yes`, or `on` before starting RAM.
+3. If the window is still black, fully close RAM so its WebView2 child processes exit. In File Explorer, enter `%LOCALAPPDATA%\com.niccdevs.roblox-account-manager` and rename `EBWebView` to a unique backup name such as `EBWebView.backup-20260810-223300`, using the current date and time. If that name already exists, use a different timestamp or suffix. If Windows reports that the profile is in use, restart Windows and retry before reopening RAM. This resets only disposable WebView cache/profile data; it does not delete RAM's account vault or INI settings. Favorites and recent-game UI history may be reset.
+4. Open **Windows Settings > Apps > Installed apps > Microsoft Edge WebView2 Runtime > Modify > Repair**, restart Windows, and try again. If WebView2 is missing, install Microsoft's [Evergreen Standalone Installer](https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download-section).
+5. Update the graphics driver. On managed PCs, ask the administrator to allow RAM and `msedgewebview2.exe` to create child processes and write to the WebView profile directory.
+
+The Windows message that a `RobloxPlayerBeta.exe` shortcut target was moved only means the shortcut points to an old versioned Roblox folder. Delete that stale shortcut and launch Roblox once from the Roblox website to recreate a current one; it is separate from RAM's WebView2 black screen.
+
+
 ## **Q:** How do I enable multi-roblox?
 
 **A:** Open the settings menu by clicking the gear/cog icon in the top right, in the `General` tab, you will see a checkbox for `Multi Roblox`, make sure you have Roblox closed, then check the checkbox.

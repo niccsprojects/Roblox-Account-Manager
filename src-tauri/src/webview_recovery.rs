@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Wry};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_SHIFT};
 
 use crate::data::settings::get_settings_path;
 
@@ -32,9 +33,26 @@ fn runtime_version() -> String {
         .unwrap_or_else(|| "unknown".to_string())
 }
 
+fn safe_mode_requested() -> bool {
+    let command_line = std::env::args_os()
+        .skip(1)
+        .any(|arg| arg.to_string_lossy().eq_ignore_ascii_case("--safe-mode"));
+    let environment = std::env::var("RAM_WEBVIEW_SAFE_MODE")
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false);
+    let shift_held = unsafe { GetAsyncKeyState(VK_SHIFT as i32) < 0 };
+
+    command_line || environment || shift_held
+}
+
 pub fn prepare_environment() {
     let marker = marker_path();
-    let mut safe_mode = false;
+    let mut safe_mode = safe_mode_requested();
 
     if let Ok(recorded) = std::fs::read_to_string(&marker) {
         let recorded = recorded.trim();
@@ -82,7 +100,7 @@ pub fn mark_ready() {
 fn show_repair_dialog(app: &AppHandle<Wry>) {
     app.dialog()
         .message(
-            "Roblox Account Manager could not display its interface, even in graphics safe mode.\n\nThis is usually caused by a broken Microsoft Edge WebView2 runtime update.\n\nTo fix it: open Windows Settings > Apps > Installed apps > Microsoft Edge WebView2 Runtime > Modify > Repair, or install the latest Microsoft Edge update, then restart your PC and open RAM again.",
+            "Roblox Account Manager could not display its interface, even in graphics safe mode.\n\nRepair Microsoft Edge WebView2 Runtime in Windows Settings > Apps > Installed apps, restart Windows, then open RAM again. You can force graphics safe mode at any time by holding Shift while RAM starts.\n\nRAM konnte die Oberfläche auch im Grafik-Sicherheitsmodus nicht anzeigen.\n\nRepariere Microsoft Edge WebView2 Runtime unter Windows-Einstellungen > Apps > Installierte Apps, starte Windows neu und öffne RAM erneut. Halte beim Starten von RAM die Umschalttaste gedrückt, um den Grafik-Sicherheitsmodus zu erzwingen.",
         )
         .title("Roblox Account Manager")
         .kind(MessageDialogKind::Error)
