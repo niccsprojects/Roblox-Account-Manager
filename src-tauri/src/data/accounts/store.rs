@@ -865,4 +865,27 @@ mod tests {
 
         cleanup_store_files(&store);
     }
+
+    #[test]
+    fn import_old_account_data_should_accept_recovery_encrypted_v4_exports() {
+        let store = new_test_store("import-recovery-v4");
+        let recovery_hash =
+            crypto::device_hash_for_identifier("11111111-1111-4111-8111-111111111111");
+        assert!(!crypto::fresh_device_hash_candidates().contains(&recovery_hash));
+        let encrypted = encrypted_test_vault(&recovery_hash);
+
+        let summary = store
+            .import_old_account_data(&encrypted, None, &[recovery_hash])
+            .unwrap();
+        let imported = store.get_all().unwrap();
+
+        assert_eq!(summary.total, 1);
+        assert_eq!(summary.added, 1);
+        assert_eq!(summary.replaced, 0);
+        assert_eq!(summary.skipped, 0);
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].user_id, 13579);
+
+        cleanup_store_files(&store);
+    }
 }
