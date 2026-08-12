@@ -84,8 +84,13 @@ pub fn reorder_accounts(
 #[tauri::command]
 pub fn import_old_account_data(
     state: tauri::State<'_, AccountStore>,
+    settings: tauri::State<'_, SettingsStore>,
     file_data: Vec<u8>,
     password: Option<String>,
 ) -> Result<OldAccountImportSummary, String> {
-    state.import_old_account_data(&file_data, password.as_deref())
+    state.import_old_account_data(
+        &file_data,
+        password.as_deref(),
+        &crate::data::vault_recovery_candidates(&settings),
+    )
 }
