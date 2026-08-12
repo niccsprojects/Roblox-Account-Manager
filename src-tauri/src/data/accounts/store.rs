@@ -510,19 +510,30 @@ impl AccountStore {
         &self,
         data: &[u8],
         import_password: Option<&str>,
+        recovery_hashes: &[Vec<u8>],
     ) -> Result<Vec<Account>, String> {
         if data.is_empty() {
             return Ok(Vec::new());
         }
 
         if crypto::is_encrypted(data) {
-            let Some(password) = import_password else {
-                return Err(IMPORT_PASSWORD_REQUIRED.to_string());
-            };
-            let hash = crypto::hash_password(password);
-            let decrypted = crypto::decrypt(data, &hash)
-                .map_err(|_| "Import password is incorrect".to_string())?;
-            return Self::parse_accounts_json(&decrypted);
+            if let Some(password) = import_password {
+                let hash = crypto::hash_password(password);
+                let decrypted = crypto::decrypt(data, &hash)
+                    .map_err(|_| "Import password is incorrect".to_string())?;
+                return Self::parse_accounts_json(&decrypted);
+            }
+
+            for hash in crypto::fresh_device_hash_candidates()
+                .iter()
+                .chain(recovery_hashes.iter())
+            {
+                if let Ok(decrypted) = crypto::decrypt(data, hash) {
+                    return Self::parse_accounts_json(&decrypted);
+                }
+            }
+
+            return Err(IMPORT_PASSWORD_REQUIRED.to_string());
         }
 
         Self::decode_plain_or_legacy_accounts(data)
@@ -537,8 +548,10 @@ impl AccountStore {
         &self,
         data: &[u8],
         import_password: Option<&str>,
+        recovery_hashes: &[Vec<u8>],
     ) -> Result<OldAccountImportSummary, String> {
-        let imported_accounts = self.decode_accounts_for_import(data, import_password)?;
+        let imported_accounts =
+            self.decode_accounts_for_import(data, import_password, recovery_hashes)?;
         let total = imported_accounts.len();
         let mut skipped = 0usize;
 
@@ -671,7 +684,7 @@ mod tests {
         let encrypted = crypto::encrypt(&json, &hash).unwrap();
 
         let summary = store
-            .import_old_account_data(&encrypted, Some(password))
+            .import_old_account_data(&encrypted, Some(password), &[])
             .unwrap();
         let imported = store.get_all().unwrap();
 
@@ -819,7 +832,7 @@ mod tests {
         )];
         let json = serde_json::to_vec(&current).unwrap();
 
-        let summary = store.import_old_account_data(&json, None).unwrap();
+        let summary = store.import_old_account_data(&json, None, &[]).unwrap();
         let imported = store.get_all().unwrap();
 
         assert_eq!(summary.total, 1);
@@ -831,5 +844,25 @@ mod tests {
         assert_eq!(imported[0].username, "PlainUser");
 
         let _ = fs::remove_file(&store.file_path);
+    }
+
+    #[test]
+    fn import_old_account_data_should_accept_default_encrypted_v4_exports() {
+        let store = new_test_store("import-default-v4");
+        let encrypted = encrypted_test_vault(&crypto::device_password_hash());
+
+        let summary = store
+            .import_old_account_data(&encrypted, None, &[])
+            .unwrap();
+        let imported = store.get_all().unwrap();
+
+        assert_eq!(summary.total, 1);
+        assert_eq!(summary.added, 1);
+        assert_eq!(summary.replaced, 0);
+        assert_eq!(summary.skipped, 0);
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].user_id, 13579);
+
+        cleanup_store_files(&store);
     }
 }
