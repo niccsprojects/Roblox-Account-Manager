@@ -128,34 +128,57 @@ async fn validate_cookie_fallback(
         display_name: String,
     }
 
-    let response = client
-        .get("https://users.roblox.com/v1/users/authenticated")
-        .header(COOKIE, cookie_header(security_token))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    let mut last_error = String::new();
 
-    if !response.status().is_success() {
-        return Err(format!(
-            "Invalid cookie (status {})",
-            response.status().as_u16()
-        ));
+    for attempt in 0..3u32 {
+        let retry_delay = Duration::from_millis(400 * 2_u64.pow(attempt));
+        match client
+            .get("https://users.roblox.com/v1/users/authenticated")
+            .header(COOKIE, cookie_header(security_token))
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_server_error() || status.as_u16() == 429 {
+                    last_error = format!("Request failed (status {})", status.as_u16());
+                    if attempt < 2 {
+                        sleep(retry_delay).await;
+                    }
+                    continue;
+                }
+                if status.as_u16() == 401 {
+                    return Err("Invalid cookie (status 401)".to_string());
+                }
+                if !status.is_success() {
+                    return Err(format!("Request rejected (status {})", status.as_u16()));
+                }
+
+                let user: AuthenticatedUser = response
+                    .json()
+                    .await
+                    .map_err(|e| format!("Failed to parse account info: {}", e))?;
+
+                return Ok(AccountInfo {
+                    user_id: user.id,
+                    name: user.name,
+                    display_name: user.display_name,
+                    user_email: None,
+                    is_email_verified: false,
+                    age_bracket: 0,
+                    user_above_13: true,
+                });
+            }
+            Err(e) => {
+                last_error = format!("Request failed: {}", e);
+                if attempt < 2 {
+                    sleep(retry_delay).await;
+                }
+            }
+        }
     }
 
-    let user: AuthenticatedUser = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse account info: {}", e))?;
-
-    Ok(AccountInfo {
-        user_id: user.id,
-        name: user.name,
-        display_name: user.display_name,
-        user_email: None,
-        is_email_verified: false,
-        age_bracket: 0,
-        user_above_13: true,
-    })
+    Err(last_error)
 }
 
 pub async fn get_csrf_token(security_token: &str) -> Result<String, String> {
