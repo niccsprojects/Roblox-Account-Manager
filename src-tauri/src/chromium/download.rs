@@ -229,7 +229,32 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
         },
     );
 
-    let (version, url) = resolve_download().await?;
+    let (version, url) = match resolve_download().await {
+        Ok(resolved) => resolved,
+        Err(err) => {
+            if let Some((version, binary)) = find_existing_install(&dir) {
+                make_executable(&binary);
+                let manifest = serde_json::json!({
+                    "version": version,
+                    "binary": binary.to_string_lossy(),
+                });
+                let _ = std::fs::write(
+                    dir.join("version.json"),
+                    serde_json::to_string_pretty(&manifest).unwrap_or_default(),
+                );
+                let _ = app.emit(
+                    "chromium-download-progress",
+                    DownloadProgress {
+                        stage: "ready".into(),
+                        downloaded: 0,
+                        total: 0,
+                    },
+                );
+                return Ok(binary);
+            }
+            return Err(err);
+        }
+    };
     let version_dir = dir.join(&version);
     let binary = binary_path(&version_dir);
 
@@ -285,14 +310,61 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(binary)
 }
 
+fn find_existing_install(dir: &Path) -> Option<(String, PathBuf)> {
+    let mut versions: Vec<PathBuf> = std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect();
+    versions.sort_by_key(|path| {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| {
+                name.split('.')
+                    .filter_map(|part| part.parse::<u32>().ok())
+                    .collect::<Vec<u32>>()
+            })
+            .unwrap_or_default()
+    });
+    versions.into_iter().rev().find_map(|version_dir| {
+        let binary = binary_path(&version_dir);
+        if binary.exists() {
+            let version = version_dir.file_name()?.to_string_lossy().to_string();
+            Some((version, binary))
+        } else {
+            None
+        }
+    })
+}
+
 async fn resolve_download() -> Result<(String, String), String> {
-    let json: Value = reqwest::get(VERSIONS_URL)
+    let mut last_error = String::new();
+    for attempt in 0..3u32 {
+        match fetch_version_list().await {
+            Ok(json) => return parse_download(&json),
+            Err(err) => {
+                last_error = err;
+                if attempt < 2 {
+                    tokio::time::sleep(std::time::Duration::from_millis(400 * 2_u64.pow(attempt)))
+                        .await;
+                }
+            }
+        }
+    }
+    Err(last_error)
+}
+
+async fn fetch_version_list() -> Result<Value, String> {
+    reqwest::get(VERSIONS_URL)
         .await
         .map_err(|e| format!("Could not reach browser download service: {}", e))?
         .json()
         .await
-        .map_err(|e| format!("Could not read browser version list: {}", e))?;
+        .map_err(|e| format!("Could not read browser version list: {}", e))
+}
 
+fn parse_download(json: &Value) -> Result<(String, String), String> {
     let stable = json
         .get("channels")
         .and_then(|c| c.get("Stable"))
