@@ -6,8 +6,22 @@ import { useModalClose } from "../../hooks/useModalClose";
 import { usePrompt } from "../../hooks/usePrompt";
 import { SlidingTabBar } from "../ui/SlidingTabBar";
 import { useTr } from "../../i18n/text";
+import { COOKIE_PATTERN } from "../../utils/cookies";
 
 type TabId = "cookie" | "userpass" | "legacy";
+
+function parseImportLine(line: string): { username: string; password: string; cookie: string } {
+  const match = line.match(COOKIE_PATTERN);
+  if (!match || match.index === undefined) {
+    return { username: "", password: "", cookie: "" };
+  }
+  const cookie = line.slice(match.index);
+  const prefix = line.slice(0, match.index).replace(/[\s:;,]+$/, "");
+  const sep = prefix.indexOf(":");
+  const username = sep >= 0 ? prefix.slice(0, sep).trim() : "";
+  const password = sep >= 0 ? prefix.slice(sep + 1).trim() : "";
+  return { username, password, cookie };
+}
 
 interface ImportResult {
   text: string;
@@ -76,7 +90,8 @@ export function ImportDialog({
 
     for (let i = 0; i < lines.length; i++) {
       setProgress(t("Importing {{current}}/{{total}}...", { current: i + 1, total: lines.length }));
-      const cookie = lines[i];
+      const parsed = parseImportLine(lines[i]);
+      const cookie = parsed.cookie || lines[i];
       try {
         const info = await invoke<{ user_id: number; name: string }>("validate_cookie", { cookie });
         if (existingIds.has(info.user_id)) {
@@ -86,6 +101,7 @@ export function ImportDialog({
             securityToken: cookie,
             username: info.name,
             userId: info.user_id,
+            password: parsed.password || null,
           });
           existingIds.add(info.user_id);
           out.push({ text: t("Added {{name}}", { name: info.name }), ok: true });
@@ -107,10 +123,33 @@ export function ImportDialog({
     setImporting(true);
     setResults([]);
 
+    const existingIds = new Set(store.accounts.map((a) => a.UserID));
     const out: ImportResult[] = [];
     for (let i = 0; i < lines.length; i++) {
       setProgress(t("Importing {{current}}/{{total}}...", { current: i + 1, total: lines.length }));
       const line = lines[i];
+      const parsed = parseImportLine(line);
+      if (parsed.cookie) {
+        try {
+          const info = await invoke<{ user_id: number; name: string }>("validate_cookie", { cookie: parsed.cookie });
+          if (existingIds.has(info.user_id)) {
+            out.push({ text: t("{{name}} - already exists", { name: info.name }), ok: false });
+          } else {
+            await invoke("add_account", {
+              securityToken: parsed.cookie,
+              username: info.name,
+              userId: info.user_id,
+              password: parsed.password || null,
+            });
+            existingIds.add(info.user_id);
+            out.push({ text: t("Added {{name}}", { name: info.name }), ok: true });
+          }
+        } catch (e) {
+          out.push({ text: t("Failed: {{error}}", { error: String(e) }), ok: false });
+        }
+        setResults([...out]);
+        continue;
+      }
       const sep = line.indexOf(":");
       const username = sep >= 0 ? line.slice(0, sep).trim() : "";
       const password = sep >= 0 ? line.slice(sep + 1) : "";
@@ -121,6 +160,7 @@ export function ImportDialog({
       }
       try {
         const info = await invoke<{ user_id: number; name: string }>("import_userpass", { username, password });
+        existingIds.add(info.user_id);
         out.push({ text: t("Added {{name}}", { name: info.name }), ok: true });
       } catch (e) {
         out.push({ text: t("Failed: {{error}}", { error: String(e) }), ok: false });
@@ -269,7 +309,7 @@ export function ImportDialog({
         <div className={`px-5 pb-4 ${tab === "legacy" ? "pt-2" : "flex-1 flex flex-col min-h-0"}`}>
           {tab === "cookie" ? (
             <>
-              <p className="text-[11px] text-zinc-500 mb-2">{t("Paste one .ROBLOSECURITY cookie per line")}</p>
+              <p className="text-[11px] text-zinc-500 mb-2">{t("Paste one .ROBLOSECURITY cookie per line. username:password:cookie lines work too.")}</p>
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -284,7 +324,7 @@ export function ImportDialog({
             </>
           ) : tab === "userpass" ? (
             <>
-              <p className="text-[11px] text-zinc-500 mb-2">{t("Paste one username:password per line. A secure browser opens for each to finish sign-in.")}</p>
+              <p className="text-[11px] text-zinc-500 mb-2">{t("Paste one username:password per line. A secure browser opens for each to finish sign-in. username:password:cookie lines import directly without a browser.")}</p>
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
