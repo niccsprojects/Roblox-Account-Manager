@@ -233,7 +233,7 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
         Ok(resolved) => resolved,
         Err(err) => {
             if let Some((version, binary)) = find_existing_install(&dir) {
-                make_executable(&binary);
+                make_executable(&binary)?;
                 let manifest = serde_json::json!({
                     "version": version,
                     "binary": binary.to_string_lossy(),
@@ -286,7 +286,7 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
         return Err("Browser archive did not contain the expected executable".into());
     }
 
-    make_executable(&binary);
+    make_executable(&binary)?;
 
     let manifest = serde_json::json!({
         "version": version,
@@ -358,6 +358,7 @@ async fn resolve_download() -> Result<(String, String), String> {
 async fn fetch_version_list() -> Result<Value, String> {
     reqwest::get(VERSIONS_URL)
         .await
+        .and_then(|response| response.error_for_status())
         .map_err(|e| format!("Could not reach browser download service: {}", e))?
         .json()
         .await
@@ -476,14 +477,16 @@ fn extract_archive(archive: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn make_executable(binary: &Path) {
+fn make_executable(binary: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(binary, std::fs::Permissions::from_mode(0o755));
+        std::fs::set_permissions(binary, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("Could not set browser executable permissions: {}", e))?;
     }
     #[cfg(not(unix))]
     {
         let _ = binary;
     }
+    Ok(())
 }
