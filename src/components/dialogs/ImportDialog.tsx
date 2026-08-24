@@ -16,7 +16,7 @@ function parseImportLine(line: string): { username: string; password: string; co
     return { username: "", password: "", cookie: "" };
   }
   const cookie = line.slice(match.index);
-  const prefix = line.slice(0, match.index).replace(/[\s:;,]+$/, "");
+  const prefix = line.slice(0, match.index).replace(/\s*:\s*$/, "");
   const sep = prefix.indexOf(":");
   const username = sep >= 0 ? prefix.slice(0, sep).trim() : "";
   const password = sep >= 0 ? prefix.slice(sep + 1).trim() : "";
