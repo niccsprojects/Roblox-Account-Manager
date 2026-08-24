@@ -64,8 +64,12 @@ pub async fn validate_cookie(security_token: &str) -> Result<AccountInfo, String
                     continue;
                 }
                 if !status.is_success() {
-                    last_error = format!("Invalid cookie (status {})", status.as_u16());
-                    cookie_rejected = true;
+                    if status.as_u16() == 401 {
+                        last_error = "Invalid cookie (status 401)".to_string();
+                        cookie_rejected = true;
+                    } else {
+                        last_error = format!("Request rejected (status {})", status.as_u16());
+                    }
                     break;
                 }
 
@@ -102,7 +106,13 @@ pub async fn validate_cookie(security_token: &str) -> Result<AccountInfo, String
 
     match validate_cookie_fallback(&client, security_token).await {
         Ok(info) => Ok(info),
-        Err(_) => Err(last_error),
+        Err(fallback_error) => {
+            if fallback_error.starts_with("Invalid cookie") {
+                Err(fallback_error)
+            } else {
+                Err(last_error)
+            }
+        }
     }
 }
 
