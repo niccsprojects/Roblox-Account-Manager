@@ -421,8 +421,35 @@ async fn join_group(
 }
 
 #[tauri::command]
-async fn get_presence(user_ids: Vec<i64>) -> Result<Vec<api::roblox::UserPresence>, String> {
-    api::roblox::get_presence(&user_ids).await
+async fn get_presence(
+    state: tauri::State<'_, AccountStore>,
+    user_ids: Vec<i64>,
+    viewer_user_id: Option<i64>,
+) -> Result<Vec<api::roblox::UserPresence>, String> {
+    let cookie = viewer_user_id
+        .and_then(|id| get_cookie(state.inner(), id).ok())
+        .filter(|cookie| !cookie.trim().is_empty())
+        .or_else(|| {
+            state.get_all().ok().and_then(|accounts| {
+                accounts
+                    .iter()
+                    .find(|account| account.valid && !account.security_token.trim().is_empty())
+                    .or_else(|| {
+                        accounts
+                            .iter()
+                            .find(|account| !account.security_token.trim().is_empty())
+                    })
+                    .map(|account| account.security_token.clone())
+            })
+        });
+
+    match cookie {
+        Some(cookie) => match api::roblox::get_presence(&user_ids, Some(&cookie)).await {
+            Ok(presences) => Ok(presences),
+            Err(_) => api::roblox::get_presence(&user_ids, None).await,
+        },
+        None => api::roblox::get_presence(&user_ids, None).await,
+    }
 }
 
 #[tauri::command]
