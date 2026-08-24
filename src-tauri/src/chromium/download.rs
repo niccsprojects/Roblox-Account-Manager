@@ -329,7 +329,7 @@ fn find_existing_install(dir: &Path) -> Option<(String, PathBuf)> {
     });
     versions.into_iter().rev().find_map(|version_dir| {
         let binary = binary_path(&version_dir);
-        if binary.exists() {
+        if binary.is_file() {
             let version = version_dir.file_name()?.to_string_lossy().to_string();
             Some((version, binary))
         } else {
