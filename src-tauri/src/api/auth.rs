@@ -8,6 +8,8 @@ const REFERER_URL: &str = "https://www.roblox.com/games/2753915549/Blox-Fruits";
 fn build_client() -> reqwest::Client {
     reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36")
         .build()
         .unwrap()
@@ -41,33 +43,150 @@ pub struct AccountInfo {
 
 pub async fn validate_cookie(security_token: &str) -> Result<AccountInfo, String> {
     let client = build_client();
+    let mut last_error = String::new();
+    let mut cookie_rejected = false;
 
-    let response = client
-        .get("https://www.roblox.com/my/account/json")
-        .header(COOKIE, cookie_header(security_token))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
+    for attempt in 0..3u32 {
+        let retry_delay = Duration::from_millis(400 * 2_u64.pow(attempt));
+        match client
+            .get("https://www.roblox.com/my/account/json")
+            .header(COOKIE, cookie_header(security_token))
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_server_error() || status.as_u16() == 429 {
+                    last_error = format!("Request failed (status {})", status.as_u16());
+                    if attempt < 2 {
+                        sleep(retry_delay).await;
+                    }
+                    continue;
+                }
+                if !status.is_success() {
+                    if status.as_u16() == 401 {
+                        last_error = "Invalid cookie (status 401)".to_string();
+                        cookie_rejected = true;
+                    } else {
+                        last_error = format!("Request rejected (status {})", status.as_u16());
+                    }
+                    break;
+                }
 
-    if !response.status().is_success() {
-        return Err(format!(
-            "Invalid cookie (status {})",
-            response.status().as_u16()
-        ));
+                match response.text().await {
+                    Ok(body) => match serde_json::from_str::<AccountInfo>(&body) {
+                        Ok(info) => return Ok(info),
+                        Err(e) => {
+                            let preview: String = body.chars().take(200).collect();
+                            last_error =
+                                format!("Failed to parse account info: {} (body: {})", e, preview);
+                            break;
+                        }
+                    },
+                    Err(e) => {
+                        last_error = format!("Failed to read response: {}", e);
+                        if attempt < 2 {
+                            sleep(retry_delay).await;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                last_error = format!("Request failed: {}", e);
+                if attempt < 2 {
+                    sleep(retry_delay).await;
+                }
+            }
+        }
     }
 
-    let body = response
-        .text()
-        .await
-        .map_err(|e| format!("Failed to read response: {}", e))?;
+    if cookie_rejected {
+        return Err(last_error);
+    }
 
-    serde_json::from_str::<AccountInfo>(&body).map_err(|e| {
-        format!(
-            "Failed to parse account info: {} (body: {})",
-            e,
-            &body[..body.len().min(200)]
-        )
-    })
+    match validate_cookie_fallback(&client, security_token).await {
+        Ok(info) => Ok(info),
+        Err(fallback_error) => {
+            if fallback_error.starts_with("Invalid cookie") {
+                Err(fallback_error)
+            } else {
+                Err(last_error)
+            }
+        }
+    }
+}
+
+async fn validate_cookie_fallback(
+    client: &reqwest::Client,
+    security_token: &str,
+) -> Result<AccountInfo, String> {
+    #[derive(Deserialize)]
+    struct AuthenticatedUser {
+        id: i64,
+        name: String,
+        #[serde(rename = "displayName")]
+        display_name: String,
+    }
+
+    let mut last_error = String::new();
+
+    for attempt in 0..3u32 {
+        let retry_delay = Duration::from_millis(400 * 2_u64.pow(attempt));
+        match client
+            .get("https://users.roblox.com/v1/users/authenticated")
+            .header(COOKIE, cookie_header(security_token))
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_server_error() || status.as_u16() == 429 {
+                    last_error = format!("Request failed (status {})", status.as_u16());
+                    if attempt < 2 {
+                        sleep(retry_delay).await;
+                    }
+                    continue;
+                }
+                if status.as_u16() == 401 {
+                    return Err("Invalid cookie (status 401)".to_string());
+                }
+                if !status.is_success() {
+                    return Err(format!("Request rejected (status {})", status.as_u16()));
+                }
+
+                match response.text().await {
+                    Ok(body) => {
+                        let user: AuthenticatedUser = serde_json::from_str(&body)
+                            .map_err(|e| format!("Failed to parse account info: {}", e))?;
+
+                        return Ok(AccountInfo {
+                            user_id: user.id,
+                            name: user.name,
+                            display_name: user.display_name,
+                            user_email: None,
+                            is_email_verified: false,
+                            age_bracket: 0,
+                            user_above_13: true,
+                        });
+                    }
+                    Err(e) => {
+                        last_error = format!("Failed to read response: {}", e);
+                        if attempt < 2 {
+                            sleep(retry_delay).await;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                last_error = format!("Request failed: {}", e);
+                if attempt < 2 {
+                    sleep(retry_delay).await;
+                }
+            }
+        }
+    }
+
+    Err(last_error)
 }
 
 pub async fn get_csrf_token(security_token: &str) -> Result<String, String> {

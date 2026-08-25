@@ -39,12 +39,21 @@ pub struct UserPresence {
     pub last_online: String,
 }
 
-pub async fn get_presence(user_ids: &[i64]) -> Result<Vec<UserPresence>, String> {
+pub async fn get_presence(
+    user_ids: &[i64],
+    security_token: Option<&str>,
+) -> Result<Vec<UserPresence>, String> {
     let client = reqwest::Client::new();
 
-    let response = client
+    let mut request = client
         .post("https://presence.roblox.com/v1/presence/users")
-        .json(&serde_json::json!({ "userIds": user_ids }))
+        .json(&serde_json::json!({ "userIds": user_ids }));
+
+    if let Some(token) = security_token {
+        request = request.header(COOKIE, cookie_header(token));
+    }
+
+    let response = request
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;

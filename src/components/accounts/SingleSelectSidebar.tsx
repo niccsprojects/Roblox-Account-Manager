@@ -131,9 +131,10 @@ export function SingleSelectSidebar() {
         }[]
       >("get_presence", {
         userIds: [user.id],
+        viewerUserId: account.UserID,
       });
       const followPresenceType = presence[0]?.userPresenceType ?? presence[0]?.user_presence_type ?? 0;
-      const directPlaceId = presence[0]?.rootPlaceId ?? presence[0]?.placeId ?? null;
+      const directPlaceId = presence[0]?.placeId ?? presence[0]?.rootPlaceId ?? null;
       const directJobId = presence[0]?.gameId ?? "";
       if (followPresenceType === 2 && directPlaceId && directJobId) {
         await invoke("launch_roblox", {

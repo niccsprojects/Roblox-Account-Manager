@@ -229,7 +229,33 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
         },
     );
 
-    let (version, url) = resolve_download().await?;
+    let (version, url) = match resolve_download().await {
+        Ok(resolved) => resolved,
+        Err(err) => {
+            if let Some((version, binary)) = find_existing_install(&dir) {
+                make_executable(&binary)?;
+                let manifest = serde_json::json!({
+                    "version": version,
+                    "binary": binary.to_string_lossy(),
+                });
+                std::fs::write(
+                    dir.join("version.json"),
+                    serde_json::to_string_pretty(&manifest).unwrap_or_default(),
+                )
+                .map_err(|e| format!("Could not write version manifest: {}", e))?;
+                let _ = app.emit(
+                    "chromium-download-progress",
+                    DownloadProgress {
+                        stage: "ready".into(),
+                        downloaded: 0,
+                        total: 0,
+                    },
+                );
+                return Ok(binary);
+            }
+            return Err(err);
+        }
+    };
     let version_dir = dir.join(&version);
     let binary = binary_path(&version_dir);
 
@@ -246,22 +272,33 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
             },
         );
 
-        let extract_target = version_dir.clone();
+        let extract_target = dir.join(format!("{}.tmp", version));
+        if extract_target.exists() {
+            let _ = std::fs::remove_dir_all(&extract_target);
+        }
         let archive_for_extract = archive.clone();
+        let extract_dir = extract_target.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            extract_archive(&archive_for_extract, &extract_target)
+            extract_archive(&archive_for_extract, &extract_dir)
         })
         .await
         .map_err(|e| format!("Extraction task failed: {}", e))??;
 
         let _ = std::fs::remove_file(&archive);
+
+        if version_dir.exists() {
+            std::fs::remove_dir_all(&version_dir)
+                .map_err(|e| format!("Could not replace the existing browser: {}", e))?;
+        }
+        std::fs::rename(&extract_target, &version_dir)
+            .map_err(|e| format!("Could not finalize the browser installation: {}", e))?;
     }
 
     if !binary.exists() {
         return Err("Browser archive did not contain the expected executable".into());
     }
 
-    make_executable(&binary);
+    make_executable(&binary)?;
 
     let manifest = serde_json::json!({
         "version": version,
@@ -285,14 +322,76 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(binary)
 }
 
+fn find_existing_install(dir: &Path) -> Option<(String, PathBuf)> {
+    let mut versions: Vec<PathBuf> = std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_dir()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| !name.ends_with(".tmp"))
+        })
+        .collect();
+    versions.sort_by_key(|path| {
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .map(|name| {
+                name.split('.')
+                    .filter_map(|part| part.parse::<u32>().ok())
+                    .collect::<Vec<u32>>()
+            })
+            .unwrap_or_default()
+    });
+    versions.into_iter().rev().find_map(|version_dir| {
+        let binary = binary_path(&version_dir);
+        if binary.is_file() {
+            let version = version_dir.file_name()?.to_string_lossy().to_string();
+            Some((version, binary))
+        } else {
+            None
+        }
+    })
+}
+
 async fn resolve_download() -> Result<(String, String), String> {
-    let json: Value = reqwest::get(VERSIONS_URL)
+    let mut last_error = String::new();
+    for attempt in 0..3u32 {
+        match fetch_version_list().await {
+            Ok(json) => return parse_download(&json),
+            Err(err) => {
+                last_error = err;
+                if attempt < 2 {
+                    tokio::time::sleep(std::time::Duration::from_millis(400 * 2_u64.pow(attempt)))
+                        .await;
+                }
+            }
+        }
+    }
+    Err(last_error)
+}
+
+async fn fetch_version_list() -> Result<Value, String> {
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Could not reach browser download service: {}", e))?;
+
+    client
+        .get(VERSIONS_URL)
+        .send()
         .await
+        .and_then(|response| response.error_for_status())
         .map_err(|e| format!("Could not reach browser download service: {}", e))?
         .json()
         .await
-        .map_err(|e| format!("Could not read browser version list: {}", e))?;
+        .map_err(|e| format!("Could not read browser version list: {}", e))
+}
 
+fn parse_download(json: &Value) -> Result<(String, String), String> {
     let stable = json
         .get("channels")
         .and_then(|c| c.get("Stable"))
@@ -404,14 +503,16 @@ fn extract_archive(archive: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn make_executable(binary: &Path) {
+fn make_executable(binary: &Path) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(binary, std::fs::Permissions::from_mode(0o755));
+        std::fs::set_permissions(binary, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("Could not set browser executable permissions: {}", e))?;
     }
     #[cfg(not(unix))]
     {
         let _ = binary;
     }
+    Ok(())
 }

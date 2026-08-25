@@ -18,6 +18,7 @@ import { GroupSection } from "./GroupSection";
 import { AccountRowView } from "./AccountRow";
 import { useTr } from "../../i18n/text";
 import { AddAccountDialog } from "../dialogs/AddAccountDialog";
+import { COOKIE_PATTERN } from "../../utils/cookies";
 
 type DragSelectRect = { left: number; top: number; width: number; height: number };
 type Container = { key: string; userIds: number[] };
@@ -211,8 +212,7 @@ export function AccountList() {
     e.preventDefault();
     const text = e.dataTransfer.getData("text/plain");
     if (!text) return;
-    const cookieRe =
-      /_\|WARNING:-DO-NOT-SHARE-THIS\.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items\.\|\w+/g;
+    const cookieRe = new RegExp(COOKIE_PATTERN.source, "g");
     const matches = text.match(cookieRe);
     if (matches) {
       for (const cookie of matches) await store.addAccountByCookie(cookie);
