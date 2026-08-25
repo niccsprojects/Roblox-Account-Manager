@@ -154,20 +154,28 @@ async fn validate_cookie_fallback(
                     return Err(format!("Request rejected (status {})", status.as_u16()));
                 }
 
-                let user: AuthenticatedUser = response
-                    .json()
-                    .await
-                    .map_err(|e| format!("Failed to parse account info: {}", e))?;
+                match response.text().await {
+                    Ok(body) => {
+                        let user: AuthenticatedUser = serde_json::from_str(&body)
+                            .map_err(|e| format!("Failed to parse account info: {}", e))?;
 
-                return Ok(AccountInfo {
-                    user_id: user.id,
-                    name: user.name,
-                    display_name: user.display_name,
-                    user_email: None,
-                    is_email_verified: false,
-                    age_bracket: 0,
-                    user_above_13: true,
-                });
+                        return Ok(AccountInfo {
+                            user_id: user.id,
+                            name: user.name,
+                            display_name: user.display_name,
+                            user_email: None,
+                            is_email_verified: false,
+                            age_bracket: 0,
+                            user_above_13: true,
+                        });
+                    }
+                    Err(e) => {
+                        last_error = format!("Failed to read response: {}", e);
+                        if attempt < 2 {
+                            sleep(retry_delay).await;
+                        }
+                    }
+                }
             }
             Err(e) => {
                 last_error = format!("Request failed: {}", e);
