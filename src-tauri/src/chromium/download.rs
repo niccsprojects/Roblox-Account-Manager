@@ -238,10 +238,11 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
                     "version": version,
                     "binary": binary.to_string_lossy(),
                 });
-                let _ = std::fs::write(
+                std::fs::write(
                     dir.join("version.json"),
                     serde_json::to_string_pretty(&manifest).unwrap_or_default(),
-                );
+                )
+                .map_err(|e| format!("Could not write version manifest: {}", e))?;
                 let _ = app.emit(
                     "chromium-download-progress",
                     DownloadProgress {
@@ -271,15 +272,26 @@ pub async fn ensure_chromium(app: &AppHandle) -> Result<PathBuf, String> {
             },
         );
 
-        let extract_target = version_dir.clone();
+        let extract_target = dir.join(format!("{}.tmp", version));
+        if extract_target.exists() {
+            let _ = std::fs::remove_dir_all(&extract_target);
+        }
         let archive_for_extract = archive.clone();
+        let extract_dir = extract_target.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            extract_archive(&archive_for_extract, &extract_target)
+            extract_archive(&archive_for_extract, &extract_dir)
         })
         .await
         .map_err(|e| format!("Extraction task failed: {}", e))??;
 
         let _ = std::fs::remove_file(&archive);
+
+        if version_dir.exists() {
+            std::fs::remove_dir_all(&version_dir)
+                .map_err(|e| format!("Could not replace the existing browser: {}", e))?;
+        }
+        std::fs::rename(&extract_target, &version_dir)
+            .map_err(|e| format!("Could not finalize the browser installation: {}", e))?;
     }
 
     if !binary.exists() {
@@ -315,7 +327,13 @@ fn find_existing_install(dir: &Path) -> Option<(String, PathBuf)> {
         .ok()?
         .filter_map(|entry| entry.ok())
         .map(|entry| entry.path())
-        .filter(|path| path.is_dir())
+        .filter(|path| {
+            path.is_dir()
+                && path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| !name.ends_with(".tmp"))
+        })
         .collect();
     versions.sort_by_key(|path| {
         path.file_name()
@@ -356,7 +374,15 @@ async fn resolve_download() -> Result<(String, String), String> {
 }
 
 async fn fetch_version_list() -> Result<Value, String> {
-    reqwest::get(VERSIONS_URL)
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Could not reach browser download service: {}", e))?;
+
+    client
+        .get(VERSIONS_URL)
+        .send()
         .await
         .and_then(|response| response.error_for_status())
         .map_err(|e| format!("Could not reach browser download service: {}", e))?
