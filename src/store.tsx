@@ -235,6 +235,7 @@ export interface StoreValue {
   launchedByProgram: Set<number>;
 
   joinServer: (userId: number) => Promise<void>;
+  launchFollow: (userId: number, target: FollowTarget) => Promise<void>;
   launchMultiple: (userIds: number[], options?: LaunchMultipleOptions) => Promise<void>;
   resolveFollowTarget: (username: string, viewerUserId: number) => Promise<FollowTarget>;
   restartRobloxClients: (userIds: number[]) => Promise<void>;
@@ -1138,7 +1139,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function joinServer(userId: number) {
+  async function runSingleLaunch(userId: number, statusMessage: string, launch: () => Promise<void>): Promise<boolean> {
+    if (joiningAccounts.has(userId)) return false;
     clearLaunchTimeout();
     setJoiningAccounts(new Set([userId]));
     setLaunchProgress({
@@ -1147,73 +1149,111 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       total: 1,
       userId,
     });
-    const launchAccount = accounts.find((a) => a.UserID === userId);
-    const accountName = launchAccount?.Alias || launchAccount?.Username || String(userId);
-    setActionStatusMessage(tr("Launching {{name}}...", { name: accountName }), "info", 5000);
+    setActionStatusMessage(statusMessage, "info", 5000);
 
-    try {
-      const pid = parseInt(placeId) || 5315046213;
-      const rawJobId = jobId.trim();
-      let resolvedJobId = rawJobId;
-      let joinVip = false;
-      let linkCode = "";
-
-      const vipPrefix = rawJobId.match(/^vip:\s*(.+)$/i);
-      if (vipPrefix?.[1]) {
-        joinVip = true;
-        linkCode = vipPrefix[1].trim();
-        resolvedJobId = "";
-      } else {
-        const linkLike = rawJobId.match(/(?:privateServerLinkCode|linkCode|code)=([^&\s]+)/i);
-        if (linkLike?.[1]) {
-          resolvedJobId = "";
-          try {
-            linkCode = decodeURIComponent(linkLike[1]);
-          } catch {
-            linkCode = linkLike[1];
-          }
-        }
-      }
-
-      await invoke("launch_roblox", {
-        userId,
-        placeId: pid,
-        jobId: resolvedJobId,
-        launchData,
-        followUser: false,
-        joinVip,
-        linkCode,
-        shuffleJob: shuffleJobId,
-      });
-      await loadAccounts();
-      void recordRecentGame(pid, userId, parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
-      if (rawJobId) {
-        try {
-          addRecentJob(rawJobId, pid, parseInt(settings?.General?.MaxRecentJobs || "12") || 12);
-        } catch {}
-      }
-      addToast(tr("Launching game..."));
-    } catch (e) {
+    const clearSingle = () => {
       setJoiningAccounts((prev) => {
         const next = new Set(prev);
         next.delete(userId);
         return next;
       });
       setLaunchProgress((prev) => (prev?.mode === "single" && prev.userId === userId ? null : prev));
+    };
+
+    try {
+      await launch();
+    } catch (e) {
+      clearSingle();
       setError(String(e));
       setActionStatusMessage(tr("Launch failed: {{error}}", { error: String(e) }), "error", 5000);
-      return;
+      throw e;
     }
 
     launchClearTimeoutRef.current = window.setTimeout(() => {
-      setJoiningAccounts((prev) => {
-        const next = new Set(prev);
-        next.delete(userId);
-        return next;
-      });
-      setLaunchProgress((prev) => (prev?.mode === "single" && prev.userId === userId ? null : prev));
+      clearSingle();
       launchClearTimeoutRef.current = null;
     }, 7000);
+    return true;
+  }
+
+  function accountDisplayName(userId: number): string {
+    const launchAccount = accounts.find((a) => a.UserID === userId);
+    return launchAccount?.Alias || launchAccount?.Username || String(userId);
+  }
+
+  async function launchFollow(userId: number, target: FollowTarget) {
+    const directJoin = isDirectFollowJoin(target);
+    const message = directJoin
+      ? tr("Joining {{name}}...", { name: target.name })
+      : tr("Following {{name}}...", { name: target.name });
+    const started = await runSingleLaunch(userId, message, () =>
+      invoke("launch_roblox", {
+        userId,
+        placeId: directJoin ? target.placeId : target.userId,
+        jobId: directJoin ? target.jobId : "",
+        launchData: "",
+        followUser: !directJoin,
+        joinVip: false,
+        linkCode: "",
+        shuffleJob: false,
+      })
+    );
+    if (!started) return;
+    await loadAccounts();
+    addToast(message);
+  }
+
+  async function joinServer(userId: number) {
+    const pid = parseInt(placeId) || 5315046213;
+    const rawJobId = jobId.trim();
+    let resolvedJobId = rawJobId;
+    let joinVip = false;
+    let linkCode = "";
+
+    const vipPrefix = rawJobId.match(/^vip:\s*(.+)$/i);
+    if (vipPrefix?.[1]) {
+      joinVip = true;
+      linkCode = vipPrefix[1].trim();
+      resolvedJobId = "";
+    } else {
+      const linkLike = rawJobId.match(/(?:privateServerLinkCode|linkCode|code)=([^&\s]+)/i);
+      if (linkLike?.[1]) {
+        resolvedJobId = "";
+        try {
+          linkCode = decodeURIComponent(linkLike[1]);
+        } catch {
+          linkCode = linkLike[1];
+        }
+      }
+    }
+
+    let started: boolean;
+    try {
+      started = await runSingleLaunch(userId, tr("Launching {{name}}...", { name: accountDisplayName(userId) }), () =>
+        invoke("launch_roblox", {
+          userId,
+          placeId: pid,
+          jobId: resolvedJobId,
+          launchData,
+          followUser: false,
+          joinVip,
+          linkCode,
+          shuffleJob: shuffleJobId,
+        })
+      );
+    } catch {
+      return;
+    }
+    if (!started) return;
+
+    await loadAccounts();
+    void recordRecentGame(pid, userId, parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
+    if (rawJobId) {
+      try {
+        addRecentJob(rawJobId, pid, parseInt(settings?.General?.MaxRecentJobs || "12") || 12);
+      } catch {}
+    }
+    addToast(tr("Launching game..."));
   }
 
   async function resolveFollowTarget(username: string, viewerUserId: number): Promise<FollowTarget> {
@@ -2483,6 +2523,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     presenceByUserId,
     launchedByProgram,
     joinServer,
+    launchFollow,
     launchMultiple,
     resolveFollowTarget,
     restartRobloxClients,

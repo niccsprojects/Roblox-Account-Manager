@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useStore, isDirectFollowJoin, needsFollowWarning } from "../../store";
+import { useStore, needsFollowWarning } from "../../store";
 import { useConfirm, usePrompt } from "../../hooks/usePrompt";
 import { useJoinOnlineWarning } from "../../hooks/useJoinOnlineWarning";
 import { SidebarSection } from "./SidebarSection";
@@ -32,6 +32,7 @@ export function SingleSelectSidebar() {
   const [description, setDescription] = useState("");
   const [robux, setRobux] = useState<number | null>(null);
   const [followUser, setFollowUser] = useState("");
+  const [following, setFollowing] = useState(false);
   const [argsOpen, setArgsOpen] = useState(false);
   const [recentsOpen, setRecentsOpen] = useState(false);
   const [recentJobsOpen, setRecentJobsOpen] = useState(false);
@@ -119,30 +120,18 @@ export function SingleSelectSidebar() {
   }
 
   async function handleFollow() {
-    if (!followUser.trim()) return;
+    if (!followUser.trim() || following || store.joiningAccounts.has(account.UserID)) return;
+    setFollowing(true);
     try {
       const target = await store.resolveFollowTarget(followUser, account.UserID);
-      const directJoin = isDirectFollowJoin(target);
       if (needsFollowWarning(target)) {
         if (!(await confirm(tr("{{name}} is not in a game. Try anyway?", { name: target.name })))) return;
       }
-      await invoke("launch_roblox", {
-        userId: account.UserID,
-        placeId: directJoin ? target.placeId : target.userId,
-        jobId: directJoin ? target.jobId : "",
-        launchData: "",
-        followUser: !directJoin,
-        joinVip: false,
-        linkCode: "",
-        shuffleJob: false,
-      });
-      store.addToast(
-        directJoin
-          ? tr("Joining {{name}}...", { name: target.name })
-          : tr("Following {{name}}...", { name: target.name })
-      );
+      await store.launchFollow(account.UserID, target);
     } catch (e) {
       store.addToast(tr("Follow failed: {{error}}", { error: String(e) }));
+    } finally {
+      setFollowing(false);
     }
   }
 
@@ -436,8 +425,12 @@ export function SingleSelectSidebar() {
               className="sidebar-input flex-1"
               onKeyDown={(e) => e.key === "Enter" && handleFollow()}
             />
-            <button onClick={handleFollow} className="sidebar-btn-sm">
-              {t("Follow")}
+            <button
+              onClick={handleFollow}
+              disabled={following || store.joiningAccounts.has(account.UserID)}
+              className="sidebar-btn-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {following ? t("Following...") : t("Follow")}
             </button>
           </div>
         </SidebarSection>
