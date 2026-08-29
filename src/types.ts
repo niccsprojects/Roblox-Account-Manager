@@ -1,3 +1,5 @@
+export const MAX_ALIAS_LENGTH = 240;
+
 export interface Account {
   Valid: boolean;
   SecurityToken: string;

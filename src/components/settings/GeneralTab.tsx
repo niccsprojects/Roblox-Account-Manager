@@ -236,6 +236,12 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
         suffix="sec"
       />
       <Toggle
+        checked={s.getBool("General", "WrapLongNames")}
+        onChange={(v) => s.setBool("General", "WrapLongNames", v)}
+        label="Wrap Long Names"
+        description="Show long aliases and usernames in full instead of cutting them off"
+      />
+      <Toggle
         checked={s.getBool("General", "DisableAgingAlert")}
         onChange={(v) => s.setBool("General", "DisableAgingAlert", v)}
         label="Disable Aging Alert"
