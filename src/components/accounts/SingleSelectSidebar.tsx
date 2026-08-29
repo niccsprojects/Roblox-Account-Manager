@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useStore } from "../../store";
+import { useStore, isDirectFollowJoin, needsFollowWarning } from "../../store";
 import { useConfirm, usePrompt } from "../../hooks/usePrompt";
 import { useJoinOnlineWarning } from "../../hooks/useJoinOnlineWarning";
 import { SidebarSection } from "./SidebarSection";
@@ -11,6 +11,7 @@ import { Select } from "../ui/Select";
 import { RecentGamesPopover } from "../server-list/RecentGamesPopover";
 import { RecentJobsPopover } from "../server-list/RecentJobsPopover";
 import { tr, useTr } from "../../i18n/text";
+import { MAX_ALIAS_LENGTH } from "../../types";
 import { User, Shuffle, Save, Settings, History, Package } from "lucide-react";
 
 function chipMaskName(name: string, previewLetters: number): string {
@@ -97,7 +98,7 @@ export function SingleSelectSidebar() {
   }, [versionsLoaded, savedVersion, savedVersionValid]);
 
   function handleSetAlias() {
-    store.updateAccount({ ...account, Alias: alias.slice(0, 30) });
+    store.updateAccount({ ...account, Alias: alias.slice(0, MAX_ALIAS_LENGTH) });
     store.addToast(tr("Alias updated"));
   }
 
@@ -120,50 +121,26 @@ export function SingleSelectSidebar() {
   async function handleFollow() {
     if (!followUser.trim()) return;
     try {
-      const user = await invoke<{ id: number }>("lookup_user", { username: followUser.trim() });
-      const presence = await invoke<
-        {
-          userPresenceType?: number;
-          user_presence_type?: number;
-          placeId?: number | null;
-          rootPlaceId?: number | null;
-          gameId?: string | null;
-        }[]
-      >("get_presence", {
-        userIds: [user.id],
-        viewerUserId: account.UserID,
-      });
-      const followPresenceType = presence[0]?.userPresenceType ?? presence[0]?.user_presence_type ?? 0;
-      const directPlaceId = presence[0]?.placeId ?? presence[0]?.rootPlaceId ?? null;
-      const directJobId = presence[0]?.gameId ?? "";
-      if (followPresenceType === 2 && directPlaceId && directJobId) {
-        await invoke("launch_roblox", {
-          userId: account.UserID,
-          placeId: directPlaceId,
-          jobId: directJobId,
-          launchData: "",
-          followUser: false,
-          joinVip: false,
-          linkCode: "",
-          shuffleJob: false,
-        });
-        store.addToast(tr("Joining {{name}}...", { name: followUser }));
-        return;
-      }
-      if (followPresenceType < 2) {
-        if (!(await confirm(tr("{{name}} is not in a game. Try anyway?", { name: followUser })))) return;
+      const target = await store.resolveFollowTarget(followUser, account.UserID);
+      const directJoin = isDirectFollowJoin(target);
+      if (needsFollowWarning(target)) {
+        if (!(await confirm(tr("{{name}} is not in a game. Try anyway?", { name: target.name })))) return;
       }
       await invoke("launch_roblox", {
         userId: account.UserID,
-        placeId: user.id,
-        jobId: "",
+        placeId: directJoin ? target.placeId : target.userId,
+        jobId: directJoin ? target.jobId : "",
         launchData: "",
-        followUser: true,
+        followUser: !directJoin,
         joinVip: false,
         linkCode: "",
         shuffleJob: false,
       });
-      store.addToast(tr("Following {{name}}...", { name: followUser }));
+      store.addToast(
+        directJoin
+          ? tr("Joining {{name}}...", { name: target.name })
+          : tr("Following {{name}}...", { name: target.name })
+      );
     } catch (e) {
       store.addToast(tr("Follow failed: {{error}}", { error: String(e) }));
     }
@@ -262,7 +239,7 @@ export function SingleSelectSidebar() {
             <input
               value={alias}
               onChange={(e) => setAlias(e.target.value)}
-              maxLength={30}
+              maxLength={MAX_ALIAS_LENGTH}
               placeholder={t("Alias")}
               className="sidebar-input flex-1"
               onKeyDown={(e) => e.key === "Enter" && handleSetAlias()}

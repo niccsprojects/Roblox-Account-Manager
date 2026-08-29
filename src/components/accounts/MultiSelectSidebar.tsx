@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronDown, Save, Shuffle, History } from "lucide-react";
-import { useStore } from "../../store";
+import { useStore, needsFollowWarning } from "../../store";
 import { usePrompt, useConfirm } from "../../hooks/usePrompt";
 import { useJoinOnlineWarning } from "../../hooks/useJoinOnlineWarning";
 import { parseGroupName } from "../../types";
@@ -29,7 +29,10 @@ export function MultiSelectSidebar() {
   const recentsRef = useRef<HTMLButtonElement>(null);
   const recentJobsRef = useRef<HTMLButtonElement>(null);
   const [recentJobsOpen, setRecentJobsOpen] = useState(false);
+  const [followUser, setFollowUser] = useState("");
+  const [following, setFollowing] = useState(false);
   const maxRecent = parseInt(store.settings?.General?.MaxRecentGames || "8") || 8;
+  const launching = store.launchProgress?.mode === "multi";
 
   const previewAccounts = accounts.slice(0, 5);
   const remaining = count - previewAccounts.length;
@@ -67,6 +70,25 @@ export function MultiSelectSidebar() {
       await store.launchMultiple(ids);
     } catch (e) {
       store.addToast(tr("Launch failed: {{error}}", { error: String(e) }));
+    }
+  }
+
+  async function handleFollow() {
+    const username = followUser.trim();
+    if (!username || following || launching) return;
+    const ids = accounts.map((a) => a.UserID);
+    setFollowing(true);
+    try {
+      const target = await store.resolveFollowTarget(username, ids[0]);
+      if (needsFollowWarning(target)) {
+        if (!(await confirm(tr("{{name}} is not in a game. Try anyway?", { name: target.name })))) return;
+      }
+      if (!(await confirmJoinOnline(ids))) return;
+      await store.launchMultiple(ids, { follow: target });
+    } catch (e) {
+      store.addToast(tr("Follow failed: {{error}}", { error: String(e) }));
+    } finally {
+      setFollowing(false);
     }
   }
 
@@ -354,10 +376,10 @@ export function MultiSelectSidebar() {
           </div>
           <button
             onClick={handleJoin}
-            disabled={store.launchProgress?.mode === "multi"}
+            disabled={launching || following}
             className="sidebar-btn theme-btn mt-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {store.launchProgress?.mode === "multi" ? t("Joining...") : t("Join All ({{count}})", { count })}
+            {launching ? t("Joining...") : t("Join All ({{count}})", { count })}
           </button>
           <button
             onClick={handleRestartLaunchedClients}
@@ -400,6 +422,25 @@ export function MultiSelectSidebar() {
           >
             {t("Close All Roblox")}
           </button>
+        </SidebarSection>
+
+        <SidebarSection title={t("Follow")}>
+          <div className="flex gap-1.5">
+            <input
+              value={followUser}
+              onChange={(e) => setFollowUser(e.target.value)}
+              placeholder={t("Username")}
+              className="sidebar-input flex-1 min-w-0"
+              onKeyDown={(e) => e.key === "Enter" && handleFollow()}
+            />
+            <button
+              onClick={handleFollow}
+              disabled={following || launching}
+              className="sidebar-btn-sm shrink-0 whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {following ? t("Following...") : t("Follow All ({{count}})", { count })}
+            </button>
+          </div>
         </SidebarSection>
 
         <SidebarSection title={t("Batch Actions")}>

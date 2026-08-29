@@ -57,6 +57,26 @@ interface LaunchProgressState {
   userId: number | null;
 }
 
+export interface FollowTarget {
+  userId: number;
+  name: string;
+  presenceType: number;
+  placeId: number | null;
+  jobId: string;
+}
+
+interface LaunchMultipleOptions {
+  follow?: FollowTarget;
+}
+
+export function isDirectFollowJoin(target: FollowTarget): boolean {
+  return target.presenceType === 2 && !!target.placeId && !!target.jobId;
+}
+
+export function needsFollowWarning(target: FollowTarget): boolean {
+  return !(target.presenceType === 2 && !!target.placeId);
+}
+
 type ActionStatusTone = "info" | "success" | "warn" | "error";
 
 interface ActionStatusState {
@@ -215,7 +235,8 @@ export interface StoreValue {
   launchedByProgram: Set<number>;
 
   joinServer: (userId: number) => Promise<void>;
-  launchMultiple: (userIds: number[]) => Promise<void>;
+  launchMultiple: (userIds: number[], options?: LaunchMultipleOptions) => Promise<void>;
+  resolveFollowTarget: (username: string, viewerUserId: number) => Promise<FollowTarget>;
   restartRobloxClients: (userIds: number[]) => Promise<void>;
   focusRobloxClient: (userId: number) => Promise<boolean>;
   killAllRobloxProcesses: () => Promise<void>;
@@ -1195,7 +1216,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 7000);
   }
 
-  async function launchMultiple(userIds: number[]) {
+  async function resolveFollowTarget(username: string, viewerUserId: number): Promise<FollowTarget> {
+    const name = username.trim();
+    const user = await invoke<{ id: number; name: string }>("lookup_user", { username: name });
+    const presence = await invoke<
+      {
+        userPresenceType?: number;
+        user_presence_type?: number;
+        placeId?: number | null;
+        rootPlaceId?: number | null;
+        gameId?: string | null;
+      }[]
+    >("get_presence", { userIds: [user.id], viewerUserId });
+    const entry = presence[0];
+    return {
+      userId: user.id,
+      name: user.name || name,
+      presenceType: entry?.userPresenceType ?? entry?.user_presence_type ?? 0,
+      placeId: entry?.placeId ?? entry?.rootPlaceId ?? null,
+      jobId: entry?.gameId ?? "",
+    };
+  }
+
+  async function launchMultiple(userIds: number[], options?: LaunchMultipleOptions) {
     if (userIds.length === 0) return;
     if (userIds.length > 1 && platformCapabilities?.os === "linux" && !platformCapabilities.supportsMultiLaunch) {
       const message =
@@ -1215,9 +1258,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       total: userIds.length,
       userId: userIds[0],
     });
-    setActionStatusMessage(tr("Launching {{count}} accounts...", { count: userIds.length }), "info", 5000);
+    const follow = options?.follow;
+    const directFollowJoin = !!follow && isDirectFollowJoin(follow);
+    setActionStatusMessage(
+      follow
+        ? tr("Following {{name}} with {{count}} accounts...", { name: follow.name, count: userIds.length })
+        : tr("Launching {{count}} accounts...", { count: userIds.length }),
+      "info",
+      5000
+    );
 
     try {
+      if (follow) {
+        await invoke("launch_multiple", {
+          userIds,
+          placeId: directFollowJoin ? follow.placeId : follow.userId,
+          jobId: directFollowJoin ? follow.jobId : "",
+          launchData: "",
+          shuffleJob: false,
+          followUserId: follow.userId,
+        });
+        await loadAccounts();
+        if (directFollowJoin && follow.placeId) {
+          void recordRecentGame(follow.placeId, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
+        }
+        addToast(tr("Following {{name}} with {{count}} accounts...", { name: follow.name, count: userIds.length }));
+        return;
+      }
+
       const pid = parseInt(placeId) || 5315046213;
       await invoke("launch_multiple", {
         userIds,
@@ -1225,6 +1293,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         jobId,
         launchData,
         shuffleJob: shuffleJobId,
+        followUserId: null,
       });
       await loadAccounts();
       void recordRecentGame(pid, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
@@ -2415,6 +2484,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     launchedByProgram,
     joinServer,
     launchMultiple,
+    resolveFollowTarget,
     restartRobloxClients,
     focusRobloxClient,
     killAllRobloxProcesses,
