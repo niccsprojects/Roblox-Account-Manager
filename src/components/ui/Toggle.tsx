@@ -16,13 +16,22 @@ export function Toggle({
   const t = useTr();
   return (
     <div
-      className={`group flex items-start gap-3 py-2 px-1 rounded-lg select-none transition-colors ${
+      role="switch"
+      aria-checked={checked}
+      aria-disabled={disabled || undefined}
+      tabIndex={disabled ? -1 : 0}
+      className={`group flex items-start gap-3 py-2 px-1 rounded-lg select-none transition-colors outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent-color)] ${
         disabled
           ? "cursor-not-allowed opacity-60"
           : "cursor-pointer hover:bg-white/[0.02]"
       }`}
       onClick={() => {
         if (disabled) return;
+        onChange(!checked);
+      }}
+      onKeyDown={(e) => {
+        if (disabled || (e.key !== " " && e.key !== "Enter")) return;
+        e.preventDefault();
         onChange(!checked);
       }}
     >
