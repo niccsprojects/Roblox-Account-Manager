@@ -473,6 +473,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const avatarLoadingRef = useRef<Set<number>>(new Set());
   const launchClearTimeoutRef = useRef<number | null>(null);
+  const reservedLaunchIdsRef = useRef<Set<number>>(new Set());
   const actionStatusTimeoutRef = useRef<number | null>(null);
   const walkthroughOpenTimeoutRef = useRef<number | null>(null);
 
@@ -1139,8 +1140,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function reserveLaunch(userIds: number[]): boolean {
+    const reserved = reservedLaunchIdsRef.current;
+    if (userIds.some((id) => reserved.has(id))) return false;
+    userIds.forEach((id) => reserved.add(id));
+    return true;
+  }
+
+  function releaseLaunch(userIds: number[]) {
+    userIds.forEach((id) => reservedLaunchIdsRef.current.delete(id));
+  }
+
   async function runSingleLaunch(userId: number, statusMessage: string, launch: () => Promise<void>): Promise<boolean> {
-    if (joiningAccounts.has(userId)) return false;
+    if (!reserveLaunch([userId])) return false;
     clearLaunchTimeout();
     setJoiningAccounts(new Set([userId]));
     setLaunchProgress({
@@ -1152,6 +1164,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setActionStatusMessage(statusMessage, "info", 5000);
 
     const clearSingle = () => {
+      releaseLaunch([userId]);
       setJoiningAccounts((prev) => {
         const next = new Set(prev);
         next.delete(userId);
@@ -1289,6 +1302,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setActionStatusMessage(message, "error", 5000);
       throw new Error(message);
     }
+    if (!reserveLaunch(userIds)) {
+      const message = tr("A launch is already in progress for one of the selected accounts");
+      setActionStatusMessage(message, "warn", 4000);
+      throw new Error(message);
+    }
 
     clearLaunchTimeout();
     setJoiningAccounts(new Set([userIds[0]]));
@@ -1349,6 +1367,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setError(String(e));
       setActionStatusMessage(tr("Launch failed: {{error}}", { error: String(e) }), "error", 5000);
       throw e;
+    } finally {
+      releaseLaunch(userIds);
     }
   }
 
