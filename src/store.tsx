@@ -1142,7 +1142,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   function reserveLaunch(userIds: number[]): boolean {
     const reserved = reservedLaunchIdsRef.current;
-    if (userIds.some((id) => reserved.has(id))) return false;
+    if (reserved.size > 0) return false;
     userIds.forEach((id) => reserved.add(id));
     return true;
   }
@@ -1182,6 +1182,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       throw e;
     }
 
+    releaseLaunch([userId]);
     launchClearTimeoutRef.current = window.setTimeout(() => {
       clearSingle();
       launchClearTimeoutRef.current = null;
@@ -1303,7 +1304,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       throw new Error(message);
     }
     if (!reserveLaunch(userIds)) {
-      const message = tr("A launch is already in progress for one of the selected accounts");
+      const message = tr("A launch is already in progress");
       setActionStatusMessage(message, "warn", 4000);
       throw new Error(message);
     }
