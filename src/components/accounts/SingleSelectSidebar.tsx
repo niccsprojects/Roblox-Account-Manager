@@ -120,7 +120,7 @@ export function SingleSelectSidebar() {
   }
 
   async function handleFollow() {
-    if (!followUser.trim() || following || store.joiningAccounts.has(account.UserID)) return;
+    if (!followUser.trim() || following || store.launchActive) return;
     setFollowing(true);
     try {
       const target = await store.resolveFollowTarget(followUser, account.UserID);
@@ -345,7 +345,7 @@ export function SingleSelectSidebar() {
           <div className="flex items-center gap-1.5 mt-2 relative">
             <button
               onClick={handleJoin}
-              disabled={isJoining}
+              disabled={isJoining || store.launchActive}
               className="sidebar-btn theme-btn flex-1 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {isJoining ? t("Joining...") : t("Join Server")}
@@ -427,7 +427,7 @@ export function SingleSelectSidebar() {
             />
             <button
               onClick={handleFollow}
-              disabled={following || store.joiningAccounts.has(account.UserID)}
+              disabled={following || store.launchActive}
               className="sidebar-btn-sm disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {following ? t("Following...") : t("Follow")}

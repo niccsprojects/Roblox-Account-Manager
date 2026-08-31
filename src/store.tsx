@@ -268,6 +268,7 @@ export interface StoreValue {
   undo: () => void;
   redo: () => void;
   joiningAccounts: Set<number>;
+  launchActive: boolean;
   launchProgress: LaunchProgressState | null;
 
   dragState: DragState | null;
@@ -474,6 +475,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const avatarLoadingRef = useRef<Set<number>>(new Set());
   const launchClearTimeoutRef = useRef<number | null>(null);
   const reservedLaunchIdsRef = useRef<Set<number>>(new Set());
+  const [launchActive, setLaunchActive] = useState(false);
   const actionStatusTimeoutRef = useRef<number | null>(null);
   const walkthroughOpenTimeoutRef = useRef<number | null>(null);
 
@@ -1142,13 +1144,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   function reserveLaunch(userIds: number[]): boolean {
     const reserved = reservedLaunchIdsRef.current;
-    if (reserved.size > 0) return false;
+    if (reserved.size > 0) {
+      setActionStatusMessage(tr("A launch is already in progress"), "warn", 4000);
+      return false;
+    }
     userIds.forEach((id) => reserved.add(id));
+    setLaunchActive(true);
     return true;
   }
 
   function releaseLaunch(userIds: number[]) {
     userIds.forEach((id) => reservedLaunchIdsRef.current.delete(id));
+    if (reservedLaunchIdsRef.current.size === 0) setLaunchActive(false);
   }
 
   async function runSingleLaunch(userId: number, statusMessage: string, launch: () => Promise<void>): Promise<boolean> {
@@ -1304,9 +1311,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       throw new Error(message);
     }
     if (!reserveLaunch(userIds)) {
-      const message = tr("A launch is already in progress");
-      setActionStatusMessage(message, "warn", 4000);
-      throw new Error(message);
+      throw new Error(tr("A launch is already in progress"));
     }
 
     clearLaunchTimeout();
@@ -2574,6 +2579,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     undo,
     redo,
     joiningAccounts,
+    launchActive,
     launchProgress,
     dragState,
     setDragState,
