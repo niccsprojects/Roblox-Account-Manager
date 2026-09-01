@@ -432,9 +432,13 @@ async fn launch_multiple(
     job_id: String,
     launch_data: String,
     shuffle_job: bool,
+    follow_user_id: Option<i64>,
 ) -> Result<(), String> {
     use platform::windows;
 
+    let follow_target = follow_user_id.filter(|id| *id > 0);
+    let follow_launch = follow_target.is_some() && job_id.trim().is_empty();
+    let shuffle_job = shuffle_job && follow_target.is_none();
     let delay = settings.get_int("General", "AccountJoinDelay").unwrap_or(8) as u64;
     let multi_rbx = settings.get_bool("General", "EnableMultiRbx");
     let delay = if multi_rbx { delay.max(12) } else { delay };
@@ -507,14 +511,21 @@ async fn launch_multiple(
         }
 
         let account = accounts.iter().find(|a| a.user_id == uid);
-        let acct_place = account
-            .and_then(|a| a.fields.get("SavedPlaceId"))
-            .and_then(|v| v.parse::<i64>().ok())
-            .unwrap_or(place_id);
-        let acct_job = account
-            .and_then(|a| a.fields.get("SavedJobId"))
-            .map(|v| v.clone())
-            .unwrap_or_else(|| job_id.clone());
+        let (acct_place, acct_job) = match follow_target {
+            Some(target_user_id) if follow_launch => (target_user_id, String::new()),
+            Some(_) => (place_id, job_id.clone()),
+            None => (
+                account
+                    .and_then(|a| a.fields.get("SavedPlaceId"))
+                    .and_then(|v| v.parse::<i64>().ok())
+                    .unwrap_or(place_id),
+                account
+                    .and_then(|a| a.fields.get("SavedJobId"))
+                    .filter(|v| !v.trim().is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| job_id.clone()),
+            ),
+        };
         let acct_version_override = account
             .and_then(|a| a.fields.get("RobloxVersion").cloned())
             .filter(|v| !v.trim().is_empty());
@@ -661,7 +672,7 @@ async fn launch_multiple(
                 private_join.place_id,
                 &actual_job,
                 &launch_data,
-                false,
+                follow_launch,
                 private_join.use_private_join,
                 &private_join.access_code,
                 &private_join.link_code,
@@ -674,7 +685,7 @@ async fn launch_multiple(
                 &actual_job,
                 &browser_tracker_id,
                 &launch_data,
-                false,
+                follow_launch,
                 private_join.use_private_join,
                 &private_join.access_code,
                 &private_join.link_code,
@@ -771,11 +782,15 @@ async fn launch_multiple(
     job_id: String,
     launch_data: String,
     shuffle_job: bool,
+    follow_user_id: Option<i64>,
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         use platform::macos;
 
+        let follow_target = follow_user_id.filter(|id| *id > 0);
+        let follow_launch = follow_target.is_some() && job_id.trim().is_empty();
+        let shuffle_job = shuffle_job && follow_target.is_none();
         let delay = settings.get_int("General", "AccountJoinDelay").unwrap_or(8) as u64;
         let multi_rbx = settings.get_bool("General", "EnableMultiRbx");
         let delay = if multi_rbx { delay.max(12) } else { delay };
@@ -794,14 +809,21 @@ async fn launch_multiple(
             }
 
             let account = accounts.iter().find(|a| a.user_id == uid);
-            let acct_place = account
-                .and_then(|a| a.fields.get("SavedPlaceId"))
-                .and_then(|v| v.parse::<i64>().ok())
-                .unwrap_or(place_id);
-            let acct_job = account
-                .and_then(|a| a.fields.get("SavedJobId"))
-                .map(|v| v.clone())
-                .unwrap_or_else(|| job_id.clone());
+            let (acct_place, acct_job) = match follow_target {
+                Some(target_user_id) if follow_launch => (target_user_id, String::new()),
+                Some(_) => (place_id, job_id.clone()),
+                None => (
+                    account
+                        .and_then(|a| a.fields.get("SavedPlaceId"))
+                        .and_then(|v| v.parse::<i64>().ok())
+                        .unwrap_or(place_id),
+                    account
+                        .and_then(|a| a.fields.get("SavedJobId"))
+                        .filter(|v| !v.trim().is_empty())
+                        .cloned()
+                        .unwrap_or_else(|| job_id.clone()),
+                ),
+            };
 
             let _ = app.emit(
                 "launch-progress",
@@ -886,7 +908,7 @@ async fn launch_multiple(
                     private_join.place_id,
                     &actual_job,
                     &launch_data,
-                    false,
+                    follow_launch,
                     private_join.use_private_join,
                     &private_join.access_code,
                     &private_join.link_code,
@@ -899,7 +921,7 @@ async fn launch_multiple(
                     &actual_job,
                     &browser_tracker_id,
                     &launch_data,
-                    false,
+                    follow_launch,
                     private_join.use_private_join,
                     &private_join.access_code,
                     &private_join.link_code,
@@ -950,6 +972,7 @@ async fn launch_multiple(
             job_id,
             launch_data,
             shuffle_job,
+            follow_user_id,
         );
         Err("Launching is only supported on Windows and macOS".into())
     }

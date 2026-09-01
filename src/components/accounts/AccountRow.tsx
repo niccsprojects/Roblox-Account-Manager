@@ -59,6 +59,8 @@ export function AccountRowView({
   const description = account.Description?.trim() || "";
   const hideAvatar = store.hideUsernames && !store.showAvatarsWhenHidden;
   const showPresence = store.settings?.General?.ShowPresence === "true";
+  const wrapLongNames = store.settings?.General?.WrapLongNames === "true";
+  const nameOverflowClass = wrapLongNames ? "break-words" : "truncate";
   const presenceType = store.presenceByUserId.get(account.UserID) ?? 0;
   const launchedLocally = store.launchedByProgram.has(account.UserID);
   const isJoining = store.joiningAccounts.has(account.UserID);
@@ -180,14 +182,14 @@ export function AccountRowView({
             </Tooltip>
           )}
           <div
-            className={`text-[13px] truncate leading-tight transition-colors duration-100 ${
+            className={`text-[13px] ${nameOverflowClass} leading-tight transition-colors duration-100 ${
               selected ? "theme-accent" : "text-[var(--panel-fg)]"
             }`}
           >
             {displayName}
           </div>
         </div>
-        {showUsername && <div className="text-[11px] theme-muted truncate leading-tight">@{account.Username}</div>}
+        {showUsername && <div className={`text-[11px] theme-muted ${nameOverflowClass} leading-tight`}>@{account.Username}</div>}
       </div>
 
       {description && (

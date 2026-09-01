@@ -654,7 +654,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                           <span
                             key={a.UserID}
                             className={[
-                              "px-2 py-1 rounded-md text-[11px] border theme-soft",
+                              "px-2 py-1 rounded-md text-[11px] border theme-soft max-w-[160px] truncate",
                               isPlayer ? "theme-accent-bg theme-accent-border theme-accent" : "theme-border text-[var(--panel-fg)]",
                             ].join(" ")}
                           >
@@ -1396,7 +1396,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                   <span
                     key={a.UserID}
                     className={[
-                      "px-2 py-1 rounded-md text-[11px] border theme-soft",
+                      "px-2 py-1 rounded-md text-[11px] border theme-soft max-w-[160px] truncate",
                       isPlayer ? "theme-accent-bg theme-accent-border theme-accent" : "theme-border text-[var(--panel-fg)]",
                     ].join(" ")}
                   >

@@ -57,6 +57,26 @@ interface LaunchProgressState {
   userId: number | null;
 }
 
+export interface FollowTarget {
+  userId: number;
+  name: string;
+  presenceType: number;
+  placeId: number | null;
+  jobId: string;
+}
+
+interface LaunchMultipleOptions {
+  follow?: FollowTarget;
+}
+
+export function isDirectFollowJoin(target: FollowTarget): boolean {
+  return target.presenceType === 2 && !!target.placeId && !!target.jobId;
+}
+
+export function needsFollowWarning(target: FollowTarget): boolean {
+  return !(target.presenceType === 2 && !!target.placeId);
+}
+
 type ActionStatusTone = "info" | "success" | "warn" | "error";
 
 interface ActionStatusState {
@@ -215,7 +235,9 @@ export interface StoreValue {
   launchedByProgram: Set<number>;
 
   joinServer: (userId: number) => Promise<void>;
-  launchMultiple: (userIds: number[]) => Promise<void>;
+  launchFollow: (userId: number, target: FollowTarget) => Promise<void>;
+  launchMultiple: (userIds: number[], options?: LaunchMultipleOptions) => Promise<void>;
+  resolveFollowTarget: (username: string, viewerUserId: number) => Promise<FollowTarget>;
   restartRobloxClients: (userIds: number[]) => Promise<void>;
   focusRobloxClient: (userId: number) => Promise<boolean>;
   killAllRobloxProcesses: () => Promise<void>;
@@ -246,6 +268,7 @@ export interface StoreValue {
   undo: () => void;
   redo: () => void;
   joiningAccounts: Set<number>;
+  launchActive: boolean;
   launchProgress: LaunchProgressState | null;
 
   dragState: DragState | null;
@@ -451,6 +474,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const avatarLoadingRef = useRef<Set<number>>(new Set());
   const launchClearTimeoutRef = useRef<number | null>(null);
+  const reservedLaunchIdsRef = useRef<Set<number>>(new Set());
+  const [launchActive, setLaunchActive] = useState(false);
   const actionStatusTimeoutRef = useRef<number | null>(null);
   const walkthroughOpenTimeoutRef = useRef<number | null>(null);
 
@@ -1117,7 +1142,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function joinServer(userId: number) {
+  function reserveLaunch(userIds: number[]): boolean {
+    const reserved = reservedLaunchIdsRef.current;
+    if (reserved.size > 0) {
+      setActionStatusMessage(tr("A launch is already in progress"), "warn", 4000);
+      return false;
+    }
+    userIds.forEach((id) => reserved.add(id));
+    setLaunchActive(true);
+    return true;
+  }
+
+  function releaseLaunch(userIds: number[]) {
+    userIds.forEach((id) => reservedLaunchIdsRef.current.delete(id));
+    if (reservedLaunchIdsRef.current.size === 0) setLaunchActive(false);
+  }
+
+  async function runSingleLaunch(userId: number, statusMessage: string, launch: () => Promise<void>): Promise<boolean> {
+    if (!reserveLaunch([userId])) return false;
     clearLaunchTimeout();
     setJoiningAccounts(new Set([userId]));
     setLaunchProgress({
@@ -1126,76 +1168,138 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       total: 1,
       userId,
     });
-    const launchAccount = accounts.find((a) => a.UserID === userId);
-    const accountName = launchAccount?.Alias || launchAccount?.Username || String(userId);
-    setActionStatusMessage(tr("Launching {{name}}...", { name: accountName }), "info", 5000);
+    setActionStatusMessage(statusMessage, "info", 5000);
+
+    const clearSingle = () => {
+      releaseLaunch([userId]);
+      setJoiningAccounts((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+      setLaunchProgress((prev) => (prev?.mode === "single" && prev.userId === userId ? null : prev));
+    };
 
     try {
-      const pid = parseInt(placeId) || 5315046213;
-      const rawJobId = jobId.trim();
-      let resolvedJobId = rawJobId;
-      let joinVip = false;
-      let linkCode = "";
-
-      const vipPrefix = rawJobId.match(/^vip:\s*(.+)$/i);
-      if (vipPrefix?.[1]) {
-        joinVip = true;
-        linkCode = vipPrefix[1].trim();
-        resolvedJobId = "";
-      } else {
-        const linkLike = rawJobId.match(/(?:privateServerLinkCode|linkCode|code)=([^&\s]+)/i);
-        if (linkLike?.[1]) {
-          resolvedJobId = "";
-          try {
-            linkCode = decodeURIComponent(linkLike[1]);
-          } catch {
-            linkCode = linkLike[1];
-          }
-        }
-      }
-
-      await invoke("launch_roblox", {
-        userId,
-        placeId: pid,
-        jobId: resolvedJobId,
-        launchData,
-        followUser: false,
-        joinVip,
-        linkCode,
-        shuffleJob: shuffleJobId,
-      });
-      await loadAccounts();
-      void recordRecentGame(pid, userId, parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
-      if (rawJobId) {
-        try {
-          addRecentJob(rawJobId, pid, parseInt(settings?.General?.MaxRecentJobs || "12") || 12);
-        } catch {}
-      }
-      addToast(tr("Launching game..."));
+      await launch();
     } catch (e) {
-      setJoiningAccounts((prev) => {
-        const next = new Set(prev);
-        next.delete(userId);
-        return next;
-      });
-      setLaunchProgress((prev) => (prev?.mode === "single" && prev.userId === userId ? null : prev));
+      clearSingle();
       setError(String(e));
       setActionStatusMessage(tr("Launch failed: {{error}}", { error: String(e) }), "error", 5000);
-      return;
+      throw e;
     }
 
+    releaseLaunch([userId]);
     launchClearTimeoutRef.current = window.setTimeout(() => {
-      setJoiningAccounts((prev) => {
-        const next = new Set(prev);
-        next.delete(userId);
-        return next;
-      });
-      setLaunchProgress((prev) => (prev?.mode === "single" && prev.userId === userId ? null : prev));
+      clearSingle();
       launchClearTimeoutRef.current = null;
     }, 7000);
+    return true;
   }
 
-  async function launchMultiple(userIds: number[]) {
+  function accountDisplayName(userId: number): string {
+    const launchAccount = accounts.find((a) => a.UserID === userId);
+    return launchAccount?.Alias || launchAccount?.Username || String(userId);
+  }
+
+  async function launchFollow(userId: number, target: FollowTarget) {
+    const directJoin = isDirectFollowJoin(target);
+    const message = directJoin
+      ? tr("Joining {{name}}...", { name: target.name })
+      : tr("Following {{name}}...", { name: target.name });
+    const started = await runSingleLaunch(userId, message, () =>
+      invoke("launch_roblox", {
+        userId,
+        placeId: directJoin ? target.placeId : target.userId,
+        jobId: directJoin ? target.jobId : "",
+        launchData: "",
+        followUser: !directJoin,
+        joinVip: false,
+        linkCode: "",
+        shuffleJob: false,
+      })
+    );
+    if (!started) return;
+    await loadAccounts();
+    addToast(message);
+  }
+
+  async function joinServer(userId: number) {
+    const pid = parseInt(placeId) || 5315046213;
+    const rawJobId = jobId.trim();
+    let resolvedJobId = rawJobId;
+    let joinVip = false;
+    let linkCode = "";
+
+    const vipPrefix = rawJobId.match(/^vip:\s*(.+)$/i);
+    if (vipPrefix?.[1]) {
+      joinVip = true;
+      linkCode = vipPrefix[1].trim();
+      resolvedJobId = "";
+    } else {
+      const linkLike = rawJobId.match(/(?:privateServerLinkCode|linkCode|code)=([^&\s]+)/i);
+      if (linkLike?.[1]) {
+        resolvedJobId = "";
+        try {
+          linkCode = decodeURIComponent(linkLike[1]);
+        } catch {
+          linkCode = linkLike[1];
+        }
+      }
+    }
+
+    let started: boolean;
+    try {
+      started = await runSingleLaunch(userId, tr("Launching {{name}}...", { name: accountDisplayName(userId) }), () =>
+        invoke("launch_roblox", {
+          userId,
+          placeId: pid,
+          jobId: resolvedJobId,
+          launchData,
+          followUser: false,
+          joinVip,
+          linkCode,
+          shuffleJob: shuffleJobId,
+        })
+      );
+    } catch {
+      return;
+    }
+    if (!started) return;
+
+    await loadAccounts();
+    void recordRecentGame(pid, userId, parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
+    if (rawJobId) {
+      try {
+        addRecentJob(rawJobId, pid, parseInt(settings?.General?.MaxRecentJobs || "12") || 12);
+      } catch {}
+    }
+    addToast(tr("Launching game..."));
+  }
+
+  async function resolveFollowTarget(username: string, viewerUserId: number): Promise<FollowTarget> {
+    const name = username.trim();
+    const user = await invoke<{ id: number; name: string }>("lookup_user", { username: name });
+    const presence = await invoke<
+      {
+        userPresenceType?: number;
+        user_presence_type?: number;
+        placeId?: number | null;
+        rootPlaceId?: number | null;
+        gameId?: string | null;
+      }[]
+    >("get_presence", { userIds: [user.id], viewerUserId });
+    const entry = presence[0];
+    return {
+      userId: user.id,
+      name: user.name || name,
+      presenceType: entry?.userPresenceType ?? entry?.user_presence_type ?? 0,
+      placeId: entry?.placeId ?? entry?.rootPlaceId ?? null,
+      jobId: entry?.gameId ?? "",
+    };
+  }
+
+  async function launchMultiple(userIds: number[], options?: LaunchMultipleOptions) {
     if (userIds.length === 0) return;
     if (userIds.length > 1 && platformCapabilities?.os === "linux" && !platformCapabilities.supportsMultiLaunch) {
       const message =
@@ -1206,6 +1310,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setActionStatusMessage(message, "error", 5000);
       throw new Error(message);
     }
+    if (!reserveLaunch(userIds)) {
+      throw new Error(tr("A launch is already in progress"));
+    }
 
     clearLaunchTimeout();
     setJoiningAccounts(new Set([userIds[0]]));
@@ -1215,9 +1322,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       total: userIds.length,
       userId: userIds[0],
     });
-    setActionStatusMessage(tr("Launching {{count}} accounts...", { count: userIds.length }), "info", 5000);
+    const follow = options?.follow;
+    const directFollowJoin = !!follow && isDirectFollowJoin(follow);
+    setActionStatusMessage(
+      follow
+        ? tr("Following {{name}} with {{count}} accounts...", { name: follow.name, count: userIds.length })
+        : tr("Launching {{count}} accounts...", { count: userIds.length }),
+      "info",
+      5000
+    );
 
     try {
+      if (follow) {
+        await invoke("launch_multiple", {
+          userIds,
+          placeId: directFollowJoin ? follow.placeId : follow.userId,
+          jobId: directFollowJoin ? follow.jobId : "",
+          launchData: "",
+          shuffleJob: false,
+          followUserId: follow.userId,
+        });
+        await loadAccounts();
+        if (directFollowJoin && follow.placeId) {
+          void recordRecentGame(follow.placeId, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
+        }
+        addToast(tr("Following {{name}} with {{count}} accounts...", { name: follow.name, count: userIds.length }));
+        return;
+      }
+
       const pid = parseInt(placeId) || 5315046213;
       await invoke("launch_multiple", {
         userIds,
@@ -1225,6 +1357,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         jobId,
         launchData,
         shuffleJob: shuffleJobId,
+        followUserId: null,
       });
       await loadAccounts();
       void recordRecentGame(pid, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
@@ -1240,6 +1373,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setError(String(e));
       setActionStatusMessage(tr("Launch failed: {{error}}", { error: String(e) }), "error", 5000);
       throw e;
+    } finally {
+      releaseLaunch(userIds);
     }
   }
 
@@ -2414,7 +2549,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     presenceByUserId,
     launchedByProgram,
     joinServer,
+    launchFollow,
     launchMultiple,
+    resolveFollowTarget,
     restartRobloxClients,
     focusRobloxClient,
     killAllRobloxProcesses,
@@ -2442,6 +2579,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     undo,
     redo,
     joiningAccounts,
+    launchActive,
     launchProgress,
     dragState,
     setDragState,
