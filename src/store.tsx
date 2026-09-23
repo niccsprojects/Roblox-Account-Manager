@@ -31,6 +31,17 @@ import {
   getUpdaterSkipVersionKey,
 } from "./updaterChannels";
 import { addRecentJob, recordRecentGame } from "./components/server-list/types";
+import afkCycleSound from "./assets/afk-cycle.wav";
+
+async function playAfkCycleSound() {
+  try {
+    const enabled = await invoke<string | null>("get_setting", { section: "Afk", key: "SoundOnCycle" });
+    if (enabled !== "true") return;
+    const audio = new Audio(afkCycleSound);
+    audio.volume = 0.5;
+    await audio.play();
+  } catch {}
+}
 
 interface PresenceEntry {
   userId?: number;
@@ -478,6 +489,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [launchActive, setLaunchActive] = useState(false);
   const actionStatusTimeoutRef = useRef<number | null>(null);
   const walkthroughOpenTimeoutRef = useRef<number | null>(null);
+  const lastAfkCyclesRef = useRef(0);
 
   const devMode = settings?.Developer?.DevMode === "true";
   const hiddenNameLetters = parseInt(settings?.General?.HiddenNameLetters || "0") || 0;
@@ -1416,6 +1428,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   async function refreshAfkStatus() {
     try {
       const status = await invoke<AfkStatus>("get_afk_mode_status");
+      lastAfkCyclesRef.current = status.totalCycles;
       setAfkStatus(status);
     } catch (e) {
       setError(String(e));
@@ -2167,7 +2180,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setGeneratorStatus(e.payload);
       }),
       listen<AfkStatus>("afk-status", (e) => {
+        const cycles = e.payload.totalCycles;
+        const completed = cycles > lastAfkCyclesRef.current;
+        lastAfkCyclesRef.current = cycles;
         setAfkStatus(e.payload);
+        if (completed) void playAfkCycleSound();
       }),
       listen("afk-stopped", () => {
         setAfkStatus((prev) => (prev ? { ...prev, active: false } : prev));

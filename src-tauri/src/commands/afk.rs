@@ -15,6 +15,14 @@ struct AfkRuntime {
 }
 
 #[cfg(target_os = "windows")]
+fn initial_afk_runtime(started_at_ms: i64, interval_seconds: u64) -> AfkRuntime {
+    AfkRuntime {
+        next_cycle_at_ms: Some(started_at_ms + (interval_seconds as i64) * 1000),
+        ..AfkRuntime::default()
+    }
+}
+
+#[cfg(target_os = "windows")]
 #[derive(Clone)]
 struct AfkSession {
     id: u64,
@@ -282,17 +290,21 @@ async fn start_afk_mode(
         AFK_MANAGER.replace_session(None);
     }
 
+    let started_at_ms = now_ms();
     let session = AfkSession {
         id: AFK_MANAGER.next_session_id(),
         stop_flag: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         stopped_notify: std::sync::Arc::new(tokio::sync::Notify::new()),
-        started_at_ms: now_ms(),
+        started_at_ms,
         config: std::sync::Arc::new(std::sync::Mutex::new(AfkConfig {
             interval_seconds,
             key,
             inter_window_delay_ms: inter_window_delay_ms.clamp(50, 5000),
         })),
-        runtime: std::sync::Arc::new(std::sync::Mutex::new(AfkRuntime::default())),
+        runtime: std::sync::Arc::new(std::sync::Mutex::new(initial_afk_runtime(
+            started_at_ms,
+            interval_seconds,
+        ))),
     };
 
     AFK_MANAGER.replace_session(Some(session.clone()));
@@ -369,4 +381,17 @@ fn get_afk_mode_status() -> Result<AfkStatusPayload, String> {
 #[tauri::command]
 async fn afk_trigger_now(_key: String, _inter_window_delay_ms: u64) -> Result<u32, String> {
     Err("Not supported on this platform".into())
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod afk_tests {
+    use super::initial_afk_runtime;
+
+    #[test]
+    fn initial_runtime_carries_first_deadline() {
+        let runtime = initial_afk_runtime(1_000, 600);
+        assert_eq!(runtime.next_cycle_at_ms, Some(601_000));
+        assert_eq!(runtime.last_cycle_at_ms, None);
+        assert_eq!(runtime.total_cycles, 0);
+    }
 }
