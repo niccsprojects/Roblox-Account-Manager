@@ -1496,7 +1496,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const message =
         platformCapabilities.reasons[0] ||
         platformCapabilities.warnings[0] ||
-        "Botting Mode is unavailable for the active Linux runner";
+        "Auto Rejoin is unavailable for the active Linux runner";
       setError(message);
       throw new Error(message);
     }
@@ -1512,7 +1512,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         playerGraceMinutes: config.playerGraceMinutes,
       });
       setBottingStatus(status);
-      addToast(tr("Botting Mode started ({{count}} accounts)", { count: config.userIds.length }));
+      addToast(tr("Auto Rejoin started ({{count}} accounts)", { count: config.userIds.length }));
     } catch (e) {
       setError(String(e));
       throw e;
@@ -1524,8 +1524,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await invoke("stop_botting_mode", { closeBotAccounts });
       await refreshBottingStatus();
       addToast(tr(closeBotAccounts
-        ? "Botting Mode stopped and bot accounts closed"
-        : "Botting Mode stopped"));
+        ? "Auto Rejoin stopped and alt accounts closed"
+        : "Auto Rejoin stopped"));
     } catch (e) {
       setError(String(e));
       throw e;
@@ -1542,8 +1542,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addToast(
         tr(
           userIds.length === 1
-            ? "Added {{count}} account to Botting Mode"
-            : "Added {{count}} accounts to Botting Mode",
+            ? "Added {{count}} account to Auto Rejoin"
+            : "Added {{count}} accounts to Auto Rejoin",
           { count: userIds.length }
         )
       );
@@ -1559,7 +1559,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         playerUserIds: userIds,
       });
       setBottingStatus(status);
-      addToast(tr(userIds.length === 0 ? "Player accounts cleared" : "Player accounts updated"));
+      addToast(tr(userIds.length === 0 ? "Main accounts cleared" : "Main accounts updated"));
     } catch (e) {
       setError(String(e));
       throw e;
@@ -2206,7 +2206,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ? `: ${e.payload.error}`
               : "";
           setActionStatusMessage(
-            `${tr("Botting rejoin failed for {{userId}}", { userId: uid })}${errorText}`,
+            `${tr("Auto Rejoin failed for {{userId}}", { userId: uid })}${errorText}`,
             "warn",
             3500
           );

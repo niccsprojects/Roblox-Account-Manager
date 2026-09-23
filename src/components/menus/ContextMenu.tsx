@@ -198,19 +198,19 @@ export function ContextMenu() {
     items.push({
       label:
         addableBottingIds.length > 1
-          ? t("Add {{count}} accounts to Botting Mode", { count: addableBottingIds.length })
+          ? t("Add {{count}} accounts to Auto Rejoin", { count: addableBottingIds.length })
           : addableBottingIds.length === 1
-            ? t("Add {{count}} account to Botting Mode", { count: 1 })
-            : t("Already in Botting Mode"),
+            ? t("Add {{count}} account to Auto Rejoin", { count: 1 })
+            : t("Already in Auto Rejoin"),
       action: async () => {
         if (addableBottingIds.length === 0) {
-          store.addToast(t("Selected accounts are already in Botting Mode"));
+          store.addToast(t("Selected accounts are already in Auto Rejoin"));
           return;
         }
         try {
           await store.addBottingAccounts(addableBottingIds);
         } catch (e) {
-          store.addToast(t("Botting account action failed: {{error}}", { error: String(e) }));
+          store.addToast(t("Auto Rejoin account action failed: {{error}}", { error: String(e) }));
         }
       },
     });

@@ -20,12 +20,12 @@ export function MiscellaneousTab({
         checked={s.getBool("General", "BottingAutoShareLaunchFields")}
         onChange={(v) => s.setBool("General", "BottingAutoShareLaunchFields", v)}
         label="Auto-share launch fields with Sidebar"
-        description="Keeps Place ID, Job ID, and JoinData synced between Sidebar and Botting Mode"
+        description="Keeps Place ID, Job ID, and JoinData synced between Sidebar and Auto Rejoin"
       />
       <Toggle
         checked={s.get("General", "BottingDualPanelDialog", "true") === "true"}
         onChange={(v) => s.setBool("General", "BottingDualPanelDialog", v)}
-        label="Use dual-panel Botting dialog"
+        label="Use dual-panel Auto Rejoin dialog"
         description="Shows setup and live cycle side-by-side with a 1/3 + 2/3 layout"
       />
 

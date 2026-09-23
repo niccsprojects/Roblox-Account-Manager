@@ -262,12 +262,6 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
         label="Persistent login profile"
         description="Reuse the login browser profile so the device builds trust over time, which cuts down on login captchas. Only the Roblox sign-in cookie is cleared before each login"
       />
-      <Toggle
-        checked={s.get("Login", "StealthMode", "true") !== "false"}
-        onChange={(v) => s.setBool("Login", "StealthMode", v)}
-        label="Reduce automation signals"
-        description="Hide browser automation flags Roblox can detect during login. Helps lower captcha prompts but is not a complete solution"
-      />
 
       <div className="px-1 py-3">
         <div className="rounded-lg border border-zinc-800/70 bg-zinc-900/35 px-3 py-2">
@@ -364,7 +358,7 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
       <Toggle
         checked={s.getBool("General", "BottingEnabled")}
         onChange={(v) => s.setBool("General", "BottingEnabled", v)}
-        label={<>Botting Mode<WarningBadge>advanced</WarningBadge></>}
+        label={<>Auto Rejoin<WarningBadge>advanced</WarningBadge></>}
         description="Enable account cycling tools to keep selected alts rejoining automatically"
       />
       <Toggle
