@@ -705,7 +705,7 @@ export function PasswordScreen() {
             : <RestrictedWavesBackground />}
       </div>
       <ModalWindowControls visible />
-      <div className="restricted-auth-shell relative z-10 w-full max-w-sm">
+      <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1
             className="restricted-auth-title text-xl font-semibold text-[var(--panel-fg)] animate-fade-in-up"
@@ -719,7 +719,7 @@ export function PasswordScreen() {
         </div>
 
         <div
-          className="restricted-auth-card theme-panel theme-border rounded-xl border p-6 shadow-2xl backdrop-blur-lg animate-fade-in-up"
+          className="restricted-auth-card theme-panel theme-border rounded-xl border p-6 backdrop-blur-lg animate-fade-in-up"
           style={{ animationDelay: "0.2s" }}
         >
           {store.error && (
