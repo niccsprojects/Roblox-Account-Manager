@@ -961,7 +961,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                         {t("Accounts")}: {liveRows.length}
                       </div>
                       <div className="rounded-md border border-sky-500/25 px-2 py-1 bg-sky-500/12 text-sky-200">
-                        {t("Players")}: {splitPlayersCount}
+                        {t("Main accounts")}: {splitPlayersCount}
                       </div>
                       <div className="rounded-md border border-zinc-500/25 px-2 py-1 bg-zinc-500/12 text-zinc-200">
                         {t("Disconnected")}: {splitDisconnectedCount}
