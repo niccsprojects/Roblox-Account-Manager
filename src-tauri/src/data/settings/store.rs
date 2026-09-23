@@ -345,7 +345,6 @@ impl SettingsStore {
 
         let login_defaults: &[(&str, &str)] = &[
             ("PersistentProfile", "true"),
-            ("StealthMode", "true"),
         ];
 
         let login = ini.section("Login");

@@ -371,21 +371,21 @@ export function SingleSelectSidebar() {
             <button
               onClick={async () => {
                 if (alreadyInBotting) {
-                  store.addToast(t("Selected accounts are already in Botting Mode"));
+                  store.addToast(t("Selected accounts are already in Auto Rejoin"));
                   return;
                 }
                 try {
                   await store.addBottingAccounts([account.UserID]);
                 } catch (e) {
-                  store.addToast(t("Botting account action failed: {{error}}", { error: String(e) }));
+                  store.addToast(t("Auto Rejoin account action failed: {{error}}", { error: String(e) }));
                 }
               }}
               disabled={alreadyInBotting}
               className="sidebar-btn theme-btn mt-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {alreadyInBotting
-                ? t("Already in Botting Mode")
-                : t("Add {{count}} account to Botting Mode", { count: 1 })}
+                ? t("Already in Auto Rejoin")
+                : t("Add {{count}} account to Auto Rejoin", { count: 1 })}
             </button>
           )}
         </SidebarSection>

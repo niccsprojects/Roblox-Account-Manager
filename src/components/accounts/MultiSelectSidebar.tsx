@@ -186,17 +186,17 @@ export function MultiSelectSidebar() {
 
   async function handleAddToBottingMode() {
     if (!bottingActive) {
-      store.addToast(t("Botting Mode is not running"));
+      store.addToast(t("Auto Rejoin is not running"));
       return;
     }
     if (addableBottingCount <= 0) {
-      store.addToast(t("Selected accounts are already in Botting Mode"));
+      store.addToast(t("Selected accounts are already in Auto Rejoin"));
       return;
     }
     try {
       await store.addBottingAccounts(addableBottingIds);
     } catch (e) {
-      store.addToast(t("Botting account action failed: {{error}}", { error: String(e) }));
+      store.addToast(t("Auto Rejoin account action failed: {{error}}", { error: String(e) }));
     }
   }
 
@@ -395,7 +395,7 @@ export function MultiSelectSidebar() {
               onClick={() => store.setBottingDialogOpen(true)}
               className="sidebar-btn theme-btn mt-1.5 bg-[var(--buttons-bg)]/80 border-[var(--buttons-bc)] animate-fade-in"
             >
-              {t("Open Botting Mode")}
+              {t("Open Auto Rejoin")}
             </button>
           )}
           {bottingActive && (
@@ -405,11 +405,11 @@ export function MultiSelectSidebar() {
               className="sidebar-btn theme-btn mt-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {addableBottingCount <= 0
-                ? t("Already in Botting Mode")
+                ? t("Already in Auto Rejoin")
                 : t(
                     addableBottingCount === 1
-                      ? "Add {{count}} account to Botting Mode"
-                      : "Add {{count}} accounts to Botting Mode",
+                      ? "Add {{count}} account to Auto Rejoin"
+                      : "Add {{count}} accounts to Auto Rejoin",
                     { count: addableBottingCount }
                   )}
             </button>

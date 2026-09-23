@@ -59,7 +59,6 @@ pub async fn open_account_browser(
     app: AppHandle,
     state: State<'_, AccountStore>,
     chromium: State<'_, ChromiumManager>,
-    settings: State<'_, SettingsStore>,
     user_id: i64,
 ) -> Result<(), String> {
     let token = {
@@ -74,11 +73,10 @@ pub async fn open_account_browser(
         return Err("Account has no .ROBLOSECURITY token".into());
     }
 
-    let stealth = settings.get_bool("Login", "StealthMode");
     let (binary, _) = ensure_chromium_or_fallback(&app).await?;
     let profile = ChromiumManager::account_profile(&app, user_id)?;
 
-    let (child, port) = spawn_chrome(&binary, &profile, "about:blank", true, stealth).await?;
+    let (child, port) = spawn_chrome(&binary, &profile, "about:blank", true).await?;
 
     let Some(port) = port else {
         let mut child = child;
@@ -90,9 +88,6 @@ pub async fn open_account_browser(
 
     match CdpClient::connect(port).await {
         Ok(mut cdp) => {
-            if stealth {
-                let _ = cdp.inject_stealth().await;
-            }
             let _ = cdp.set_roblosecurity(&token, ".roblox.com").await;
             let _ = cdp.set_roblosecurity(&token, "www.roblox.com").await;
             let _ = cdp.navigate(ROBLOX_HOME_URL).await;
@@ -120,13 +115,9 @@ fn wipe_profile_dir(profile: &Path) -> Result<(), String> {
 
 async fn setup_login_session(
     cdp: &mut CdpClient,
-    stealth: bool,
     persistent: bool,
     start_url: &str,
 ) -> Result<(), String> {
-    if stealth {
-        let _ = cdp.inject_stealth().await;
-    }
     if persistent {
         cdp.delete_roblosecurity(".roblox.com").await?;
         cdp.delete_roblosecurity("www.roblox.com").await?;
@@ -147,19 +138,18 @@ pub async fn open_login_browser(
     chromium.close_login_session();
 
     let persistent = settings.get_bool("Login", "PersistentProfile");
-    let stealth = settings.get_bool("Login", "StealthMode");
 
     let profile = ChromiumManager::login_profile(&app)?;
     if !persistent {
         wipe_profile_dir(&profile)?;
     }
 
-    let start_url = if persistent || stealth {
+    let start_url = if persistent {
         "about:blank"
     } else {
         ROBLOX_LOGIN_URL
     };
-    let (child, port) = spawn_chrome(&binary, &profile, start_url, true, stealth).await?;
+    let (child, port) = spawn_chrome(&binary, &profile, start_url, true).await?;
     chromium.track(LOGIN_KEY, child);
 
     let port = port.ok_or("Could not start the login browser")?;
@@ -171,7 +161,7 @@ pub async fn open_login_browser(
             return Err(e);
         }
     };
-    if let Err(e) = setup_login_session(&mut cdp, stealth, persistent, start_url).await {
+    if let Err(e) = setup_login_session(&mut cdp, persistent, start_url).await {
         chromium.close_login_session();
         return Err(e);
     }
@@ -235,19 +225,18 @@ pub async fn import_userpass(
     chromium.close_login_session();
 
     let persistent = settings.get_bool("Login", "PersistentProfile");
-    let stealth = settings.get_bool("Login", "StealthMode");
 
     let profile = ChromiumManager::login_profile(&app)?;
     if !persistent {
         wipe_profile_dir(&profile)?;
     }
 
-    let start_url = if persistent || stealth {
+    let start_url = if persistent {
         "about:blank"
     } else {
         ROBLOX_LOGIN_URL
     };
-    let (child, port) = spawn_chrome(&binary, &profile, start_url, true, stealth).await?;
+    let (child, port) = spawn_chrome(&binary, &profile, start_url, true).await?;
     chromium.track(LOGIN_KEY, child);
 
     let port = port.ok_or("Could not start the login browser")?;
@@ -264,7 +253,7 @@ pub async fn import_userpass(
         }
     };
 
-    if let Err(e) = setup_login_session(&mut cdp, stealth, persistent, start_url).await {
+    if let Err(e) = setup_login_session(&mut cdp, persistent, start_url).await {
         chromium.close_login_session();
         if !persistent {
             if let Err(cleanup) = wipe_profile_dir(&profile) {

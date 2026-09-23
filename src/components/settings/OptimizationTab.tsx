@@ -380,8 +380,8 @@ export function OptimizationTab({ s }: { s: UseSettingsReturn }) {
             <Toggle
             checked={sharedProfile}
             onChange={(v) => s.setBool("General", "BottingUseSharedClientProfile", v)}
-            label="Use same client settings for player and bots"
-            description="Player and bot profiles inherit Normal while shared mode is enabled"
+            label="Use same client settings for main and alts"
+            description="Main and alt profiles inherit Normal while shared mode is enabled"
           />
           </>
         ) : null}
@@ -417,13 +417,13 @@ export function OptimizationTab({ s }: { s: UseSettingsReturn }) {
         <>
           <OptimizationProfileSection
             s={s}
-            title={t("Botting Player")}
+            title={t("Main")}
             profile="BottingPlayer"
             isWindows={isWindows}
           />
           <OptimizationProfileSection
             s={s}
-            title={t("Botting Bot")}
+            title={t("Alts")}
             profile="BottingBot"
             isWindows={isWindows}
           />

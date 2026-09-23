@@ -108,7 +108,7 @@ export function FirstRunWalkthrough() {
         title: t("Power settings, used carefully"),
         summary: t("Only enable advanced features after your basic launch flow is stable."),
         highlights: [
-          t("Multi Roblox and Botting are powerful but higher risk"),
+          t("Multi Roblox and Auto Rejoin are powerful but higher risk"),
           t("Keep online-join warnings enabled until you fully trust your routine"),
         ],
         targets: ["[data-tour='settings-modal']", "[data-tour='toolbar-settings']"],

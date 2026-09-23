@@ -13,7 +13,6 @@ pub async fn spawn_chrome(
     profile: &Path,
     start_url: &str,
     debug: bool,
-    stealth: bool,
 ) -> Result<(Child, Option<u16>), String> {
     let _ = std::fs::create_dir_all(profile);
     let active_port_file = profile.join("DevToolsActivePort");
@@ -26,9 +25,7 @@ pub async fn spawn_chrome(
     cmd.arg("--no-first-run");
     cmd.arg("--no-default-browser-check");
     cmd.arg("--disable-features=Translate");
-    if stealth {
-        cmd.arg("--lang=en-US");
-    }
+    cmd.arg("--lang=en-US");
     if debug {
         cmd.arg("--remote-debugging-port=0");
     }
@@ -169,17 +166,6 @@ impl CdpClient {
 
     pub async fn navigate(&mut self, url: &str) -> Result<(), String> {
         self.send("Page.navigate", json!({ "url": url })).await?;
-        Ok(())
-    }
-
-    pub async fn inject_stealth(&mut self) -> Result<(), String> {
-        let _ = self.send("Page.enable", json!({})).await;
-        let source = "Object.defineProperty(navigator, 'webdriver', { get: () => undefined });";
-        self.send(
-            "Page.addScriptToEvaluateOnNewDocument",
-            json!({ "source": source }),
-        )
-        .await?;
         Ok(())
     }
 

@@ -286,7 +286,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
     }
     const multiRbxEnabled = store.settings?.General?.EnableMultiRbx === "true";
     if (!multiRbxEnabled) {
-      const msg = t("Botting Mode currently requires Multi Roblox to be enabled");
+      const msg = t("Auto Rejoin requires Multi Roblox");
       setBottingStartError(msg);
       store.addToast(msg);
       return;
@@ -319,7 +319,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
     } catch (e) {
       setBottingStartError(String(e));
       store.addToast(
-        t("Botting start failed: {{error}}", {
+        t("Auto Rejoin start failed: {{error}}", {
           error: String(e),
         })
       );
@@ -353,7 +353,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
       await store.bottingAccountAction(userId, action);
     } catch (e) {
       store.addToast(
-        t("Botting account action failed: {{error}}", {
+        t("Auto Rejoin account action failed: {{error}}", {
           error: String(e),
         })
       );
@@ -559,7 +559,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-4 border-b theme-border flex items-center justify-between">
-          <div className="text-[15px] font-semibold text-[var(--panel-fg)]">{t("Botting Mode")}</div>
+          <div className="text-[15px] font-semibold text-[var(--panel-fg)]">{t("Auto Rejoin")}</div>
           <div className="flex items-center gap-2">
             <div className="flex items-center rounded-lg border theme-border p-1 theme-soft">
               <button
@@ -664,7 +664,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                       })}
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-[11px] theme-muted w-24 shrink-0">{t("Player Accounts")}</label>
+                      <label className="text-[11px] theme-muted w-24 shrink-0">{t("Main accounts")}</label>
                       <div ref={playerMenuRef} className="relative w-full">
                         <button
                           type="button"
@@ -882,7 +882,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                         />
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-[11px] theme-muted w-32 shrink-0">{t("Player Grace")}</label>
+                        <label className="text-[11px] theme-muted w-32 shrink-0">{t("Main grace")}</label>
                         <NumericInput
                           value={playerGraceMinutes}
                           min={1}
@@ -907,13 +907,13 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                       </div>
                     </div>
                     <div className="text-[10px] theme-muted mt-2">
-                      {t("Player account demotion grace is {{minutes}} minutes before it enters normal restart cycle.", {
+                      {t("Main account demotion grace is {{minutes}} minutes before it enters normal restart cycle.", {
                         minutes: playerGraceMinutes,
                       })}
                     </div>
                     {!multiRbxEnabled ? (
                       <div className="text-[10px] text-amber-300 mt-1">
-                        {t("Botting Mode currently requires Multi Roblox to be enabled")}
+                        {t("Auto Rejoin requires Multi Roblox")}
                       </div>
                     ) : null}
                   </section>
@@ -926,21 +926,21 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                         disabled={!canStart}
                         className="sidebar-btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {t("Start Botting Mode")}
+                        {t("Start Auto Rejoin")}
                       </button>
                       <button
                         onClick={() => store.stopBottingMode(false)}
                         disabled={actionButtonsLocked}
                         className="sidebar-btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {t("Stop Botting Mode")}
+                        {t("Stop Auto Rejoin")}
                       </button>
                       <button
                         onClick={() => store.stopBottingMode(true)}
                         disabled={actionButtonsLocked}
                         className="sidebar-btn-sm text-red-200 border-red-400/40 hover:bg-red-500/15 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {t("Stop + Close Bot Accounts")}
+                        {t("Stop + Close Alt Accounts")}
                       </button>
                     </div>
                   </section>
@@ -951,7 +951,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                 <section className="theme-surface rounded-2xl border theme-border h-full p-3 shadow-[0_22px_50px_rgba(0,0,0,0.23)] flex flex-col min-h-0">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <div className="text-[13px] font-medium text-[var(--panel-fg)]">{t("Live Botting List")}</div>
+                      <div className="text-[13px] font-medium text-[var(--panel-fg)]">{t("Live Cycle")}</div>
                       <div className="text-[10px] theme-muted mt-0.5">
                         {t("Track each account cycle, quick actions, and retry pressure in one place")}
                       </div>
@@ -996,7 +996,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                         disabled={actionButtonsLocked || visibleBotRowIds.length === 0}
                         className="px-2.5 py-1 text-[11px] rounded-md border theme-border bg-[var(--buttons-bg)] text-[var(--buttons-fg)] hover:text-[var(--panel-fg)] hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {t("Select bots")}
+                        {t("Select alts")}
                       </button>
 
                       <button
@@ -1268,7 +1268,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                                 content={
                                   <div className="space-y-0.5">
                                     <div className="font-semibold">{t("Restart client")}</div>
-                                    <div className="theme-muted">{t("Closes and relaunches this client now while keeping the current loop timing. Works for player accounts too.")}</div>
+                                    <div className="theme-muted">{t("Closes and relaunches this client now while keeping the current loop timing. Works for main accounts too.")}</div>
                                   </div>
                                 }
                               >
@@ -1322,7 +1322,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                                 content={
                                   <div className="space-y-0.5">
                                     <div className="font-semibold">{t("Restart loop")}</div>
-                                    <div className="theme-muted">{t("Closes the current client and relaunches now. Player accounts stay player accounts; non-player accounts continue standard rejoin timing.")}</div>
+                                    <div className="theme-muted">{t("Closes the current client and relaunches now. Main accounts stay main accounts; alt accounts continue standard rejoin timing.")}</div>
                                   </div>
                                 }
                               >
@@ -1406,7 +1406,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
               })}
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-[11px] theme-muted w-24 shrink-0">{t("Player Accounts")}</label>
+              <label className="text-[11px] theme-muted w-24 shrink-0">{t("Main accounts")}</label>
               <div ref={playerMenuRef} className="relative w-full">
                 <button
                   type="button"
@@ -1624,7 +1624,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-[11px] theme-muted w-36 shrink-0">{t("Player Grace (minutes)")}</label>
+                <label className="text-[11px] theme-muted w-36 shrink-0">{t("Main grace (minutes)")}</label>
                 <NumericInput
                   value={playerGraceMinutes}
                   min={1}
@@ -1649,13 +1649,13 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
               </div>
             </div>
             <div className="text-[10px] theme-muted mt-2">
-              {t("Player account demotion grace is {{minutes}} minutes before it enters normal restart cycle.", {
+              {t("Main account demotion grace is {{minutes}} minutes before it enters normal restart cycle.", {
                 minutes: playerGraceMinutes,
               })}
             </div>
             {!multiRbxEnabled ? (
               <div className="text-[10px] text-amber-300 mt-1">
-                {t("Botting Mode currently requires Multi Roblox to be enabled")}
+                {t("Auto Rejoin requires Multi Roblox")}
               </div>
             ) : null}
           </section>
@@ -1782,7 +1782,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                             content={
                               <div className="space-y-0.5">
                                 <div className="font-semibold">{t("Restart client")}</div>
-                                <div className="theme-muted">{t("Closes and relaunches this client now while keeping the current loop timing. Works for player accounts too.")}</div>
+                                <div className="theme-muted">{t("Closes and relaunches this client now while keeping the current loop timing. Works for main accounts too.")}</div>
                               </div>
                             }
                           >
@@ -1836,7 +1836,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                             content={
                               <div className="space-y-0.5">
                                 <div className="font-semibold">{t("Restart loop")}</div>
-                                <div className="theme-muted">{t("Closes the current client and relaunches now. Player accounts stay player accounts; non-player accounts continue standard rejoin timing.")}</div>
+                                <div className="theme-muted">{t("Closes the current client and relaunches now. Main accounts stay main accounts; alt accounts continue standard rejoin timing.")}</div>
                               </div>
                             }
                           >
@@ -1925,21 +1925,21 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
             disabled={!canStart}
             className="sidebar-btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t("Start Botting Mode")}
+            {t("Start Auto Rejoin")}
           </button>
           <button
             onClick={() => store.stopBottingMode(false)}
             disabled={actionButtonsLocked}
             className="sidebar-btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t("Stop Botting Mode")}
+            {t("Stop Auto Rejoin")}
           </button>
           <button
             onClick={() => store.stopBottingMode(true)}
             disabled={actionButtonsLocked}
             className="sidebar-btn-sm text-red-200 border-red-400/40 hover:bg-red-500/15 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {t("Stop + Close Bot Accounts")}
+            {t("Stop + Close Alt Accounts")}
           </button>
         </div>
         ) : null}
