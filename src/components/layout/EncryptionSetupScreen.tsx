@@ -60,7 +60,7 @@ export function EncryptionSetupScreen() {
   return (
     <div className="theme-app min-h-screen w-full flex items-center justify-center px-6 py-8 bg-[radial-gradient(1200px_420px_at_15%_0%,var(--accent-soft),transparent_62%),radial-gradient(900px_360px_at_85%_100%,var(--panel-soft),transparent_68%)]">
       <div className="w-full max-w-xl rounded-2xl border theme-border theme-panel shadow-2xl overflow-hidden animate-scale-in">
-        <div className="px-6 py-5 border-b theme-border bg-[linear-gradient(140deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]">
+        <div className="px-6 py-5 border-b theme-border">
           <div className="animate-fade-in-up" style={{ animationDelay: "0.03s" }}>
             <h1 className="text-[15px] font-semibold text-[var(--panel-fg)]">
               {isFirstRun ? t("Set Up Encryption") : t("Change Encryption Method")}
@@ -85,8 +85,8 @@ export function EncryptionSetupScreen() {
               className={[
                 "w-full text-left rounded-xl border p-3.5 transition-all duration-300 ease-out animate-fade-in-up",
                 method === "password"
-                  ? "theme-accent-border theme-accent-bg shadow-[0_12px_24px_var(--accent-soft)] scale-[1.01]"
-                  : "theme-border bg-[var(--panel-soft)] hover:brightness-110",
+                  ? "theme-accent-border theme-surface"
+                  : "border-[var(--border-color)] bg-[var(--panel-soft)] hover:border-[var(--accent-strong)]",
               ].join(" ")}
               style={{ animationDelay: "0.11s" }}
             >
@@ -104,7 +104,7 @@ export function EncryptionSetupScreen() {
                 <div className={[
                   "mt-1 h-2.5 w-2.5 rounded-full border transition-all duration-300 ease-out",
                   method === "password"
-                    ? "theme-accent-border theme-accent-bg shadow-[0_0_8px_var(--accent-soft)]"
+                    ? "theme-accent-border theme-accent-bg"
                     : "theme-border bg-transparent",
                 ].join(" ")} />
               </div>
@@ -117,8 +117,8 @@ export function EncryptionSetupScreen() {
               className={[
                 "w-full text-left rounded-xl border p-3.5 transition-all duration-300 ease-out animate-fade-in-up",
                 method === "default"
-                  ? "theme-accent-border theme-accent-bg shadow-[0_12px_24px_var(--accent-soft)] scale-[1.01]"
-                  : "theme-border bg-[var(--panel-soft)] hover:brightness-110",
+                  ? "theme-accent-border theme-surface"
+                  : "border-[var(--border-color)] bg-[var(--panel-soft)] hover:border-[var(--accent-strong)]",
               ].join(" ")}
               style={{ animationDelay: "0.15s" }}
             >
@@ -136,7 +136,7 @@ export function EncryptionSetupScreen() {
                 <div className={[
                   "mt-1 h-2.5 w-2.5 rounded-full border transition-all duration-300 ease-out",
                   method === "default"
-                    ? "theme-accent-border theme-accent-bg shadow-[0_0_8px_var(--accent-soft)]"
+                    ? "theme-accent-border theme-accent-bg"
                     : "theme-border bg-transparent",
                 ].join(" ")} />
               </div>
