@@ -105,10 +105,10 @@ export function FirstRunWalkthrough() {
         : []),
       {
         id: "safety",
-        title: t("Power settings, used carefully"),
+        title: t("Advanced features"),
         summary: t("Only enable advanced features after your basic launch flow is stable."),
         highlights: [
-          t("Multi Roblox and Auto Rejoin are powerful but higher risk"),
+          t("Multi Roblox and Auto Rejoin are powerful, enable them once your basic flow works"),
           t("Keep online-join warnings enabled until you fully trust your routine"),
         ],
         targets: ["[data-tour='settings-modal']", "[data-tour='toolbar-settings']"],
@@ -119,7 +119,7 @@ export function FirstRunWalkthrough() {
       },
       {
         id: "ready",
-        title: t("You're ready to roll"),
+        title: t("You're set"),
         summary: t("Run this quick checklist before scaling up."),
         highlights: [
           t("Add one valid account and confirm a single launch works"),
@@ -369,14 +369,16 @@ export function FirstRunWalkthrough() {
 
       <div
         ref={panelRef}
-        className="walkthrough-panel pointer-events-auto animate-scale-in"
+        className="walkthrough-panel theme-panel theme-border rounded-2xl border shadow-2xl pointer-events-auto animate-scale-in"
         style={{
           left: `${panelPosition.left}px`,
           top: `${panelPosition.top}px`,
         }}
       >
-        <div className="flex items-center justify-between gap-3">
-          <div className="walkthrough-chip">{isFirstRunMode ? t("First-Time Walkthrough") : t("Walkthrough Replay")}</div>
+        <div className="flex items-center gap-3">
+          <div className="walkthrough-progress flex-1">
+            <div className="walkthrough-progress-bar" style={{ width: `${progress}%` }} />
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -393,14 +395,10 @@ export function FirstRunWalkthrough() {
           </button>
         </div>
 
-        <div className="mt-3 walkthrough-progress">
-          <div className="walkthrough-progress-bar" style={{ width: `${progress}%` }} />
-        </div>
-
         <div key={activeStep.id} className="mt-4 animate-fade-in-up">
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-[15px] font-semibold tracking-tight text-[var(--panel-fg)]">{activeStep.title}</h2>
+              <h2 className="text-[15px] font-semibold text-[var(--panel-fg)]">{activeStep.title}</h2>
               <span className="text-[11px] theme-muted shrink-0">
                 {t("Walkthrough step {{current}} of {{total}}", {
                   current: stepIndex + 1,
@@ -408,12 +406,12 @@ export function FirstRunWalkthrough() {
                 })}
               </span>
             </div>
-            <p className="mt-1.5 text-[12px] text-zinc-300 leading-relaxed">{activeStep.summary}</p>
+            <p className="mt-1.5 text-[12px] text-[var(--panel-fg)] leading-relaxed">{activeStep.summary}</p>
           </div>
 
           {isLanguageStep ? (
             <div className="mt-3">
-              <div className="text-[11px] uppercase tracking-wide theme-muted mb-1.5">{t("Language")}</div>
+              <div className="text-[11px] theme-muted mb-1.5">{t("Language")}</div>
               <Select
                 value={currentLanguage}
                 options={LANGUAGE_OPTIONS}
@@ -450,7 +448,7 @@ export function FirstRunWalkthrough() {
             <button
               type="button"
               onClick={activeStep.onAction}
-              className="walkthrough-action-btn mt-3"
+              className="sidebar-btn-sm mt-3"
             >
               {activeStep.actionLabel}
             </button>
@@ -462,7 +460,7 @@ export function FirstRunWalkthrough() {
             type="button"
             onClick={() => setStepIndex((prev) => Math.max(0, prev - 1))}
             disabled={stepIndex === 0}
-            className="walkthrough-secondary-btn"
+            className="sidebar-btn-sm inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowLeft size={13} strokeWidth={2} />
             <span>{t("Back")}</span>
@@ -478,7 +476,7 @@ export function FirstRunWalkthrough() {
                   store.closeFirstRunWalkthrough();
                 }
               }}
-              className="walkthrough-tertiary-btn"
+              className="sidebar-btn-sm"
             >
               {isFirstRunMode ? t("Skip Walkthrough") : t("Close")}
             </button>
@@ -493,7 +491,7 @@ export function FirstRunWalkthrough() {
                 setStepIndex((prev) => Math.min(steps.length - 1, prev + 1));
               }}
               disabled={isLanguageStep && (!languageSelected || languageSaving)}
-              className="walkthrough-primary-btn"
+              className="sidebar-btn-sm theme-accent-bg theme-accent-border theme-accent inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span>{isLastStep ? t("Finish") : t("Next")}</span>
               {!isLastStep ? <ArrowRight size={13} strokeWidth={2} /> : null}

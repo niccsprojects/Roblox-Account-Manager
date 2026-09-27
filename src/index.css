@@ -330,19 +330,14 @@ body {
 .walkthrough-focus-ring {
   position: fixed;
   border-radius: 14px;
-  border: 1px solid var(--accent-strong);
-  background: color-mix(in srgb, var(--accent-soft) 38%, transparent);
-  box-shadow:
-    0 0 0 9999px rgba(2, 6, 23, 0.63),
-    0 0 0 1px rgba(255, 255, 255, 0.08),
-    0 0 30px color-mix(in srgb, var(--accent-soft) 72%, transparent);
+  border: 2px solid var(--accent-color);
+  box-shadow: 0 0 0 9999px rgba(2, 6, 23, 0.63);
   pointer-events: none;
   transition:
     left 220ms cubic-bezier(0.22, 1, 0.36, 1),
     top 220ms cubic-bezier(0.22, 1, 0.36, 1),
     width 220ms cubic-bezier(0.22, 1, 0.36, 1),
     height 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  animation: walkthrough-focus-pulse 2.4s ease-in-out infinite;
 }
 
 .walkthrough-panel {
@@ -350,34 +345,12 @@ body {
   left: 1rem;
   top: 1rem;
   width: min(460px, calc(100vw - 2rem));
-  border-radius: 20px;
-  border: 1px solid var(--border-color);
-  background:
-    linear-gradient(148deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02) 38%, rgba(255, 255, 255, 0)),
-    var(--panel-bg);
-  box-shadow:
-    0 28px 64px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   padding: 14px;
   overflow: hidden;
   transition:
     left 320ms cubic-bezier(0.22, 1, 0.36, 1),
-    top 320ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 220ms ease;
+    top 320ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: left, top;
-}
-
-.walkthrough-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--accent-strong);
-  background: color-mix(in srgb, var(--accent-soft) 52%, transparent);
-  color: var(--panel-fg);
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .walkthrough-close-btn {
@@ -414,8 +387,7 @@ body {
 .walkthrough-progress-bar {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent-color) 70%, white 5%), var(--accent-color));
-  box-shadow: 0 0 16px color-mix(in srgb, var(--accent-soft) 90%, transparent);
+  background: var(--accent-color);
   transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -429,12 +401,11 @@ body {
 }
 
 .walkthrough-highlight-dot {
-  width: 6px;
-  height: 6px;
-  margin-top: 5px;
+  width: 5px;
+  height: 5px;
+  margin-top: 6px;
   border-radius: 999px;
-  background: var(--accent-color);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--accent-soft) 90%, transparent);
+  background: var(--panel-muted);
   flex-shrink: 0;
 }
 
@@ -445,61 +416,6 @@ body {
   padding: 9px 10px;
   font-size: 11px;
   color: color-mix(in srgb, var(--panel-fg) 86%, #d4d4d8 14%);
-}
-
-.walkthrough-action-btn,
-.walkthrough-primary-btn,
-.walkthrough-secondary-btn,
-.walkthrough-tertiary-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 10px;
-  padding: 8px 11px;
-  font-size: 12px;
-  font-weight: 600;
-  transition: filter 0.15s, transform 0.15s, opacity 0.15s;
-}
-
-.walkthrough-action-btn,
-.walkthrough-primary-btn {
-  border: 1px solid var(--accent-strong);
-  color: var(--panel-fg);
-  background:
-    linear-gradient(142deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 56%),
-    color-mix(in srgb, var(--accent-soft) 68%, var(--buttons-bg));
-}
-
-.walkthrough-secondary-btn,
-.walkthrough-tertiary-btn {
-  border: 1px solid var(--border-color);
-  color: var(--panel-muted);
-  background: color-mix(in srgb, var(--panel-soft) 78%, transparent);
-}
-
-.walkthrough-secondary-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.walkthrough-primary-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.walkthrough-action-btn:hover,
-.walkthrough-primary-btn:hover,
-.walkthrough-secondary-btn:hover,
-.walkthrough-tertiary-btn:hover {
-  filter: brightness(1.08);
-}
-
-.walkthrough-action-btn:active,
-.walkthrough-primary-btn:active,
-.walkthrough-secondary-btn:active,
-.walkthrough-tertiary-btn:active {
-  transform: scale(0.985);
 }
 
 .restricted-fluid-bg {
@@ -839,27 +755,6 @@ body {
   100% { transform: translate3d(0, 0, 0); }
 }
 
-@keyframes walkthrough-focus-pulse {
-  0% {
-    box-shadow:
-      0 0 0 9999px rgba(2, 6, 23, 0.63),
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      0 0 24px color-mix(in srgb, var(--accent-soft) 78%, transparent);
-  }
-  50% {
-    box-shadow:
-      0 0 0 9999px rgba(2, 6, 23, 0.59),
-      0 0 0 1px rgba(255, 255, 255, 0.12),
-      0 0 34px color-mix(in srgb, var(--accent-soft) 98%, transparent);
-  }
-  100% {
-    box-shadow:
-      0 0 0 9999px rgba(2, 6, 23, 0.63),
-      0 0 0 1px rgba(255, 255, 255, 0.08),
-      0 0 24px color-mix(in srgb, var(--accent-soft) 78%, transparent);
-  }
-}
-
 @keyframes fade-in {
   from { opacity: 0; transform: translate3d(0, -2px, 0); }
   to { opacity: 1; transform: translate3d(0, 0, 0); }
@@ -961,10 +856,6 @@ body {
   }
 
   .restricted-auth-shell {
-    animation: none !important;
-  }
-
-  .walkthrough-focus-ring {
     animation: none !important;
   }
 
