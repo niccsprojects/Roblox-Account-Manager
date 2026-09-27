@@ -1,19 +1,19 @@
 {
-  "version": "4.7.14-beta",
-  "notes": "> [!WARNING]\nThis is a beta release. Missing features, bugs, and crashes are possible. Run at your own risk.\n\nChannel: Beta\nRelease commit: dbf19de\nApp version: 4.7.14\n\n## What's Changed\n* feat(accounts): multi-account follow, longer aliases and name wrapping by @niccdevs in https://github.com/niccsprojects/Roblox-Account-Manager/pull/93\n\n\n**Full Changelog**: https://github.com/niccsprojects/Roblox-Account-Manager/compare/v4.7.13-beta...v4.7.14-beta",
-  "pub_date": "2026-09-01T05:50:55.3782321Z",
+  "version": "4.7.15-beta",
+  "notes": "> [!WARNING]\nThis is a beta release. Missing features, bugs, and crashes are possible. Run at your own risk.\n\nChannel: Beta\nRelease commit: c73ff0c\nApp version: 4.7.15\n\n## What's Changed\n* chore(ui): rename the rejoin cycler to Auto Rejoin with main and alt roles by @niccdevs in https://github.com/niccsprojects/Roblox-Account-Manager/pull/94\n* style(auth): flatten the password and encryption setup cards by @niccdevs in https://github.com/niccsprojects/Roblox-Account-Manager/pull/95\n* fix(afk): start the next-cycle countdown when the session starts by @niccdevs in https://github.com/niccsprojects/Roblox-Account-Manager/pull/96\n\n\n**Full Changelog**: https://github.com/niccsprojects/Roblox-Account-Manager/compare/v4.7.14-beta...v4.7.15-beta",
+  "pub_date": "2026-09-27T22:07:13.5411384Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QmRLd2k0dEdQeXZ5SkFQcG5lbExOdm1LbTNKbllPa3JkOEwzRFlJZ3U4VHJFdy84RTFmNS9HV3pZdjBpcXVRTXNEVk5ucVN3OUhNd3EvV09CTEJkVFFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MjQxODU1CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjcuMTRfeDY0X2VuLVVTLm1zaQpYaTFicjVGV1NnNXJCWTZ4c1lpM0xTS0YyWWhvWGE5V1NBeHU1WWZVS3NjMTZGM3FCeXpyYkNrVnZGbnBDTkpLa1NmVVVQUGFVQ3pibEwrZS95cmxEdz09Cg==",
-      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.7.14-beta/Roblox.Account.Manager_4.7.14_x64_en-US_full-nexus-ws.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QllueVVkMmFOdkVQSU1nWGJMQ29Ub1Z0TmViL3FOc0lQUEV5Y0pyQW1Fdk1ESTUrV0Qrd3ZXUGVnN2xWQVdzaXhzeWpmS0tybVdRam9haDhaYzBkY2dvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkwNTQ2ODMzCWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjcuMTVfeDY0X2VuLVVTLm1zaQpnUWNhUGJvTy9uaitHblZJSjlJeWdoWHdGSmdvMGl2TVRyOGVDZE52a3diNGNpUWFtQU45enNtWjh0ckpWdmV0bER6eHBsWVBEakwzT3FYMk95aU1Cdz09Cg==",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.7.15-beta/Roblox.Account.Manager_4.7.15_x64_en-US_full-nexus-ws.msi"
     },
     "windows-x86_64-msi": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QmRLd2k0dEdQeXZ5SkFQcG5lbExOdm1LbTNKbllPa3JkOEwzRFlJZ3U4VHJFdy84RTFmNS9HV3pZdjBpcXVRTXNEVk5ucVN3OUhNd3EvV09CTEJkVFFBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MjQxODU1CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjcuMTRfeDY0X2VuLVVTLm1zaQpYaTFicjVGV1NnNXJCWTZ4c1lpM0xTS0YyWWhvWGE5V1NBeHU1WWZVS3NjMTZGM3FCeXpyYkNrVnZGbnBDTkpLa1NmVVVQUGFVQ3pibEwrZS95cmxEdz09Cg==",
-      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.7.14-beta/Roblox.Account.Manager_4.7.14_x64_en-US_full-nexus-ws.msi"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QllueVVkMmFOdkVQSU1nWGJMQ29Ub1Z0TmViL3FOc0lQUEV5Y0pyQW1Fdk1ESTUrV0Qrd3ZXUGVnN2xWQVdzaXhzeWpmS0tybVdRam9haDhaYzBkY2dvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkwNTQ2ODMzCWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjcuMTVfeDY0X2VuLVVTLm1zaQpnUWNhUGJvTy9uaitHblZJSjlJeWdoWHdGSmdvMGl2TVRyOGVDZE52a3diNGNpUWFtQU45enNtWjh0ckpWdmV0bER6eHBsWVBEakwzT3FYMk95aU1Cdz09Cg==",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.7.15-beta/Roblox.Account.Manager_4.7.15_x64_en-US_full-nexus-ws.msi"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3QmR4Y3kxYlZqSVVRbFVNWGhITHpGT3JneWN5dHFwVEV3QWtucS92YzNRWStIRU1DKzVyQ0ozcm4reEJVZHQxcEx4NW5rd1dYS2ZWMktYd0JrNkdLTEFNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg4MjQxODU1CWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjcuMTRfeDY0LXNldHVwLmV4ZQo1dEhxM1JUSTU4RHJEcjJkbmtWNW9pM3JSeTZ0WEc3MjF1cGMwRlJ2VTBuY2dFSjlJNHhyWUxyczV6NVVHRnNrVVZMTlFNTC9jRFM4eHhxSUVOdG5Cdz09Cg==",
-      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.7.14-beta/Roblox.Account.Manager_4.7.14_x64-setup_full-nexus-ws.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVQzQkRMeXR3Qld3eTREN3hFR3FSUHpqajJ5VXdjRWxXUGcvMEtJQ2VxT29PczlWVlVTTG5xeWU4VWJ0OHZyNzN1TWZnQkJhakdiVmhRSCtPNXdPZDRiYkFhOFVXaXdnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkwNTQ2ODMzCWZpbGU6Um9ibG94IEFjY291bnQgTWFuYWdlcl80LjcuMTVfeDY0LXNldHVwLmV4ZQp2anNsdUk0YzQwZDlmdHUwSHBkaGJPTUxZS1dqU0RES28wSmtJdVhhZmRVU2dzdnVWeS80ejY1YzB3MHJjcmgzaHJkaEVPNUx3ZVh3NGR4ZTQzWWxEdz09Cg==",
+      "url": "https://github.com/niccsprojects/Roblox-Account-Manager/releases/download/v4.7.15-beta/Roblox.Account.Manager_4.7.15_x64-setup_full-nexus-ws.exe"
     }
   }
 }
