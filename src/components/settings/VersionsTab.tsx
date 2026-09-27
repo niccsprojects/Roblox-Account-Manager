@@ -238,6 +238,9 @@ export function VersionsTab({ s }: { s: UseSettingsReturn }) {
         label="Always use direct exe launch for managed versions"
         description="Required to spawn a non-default Roblox version. Disable only for troubleshooting."
       />
+      <p className="px-1 pt-1 pb-2 text-[11px] theme-muted">
+        {t("Older clients are offered so nobody has to fetch them from untrusted sites. Running an outdated version can look suspicious to Roblox, so prefer the current one unless you have a specific reason.")}
+      </p>
 
       <Divider />
       <SectionLabel>Credits</SectionLabel>

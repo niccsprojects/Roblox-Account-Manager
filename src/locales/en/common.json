@@ -919,5 +919,9 @@
   "Each cycle briefly focuses every Roblox window to send the key, then returns to the window you were using": "Each cycle briefly focuses every Roblox window to send the key, then returns to the window you were using",
   "Create a restore point before spoofing": "Create a restore point before spoofing",
   "Creates a Windows System Restore point right before identifiers are rotated, so you can roll the machine back if needed": "Creates a Windows System Restore point right before identifiers are rotated, so you can roll the machine back if needed",
-  "Another program holds the Roblox singleton mutex": "Another program holds the Roblox singleton mutex"
+  "Another program holds the Roblox singleton mutex": "Another program holds the Roblox singleton mutex",
+  "Window mode": "Window mode",
+  "Windowed": "Windowed",
+  "Fullscreen": "Fullscreen",
+  "Older clients are offered so nobody has to fetch them from untrusted sites. Running an outdated version can look suspicious to Roblox, so prefer the current one unless you have a specific reason.": "Older clients are offered so nobody has to fetch them from untrusted sites. Running an outdated version can look suspicious to Roblox, so prefer the current one unless you have a specific reason."
 }

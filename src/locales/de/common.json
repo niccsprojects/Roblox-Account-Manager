@@ -917,5 +917,9 @@
   "Each cycle briefly focuses every Roblox window to send the key, then returns to the window you were using": "Jeder Durchlauf fokussiert kurz jedes Roblox-Fenster, um die Taste zu senden, und kehrt danach zu deinem vorherigen Fenster zurück",
   "Create a restore point before spoofing": "Vor dem Spoofen einen Wiederherstellungspunkt erstellen",
   "Creates a Windows System Restore point right before identifiers are rotated, so you can roll the machine back if needed": "Erstellt direkt vor dem Rotieren der Kennungen einen Windows-Wiederherstellungspunkt, damit du das System bei Bedarf zurücksetzen kannst",
-  "Another program holds the Roblox singleton mutex": "Ein anderes Programm hält den Roblox-Singleton-Mutex"
+  "Another program holds the Roblox singleton mutex": "Ein anderes Programm hält den Roblox-Singleton-Mutex",
+  "Window mode": "Fenstermodus",
+  "Windowed": "Fenster",
+  "Fullscreen": "Vollbild",
+  "Older clients are offered so nobody has to fetch them from untrusted sites. Running an outdated version can look suspicious to Roblox, so prefer the current one unless you have a specific reason.": "Ältere Clients werden angeboten, damit niemand sie von unsicheren Seiten laden muss. Eine veraltete Version kann für Roblox verdächtig wirken, nimm also lieber die aktuelle, außer du hast einen bestimmten Grund."
 }
