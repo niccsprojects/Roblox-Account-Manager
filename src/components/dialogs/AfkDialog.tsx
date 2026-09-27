@@ -5,6 +5,7 @@ import { useModalClose } from "../../hooks/useModalClose";
 import { useTr } from "../../i18n/text";
 import { Select } from "../ui/Select";
 import { NumericInput } from "../ui/NumericInput";
+import { ToggleRow } from "../ui/ToggleRow";
 import { X, Send } from "lucide-react";
 
 interface AfkDialogProps {
@@ -27,6 +28,15 @@ function formatCountdown(targetMs: number | null, nowMs: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function formatElapsed(startMs: number | null, nowMs: number): string {
+  if (startMs === null) return "--";
+  const mins = Math.floor(Math.max(0, nowMs - startMs) / 60000);
+  if (mins < 1) return "<1m";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 export function AfkDialog({ open, onClose }: AfkDialogProps) {
   const t = useTr();
   const store = useStore();
@@ -39,6 +49,7 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
   const [interWindowDelayMs, setInterWindowDelayMs] = useState(250);
   const [busy, setBusy] = useState(false);
   const [sendingNow, setSendingNow] = useState(false);
+  const [soundOnCycle, setSoundOnCycle] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
 
   useEffect(() => {
@@ -52,6 +63,7 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
         setIntervalMinutes(parseInt(afk.IntervalMinutes || "10", 10) || 10);
         setKey(afk.Key || "Space");
         setInterWindowDelayMs(parseInt(afk.InterWindowDelayMs || "250", 10) || 250);
+        setSoundOnCycle(afk.SoundOnCycle === "true");
       } catch {}
     })();
     return () => {
@@ -60,7 +72,9 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
   }, [visible]);
 
   useEffect(() => {
-    if (!visible || !running) return;
+    if (!visible) return;
+    setNowMs(Date.now());
+    if (!running) return;
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [visible, running]);
@@ -116,6 +130,7 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
 
   const configDisabled = running || busy;
   const countdown = formatCountdown(status?.nextCycleAtMs ?? null, nowMs);
+  const elapsed = formatElapsed(status?.startedAtMs ?? null, nowMs);
 
   return (
     <div
@@ -196,6 +211,14 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
               />
               <span className="text-[11px] theme-muted">{t("ms")}</span>
             </label>
+            <ToggleRow
+              label="Play sound when a cycle completes"
+              checked={soundOnCycle}
+              onChange={(v) => {
+                setSoundOnCycle(v);
+                persist("SoundOnCycle", v ? "true" : "false");
+              }}
+            />
             <div className="text-[10px] theme-muted leading-4">
               {t("Each cycle briefly focuses every Roblox window to send the key, then returns to the window you were using")}
             </div>
@@ -203,7 +226,7 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
 
           {running ? (
             <section className="theme-surface rounded-xl border theme-border p-3">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="rounded-lg border theme-border bg-[rgba(0,0,0,0.18)] px-2.5 py-2">
                   <div className="text-[9px] uppercase tracking-[0.08em] theme-muted">{t("Next in")}</div>
                   <div className="text-[14px] font-mono text-cyan-200 leading-tight mt-0.5">{countdown}</div>
@@ -219,6 +242,10 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
                   <div className="text-[14px] font-mono text-[var(--panel-fg)] leading-tight mt-0.5">
                     {status?.totalCycles ?? 0}
                   </div>
+                </div>
+                <div className="rounded-lg border theme-border bg-[rgba(0,0,0,0.18)] px-2.5 py-2">
+                  <div className="text-[9px] uppercase tracking-[0.08em] theme-muted">{t("Running for")}</div>
+                  <div className="text-[14px] font-mono text-[var(--panel-fg)] leading-tight mt-0.5">{elapsed}</div>
                 </div>
               </div>
               {status?.lastError ? (
