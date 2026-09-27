@@ -1428,7 +1428,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   async function refreshAfkStatus() {
     try {
       const status = await invoke<AfkStatus>("get_afk_mode_status");
-      lastAfkCyclesRef.current = status.totalCycles;
       setAfkStatus(status);
     } catch (e) {
       setError(String(e));
