@@ -251,7 +251,10 @@ pub async fn is_friends_with(
     viewer_user_id: i64,
     target_user_id: i64,
 ) -> Result<bool, String> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Request failed: {}", e))?;
 
     let response = client
         .get(format!(
