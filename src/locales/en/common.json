@@ -937,5 +937,13 @@
   "Enter a whole number of minutes between 1 and 1440": "Enter a whole number of minutes between 1 and 1440",
   "Scheduled close in {{minutes}} min": "Scheduled close in {{minutes}} min",
   "Scheduled close cancelled": "Scheduled close cancelled",
-  "Closing {{count}} in {{time}}": "Closing {{count}} in {{time}}"
+  "Closing {{count}} in {{time}}": "Closing {{count}} in {{time}}",
+  "Hotkeys": "Hotkeys",
+  "Toggle AFK mode": "Toggle AFK mode",
+  "Send AFK key now": "Send AFK key now",
+  "Not set": "Not set",
+  "Press a key combination": "Press a key combination",
+  "Hold Ctrl, Alt or Shift with the key": "Hold Ctrl, Alt or Shift with the key",
+  "Click a field, then press the combination. Esc cancels, Backspace clears": "Click a field, then press the combination. Esc cancels, Backspace clears",
+  "Could not register the hotkey for {{action}}": "Could not register the hotkey for {{action}}"
 }

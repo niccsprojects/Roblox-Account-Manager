@@ -17,6 +17,9 @@
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "updater:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-unregister-all"
   ]
 }

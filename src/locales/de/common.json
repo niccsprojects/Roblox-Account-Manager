@@ -935,5 +935,13 @@
   "Enter a whole number of minutes between 1 and 1440": "Gib eine ganze Zahl zwischen 1 und 1440 Minuten ein",
   "Scheduled close in {{minutes}} min": "Schließen geplant in {{minutes}} Min",
   "Scheduled close cancelled": "Geplantes Schließen abgebrochen",
-  "Closing {{count}} in {{time}}": "{{count}} werden geschlossen in {{time}}"
+  "Closing {{count}} in {{time}}": "{{count}} werden geschlossen in {{time}}",
+  "Hotkeys": "Tastenkürzel",
+  "Toggle AFK mode": "AFK-Modus umschalten",
+  "Send AFK key now": "AFK-Taste jetzt senden",
+  "Not set": "Nicht festgelegt",
+  "Press a key combination": "Tastenkombination drücken",
+  "Hold Ctrl, Alt or Shift with the key": "Halte Strg, Alt oder Umschalt zusammen mit der Taste",
+  "Click a field, then press the combination. Esc cancels, Backspace clears": "Klicke auf ein Feld und drücke dann die Kombination. Esc bricht ab, Rücktaste löscht",
+  "Could not register the hotkey for {{action}}": "Tastenkürzel für {{action}} konnte nicht registriert werden"
 }
