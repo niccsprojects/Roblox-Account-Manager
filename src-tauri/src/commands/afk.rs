@@ -9,6 +9,7 @@ struct AfkConfig {
 struct AfkRuntime {
     last_cycle_at_ms: Option<i64>,
     next_cycle_at_ms: Option<i64>,
+    close_at_ms: Option<i64>,
     last_window_count: u32,
     total_cycles: u64,
     last_error: Option<String>,
@@ -99,6 +100,7 @@ struct AfkStatusPayload {
     inter_window_delay_ms: u64,
     last_cycle_at_ms: Option<i64>,
     next_cycle_at_ms: Option<i64>,
+    close_at_ms: Option<i64>,
     last_window_count: u32,
     total_cycles: u64,
     last_error: Option<String>,
@@ -130,6 +132,7 @@ fn current_afk_status() -> AfkStatusPayload {
                 inter_window_delay_ms: config.inter_window_delay_ms,
                 last_cycle_at_ms: runtime.last_cycle_at_ms,
                 next_cycle_at_ms: runtime.next_cycle_at_ms,
+                close_at_ms: runtime.close_at_ms,
                 last_window_count: runtime.last_window_count,
                 total_cycles: runtime.total_cycles,
                 last_error: runtime.last_error,
@@ -194,9 +197,30 @@ fn run_afk_cycle_blocking(
     Ok(hit)
 }
 
+#[cfg(any(target_os = "windows", test))]
+#[derive(Debug, PartialEq)]
+enum AfkWait {
+    Sleep(i64),
+    Cycle,
+    Close,
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn afk_wait_step(now: i64, next_cycle_at: i64, close_at: Option<i64>) -> AfkWait {
+    if close_at.is_some_and(|at| at <= now) {
+        return AfkWait::Close;
+    }
+    if next_cycle_at <= now {
+        return AfkWait::Cycle;
+    }
+    let until = close_at.map_or(next_cycle_at, |at| at.min(next_cycle_at));
+    AfkWait::Sleep((until - now).min(5000))
+}
+
 #[cfg(target_os = "windows")]
 async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
-    loop {
+    let mut auto_closed = false;
+    'session: loop {
         if session
             .stop_flag
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -208,18 +232,33 @@ async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
             Ok(c) => c.clone(),
             Err(_) => break,
         };
+        let interval_ms = (config.interval_seconds as i64) * 1000;
 
-        if let Ok(mut runtime) = session.runtime.lock() {
-            runtime.next_cycle_at_ms = Some(now_ms() + (config.interval_seconds as i64) * 1000);
-        }
-        emit_afk_status(&app);
+        let (next_cycle_at, close_at) = match session.runtime.lock() {
+            Ok(mut runtime) => {
+                let next = *runtime
+                    .next_cycle_at_ms
+                    .get_or_insert_with(|| now_ms() + interval_ms);
+                (next, runtime.close_at_ms)
+            }
+            Err(_) => break,
+        };
 
-        sleep_interruptible(&session.stop_flag, (config.interval_seconds as i64) * 1000).await;
-        if session
-            .stop_flag
-            .load(std::sync::atomic::Ordering::Relaxed)
-        {
-            break;
+        loop {
+            if session
+                .stop_flag
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                break 'session;
+            }
+            match afk_wait_step(now_ms(), next_cycle_at, close_at) {
+                AfkWait::Sleep(ms) => sleep_interruptible(&session.stop_flag, ms).await,
+                AfkWait::Cycle => break,
+                AfkWait::Close => {
+                    auto_closed = true;
+                    break 'session;
+                }
+            }
         }
 
         let cycle_config = config.clone();
@@ -235,6 +274,7 @@ async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
 
         if let Ok(mut runtime) = session.runtime.lock() {
             runtime.last_cycle_at_ms = Some(now_ms());
+            runtime.next_cycle_at_ms = Some(now_ms() + interval_ms);
             runtime.total_cycles += 1;
             match result {
                 Ok(count) => {
@@ -249,6 +289,16 @@ async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
         emit_afk_status(&app);
     }
 
+    let killed = if auto_closed {
+        tokio::task::spawn_blocking(cmd_kill_all_roblox)
+            .await
+            .ok()
+            .and_then(|r| r.ok())
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
     let owns_session = AFK_MANAGER
         .get_session()
         .map(|s| s.id == session.id)
@@ -257,7 +307,11 @@ async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
         AFK_MANAGER.replace_session(None);
     }
     session.stopped_notify.notify_waiters();
-    let _ = app.emit("afk-stopped", ());
+    let reason = if auto_closed { "auto-close" } else { "stopped" };
+    let _ = app.emit(
+        "afk-stopped",
+        serde_json::json!({ "reason": reason, "count": killed }),
+    );
     emit_afk_status(&app);
 }
 
@@ -291,6 +345,13 @@ async fn start_afk_mode(
     }
 
     let started_at_ms = now_ms();
+    let auto_close_minutes = app
+        .state::<SettingsStore>()
+        .get_int("Afk", "AutoCloseMinutes")
+        .unwrap_or(0)
+        .clamp(0, 1440);
+    let close_at_ms =
+        (auto_close_minutes > 0).then(|| started_at_ms + auto_close_minutes * 60_000);
     let session = AfkSession {
         id: AFK_MANAGER.next_session_id(),
         stop_flag: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -301,10 +362,10 @@ async fn start_afk_mode(
             key,
             inter_window_delay_ms: inter_window_delay_ms.clamp(50, 5000),
         })),
-        runtime: std::sync::Arc::new(std::sync::Mutex::new(initial_afk_runtime(
-            started_at_ms,
-            interval_seconds,
-        ))),
+        runtime: std::sync::Arc::new(std::sync::Mutex::new(AfkRuntime {
+            close_at_ms,
+            ..initial_afk_runtime(started_at_ms, interval_seconds)
+        })),
     };
 
     AFK_MANAGER.replace_session(Some(session.clone()));
@@ -393,5 +454,37 @@ mod afk_tests {
         assert_eq!(runtime.next_cycle_at_ms, Some(601_000));
         assert_eq!(runtime.last_cycle_at_ms, None);
         assert_eq!(runtime.total_cycles, 0);
+    }
+}
+
+#[cfg(test)]
+mod afk_wait_tests {
+    use super::{afk_wait_step, AfkWait};
+
+    #[test]
+    fn sleeps_at_most_five_seconds() {
+        assert_eq!(afk_wait_step(0, 600_000, None), AfkWait::Sleep(5000));
+    }
+
+    #[test]
+    fn sleeps_until_nearer_deadline() {
+        assert_eq!(afk_wait_step(0, 3000, None), AfkWait::Sleep(3000));
+        assert_eq!(afk_wait_step(0, 600_000, Some(1200)), AfkWait::Sleep(1200));
+    }
+
+    #[test]
+    fn cycles_when_due() {
+        assert_eq!(afk_wait_step(10_000, 10_000, None), AfkWait::Cycle);
+        assert_eq!(afk_wait_step(10_000, 10_000, Some(20_000)), AfkWait::Cycle);
+    }
+
+    #[test]
+    fn closes_when_close_deadline_passed() {
+        assert_eq!(afk_wait_step(5000, 600_000, Some(5000)), AfkWait::Close);
+    }
+
+    #[test]
+    fn close_wins_over_due_cycle() {
+        assert_eq!(afk_wait_step(10_000, 9000, Some(10_000)), AfkWait::Close);
     }
 }

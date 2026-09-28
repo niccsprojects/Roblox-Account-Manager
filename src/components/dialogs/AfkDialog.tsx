@@ -5,6 +5,7 @@ import { useModalClose } from "../../hooks/useModalClose";
 import { useTr } from "../../i18n/text";
 import { Select } from "../ui/Select";
 import { NumericInput } from "../ui/NumericInput";
+import { NumberField } from "../ui/NumberField";
 import { ToggleRow } from "../ui/ToggleRow";
 import { X, Send } from "lucide-react";
 
@@ -47,6 +48,7 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
   const [intervalMinutes, setIntervalMinutes] = useState(10);
   const [key, setKey] = useState("Space");
   const [interWindowDelayMs, setInterWindowDelayMs] = useState(250);
+  const [autoCloseMinutes, setAutoCloseMinutes] = useState(0);
   const [busy, setBusy] = useState(false);
   const [sendingNow, setSendingNow] = useState(false);
   const [soundOnCycle, setSoundOnCycle] = useState(false);
@@ -63,6 +65,7 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
         setIntervalMinutes(parseInt(afk.IntervalMinutes || "10", 10) || 10);
         setKey(afk.Key || "Space");
         setInterWindowDelayMs(parseInt(afk.InterWindowDelayMs || "250", 10) || 250);
+        setAutoCloseMinutes(Math.max(0, parseInt(afk.AutoCloseMinutes || "0", 10) || 0));
         setSoundOnCycle(afk.SoundOnCycle === "true");
       } catch {}
     })();
@@ -211,6 +214,17 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
               />
               <span className="text-[11px] theme-muted">{t("ms")}</span>
             </label>
+            <NumberField
+              value={autoCloseMinutes}
+              min={0}
+              max={1440}
+              disabled={configDisabled}
+              label="Close all clients after (minutes), 0 = never"
+              onChange={(v) => {
+                setAutoCloseMinutes(v);
+                persist("AutoCloseMinutes", String(v));
+              }}
+            />
             <ToggleRow
               label="Play sound when a cycle completes"
               checked={soundOnCycle}
@@ -248,6 +262,11 @@ export function AfkDialog({ open, onClose }: AfkDialogProps) {
                   <div className="text-[14px] font-mono text-[var(--panel-fg)] leading-tight mt-0.5">{elapsed}</div>
                 </div>
               </div>
+              {status?.closeAtMs ? (
+                <div className="mt-2 text-[11px] theme-muted">
+                  {t("Closing all clients in {{time}}", { time: formatCountdown(status.closeAtMs, nowMs) })}
+                </div>
+              ) : null}
               {status?.lastError ? (
                 <div className="mt-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-[11px] text-red-300 break-words">
                   {status.lastError}

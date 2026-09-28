@@ -12,6 +12,8 @@ import { RecentGamesPopover } from "../server-list/RecentGamesPopover";
 import { RecentJobsPopover } from "../server-list/RecentJobsPopover";
 import { tr, useTr } from "../../i18n/text";
 
+const CLOSE_LATER_MINUTES = [5, 10, 30, 60];
+
 export function MultiSelectSidebar() {
   const t = useTr();
   const store = useStore();
@@ -31,6 +33,7 @@ export function MultiSelectSidebar() {
   const [recentJobsOpen, setRecentJobsOpen] = useState(false);
   const [followUser, setFollowUser] = useState("");
   const [following, setFollowing] = useState(false);
+  const [closeLaterOpen, setCloseLaterOpen] = useState(false);
   const maxRecent = parseInt(store.settings?.General?.MaxRecentGames || "8") || 8;
   const launching = store.launchProgress?.mode === "multi";
 
@@ -202,6 +205,17 @@ export function MultiSelectSidebar() {
 
   async function handleRestartLaunchedClients() {
     await store.restartRobloxClients(launchedSelectedIds);
+  }
+
+  async function handleCloseLater(minutes: number | null) {
+    setCloseLaterOpen(false);
+    if (minutes !== null) {
+      await store.scheduleCloseAccounts(launchedSelectedIds, minutes);
+      return;
+    }
+    const input = await prompt(tr("Close after how many minutes?"));
+    if (input === null) return;
+    await store.scheduleCloseAccounts(launchedSelectedIds, Number(input.trim()));
   }
 
   return (
@@ -390,6 +404,25 @@ export function MultiSelectSidebar() {
               ? t("Restart launched client")
               : t("Restart launched clients ({{count}})", { count: launchedSelectedCount })}
           </button>
+          <button
+            onClick={() => setCloseLaterOpen((open) => !open)}
+            disabled={launchedSelectedCount === 0}
+            className="sidebar-btn theme-btn mt-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {t("Close selected after…")}
+          </button>
+          {closeLaterOpen && launchedSelectedCount > 0 && (
+            <div className="grid grid-cols-5 gap-1 mt-1.5 animate-fade-in">
+              {CLOSE_LATER_MINUTES.map((m) => (
+                <button key={m} onClick={() => void handleCloseLater(m)} className="sidebar-btn-sm">
+                  {t("{{count}} min", { count: m })}
+                </button>
+              ))}
+              <button onClick={() => void handleCloseLater(null)} className="sidebar-btn-sm">
+                {t("Custom")}
+              </button>
+            </div>
+          )}
           {showBottingButton && (
             <button
               onClick={() => store.setBottingDialogOpen(true)}

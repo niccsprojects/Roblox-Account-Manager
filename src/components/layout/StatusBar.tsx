@@ -40,12 +40,21 @@ export function StatusBar() {
     afkCountdown === null
       ? "-"
       : `${Math.floor(afkCountdown / 60)}:${String(afkCountdown % 60).padStart(2, "0")}`;
+  const scheduledClose = store.scheduledClose;
+  const closeCountdown = scheduledClose
+    ? Math.max(0, Math.ceil((scheduledClose.closeAtMs - tickNow) / 1000))
+    : null;
+  const closeLabel =
+    closeCountdown === null
+      ? "-"
+      : `${Math.floor(closeCountdown / 60)}:${String(closeCountdown % 60).padStart(2, "0")}`;
 
   useEffect(() => {
-    if (!bottingActive && !afkActive) return;
+    if (!bottingActive && !afkActive && !scheduledClose) return;
+    setTickNow(Date.now());
     const timer = window.setInterval(() => setTickNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [bottingActive, afkActive]);
+  }, [bottingActive, afkActive, scheduledClose]);
 
   return (
     <div data-tour="status-bar" className="theme-surface theme-border flex items-center justify-between gap-3 px-4 py-2 border-t text-[12px] shrink-0">
@@ -107,6 +116,20 @@ export function StatusBar() {
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
               <span className="text-cyan-300/90">{t("afk")}</span>
               <span className="text-cyan-200/90">{t("next")} {afkLabel}</span>
+            </span>
+          )}
+          {scheduledClose && (
+            <span className="theme-muted inline-flex items-center gap-1 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-amber-200/90">
+                {t("Closing {{count}} in {{time}}", { count: scheduledClose.userIds.length, time: closeLabel })}
+              </span>
+              <button
+                onClick={() => void store.cancelScheduledClose()}
+                className="ml-1 text-amber-300/90 hover:text-amber-100 hover:underline underline-offset-2"
+              >
+                {t("Cancel")}
+              </button>
             </span>
           )}
           {browserDownloading && (

@@ -165,6 +165,7 @@ export interface AfkStatus {
   interWindowDelayMs: number;
   lastCycleAtMs: number | null;
   nextCycleAtMs: number | null;
+  closeAtMs: number | null;
   lastWindowCount: number;
   totalCycles: number;
   lastError: string | null;
@@ -174,6 +175,11 @@ export interface AfkStartConfig {
   intervalSeconds: number;
   key: string;
   interWindowDelayMs: number;
+}
+
+export interface ScheduledCloseStatus {
+  userIds: number[];
+  closeAtMs: number;
 }
 
 export interface GeneratorStartConfig {
@@ -268,6 +274,8 @@ export interface StoreValue {
   startAfkMode: (config: AfkStartConfig) => Promise<void>;
   stopAfkMode: () => Promise<void>;
   refreshAfkStatus: () => Promise<void>;
+  scheduleCloseAccounts: (userIds: number[], minutes: number) => Promise<void>;
+  cancelScheduledClose: () => Promise<void>;
   refreshCookie: (userId: number) => Promise<boolean>;
   moveToGroup: (userIds: number[], group: string) => Promise<void>;
   sortGroupAlphabetically: (groupKey: string) => void;
@@ -345,6 +353,7 @@ export interface StoreValue {
   afkDialogOpen: boolean;
   setAfkDialogOpen: (open: boolean) => void;
   afkStatus: AfkStatus | null;
+  scheduledClose: ScheduledCloseStatus | null;
   versionsDialogOpen: boolean;
   setVersionsDialogOpen: (open: boolean) => void;
   setDefaultVersion: (versionId: string | null) => void;
@@ -465,6 +474,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [generatorStatus, setGeneratorStatus] = useState<GeneratorStatus | null>(null);
   const [afkDialogOpen, setAfkDialogOpen] = useState(false);
   const [afkStatus, setAfkStatus] = useState<AfkStatus | null>(null);
+  const [scheduledClose, setScheduledClose] = useState<ScheduledCloseStatus | null>(null);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
   const [missingAssets, setMissingAssets] = useState<{ userId: number; username: string; assetIds: number[] } | null>(null);
   const [nexusOpen, setNexusOpen] = useState(false);
@@ -1483,6 +1493,31 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function scheduleCloseAccounts(userIds: number[], minutes: number) {
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+      addToast(tr("Enter a whole number of minutes between 1 and 1440"));
+      return;
+    }
+    if (userIds.length === 0) return;
+    try {
+      const status = await invoke<ScheduledCloseStatus>("schedule_close_accounts", { userIds, minutes });
+      setScheduledClose(status);
+      addToast(tr("Scheduled close in {{minutes}} min", { minutes }));
+    } catch (e) {
+      addToast(tr("Error: {{error}}", { error: String(e) }));
+    }
+  }
+
+  async function cancelScheduledClose() {
+    try {
+      await invoke("cancel_scheduled_close");
+      setScheduledClose(null);
+      addToast(tr("Scheduled close cancelled"));
+    } catch (e) {
+      addToast(tr("Error: {{error}}", { error: String(e) }));
+    }
+  }
+
   async function restartRobloxClients(userIds: number[]) {
     const uniqueIds = Array.from(new Set(userIds));
     const launchedIds = uniqueIds.filter((userId) => launchedByProgram.has(userId));
@@ -2193,6 +2228,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     refreshBottingStatus();
     refreshGeneratorStatus();
     refreshAfkStatus();
+    invoke<ScheduledCloseStatus | null>("get_scheduled_close")
+      .then(setScheduledClose)
+      .catch(() => {});
     const unsubs: Array<() => void> = [];
     const listeners = [
       listen<BottingStatus>("botting-status", (e) => {
@@ -2208,8 +2246,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAfkStatus(e.payload);
         if (completed) void playAfkCycleSound();
       }),
-      listen("afk-stopped", () => {
+      listen<{ reason?: string; count?: number }>("afk-stopped", (e) => {
         setAfkStatus((prev) => (prev ? { ...prev, active: false } : prev));
+        if (e.payload?.reason === "auto-close") {
+          const count = e.payload.count ?? 0;
+          addToast(
+            count > 0
+              ? tr(count === 1 ? "Closed {{count}} Roblox process" : "Closed {{count}} Roblox processes", { count })
+              : tr("No open Roblox processes found")
+          );
+          void playAfkCycleSound();
+        }
+      }),
+      listen<number>("scheduled-close-fired", (e) => {
+        setScheduledClose(null);
+        const count = e.payload ?? 0;
+        addToast(
+          count > 0
+            ? tr(count === 1 ? "Closed {{count}} Roblox process" : "Closed {{count}} Roblox processes", { count })
+            : tr("No open Roblox processes found")
+        );
       }),
       listen("generator-account-added", () => {
         loadAccounts();
@@ -2257,7 +2313,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubs.forEach((fn) => fn());
     };
-  }, [needsPassword, initialized, setActionStatusMessage]);
+  }, [needsPassword, initialized, setActionStatusMessage, addToast]);
 
   useEffect(() => {
     if (needsPassword || !initialized) return;
@@ -2607,6 +2663,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     startAfkMode,
     stopAfkMode,
     refreshAfkStatus,
+    scheduleCloseAccounts,
+    cancelScheduledClose,
     refreshCookie,
     moveToGroup,
     sortGroupAlphabetically,
@@ -2678,6 +2736,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     afkDialogOpen,
     setAfkDialogOpen,
     afkStatus,
+    scheduledClose,
     versionsDialogOpen,
     setVersionsDialogOpen,
     setDefaultVersion,
