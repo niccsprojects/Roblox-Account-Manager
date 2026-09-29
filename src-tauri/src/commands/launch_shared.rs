@@ -4,7 +4,7 @@ struct WindowsClientOverrides {
     master_volume: Option<f32>,
     graphics_level: Option<u32>,
     window_size: Option<(u32, u32)>,
-    fullscreen: bool,
+    fullscreen: Option<bool>,
     fast_flags: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
@@ -193,9 +193,11 @@ fn windows_client_overrides(
         "BottingPlayerClientWindowMode",
         "BottingBotClientWindowMode",
     );
-    let fullscreen = settings
-        .get_string("General", window_mode_key)
-        .eq_ignore_ascii_case("fullscreen");
+    let fullscreen = match settings.get_string("General", window_mode_key).to_ascii_lowercase().as_str() {
+        "fullscreen" => Some(true),
+        "windowed" => Some(false),
+        _ => None,
+    };
 
     let optimization_profile = platform::windows::load_optimization_profile(settings, profile);
     let fast_flags = if optimization_profile.experimental.enable_fast_flags {

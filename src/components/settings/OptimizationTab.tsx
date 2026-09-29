@@ -170,9 +170,10 @@ function OptimizationProfileSection({
           <div className="text-[13px] text-zinc-300">{t("Window mode")}</div>
           <div className="ml-auto w-[170px]">
             <Select
-              value={s.get("General", generalKey(profile, "ClientWindowMode"), "windowed")}
+              value={s.get("General", generalKey(profile, "ClientWindowMode"), "")}
               onChange={(value) => s.set("General", generalKey(profile, "ClientWindowMode"), value)}
               options={[
+                { value: "", label: "Roblox default" },
                 { value: "windowed", label: "Windowed" },
                 { value: "fullscreen", label: "Fullscreen" },
               ]}
