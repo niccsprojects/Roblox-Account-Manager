@@ -10,6 +10,7 @@ import {
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import type {
   Account,
   ThemeData,
@@ -165,6 +166,7 @@ export interface AfkStatus {
   interWindowDelayMs: number;
   lastCycleAtMs: number | null;
   nextCycleAtMs: number | null;
+  closeAtMs: number | null;
   lastWindowCount: number;
   totalCycles: number;
   lastError: string | null;
@@ -174,6 +176,13 @@ export interface AfkStartConfig {
   intervalSeconds: number;
   key: string;
   interWindowDelayMs: number;
+}
+
+export type HotkeyAction = "AfkToggle" | "AfkTriggerNow";
+
+export interface ScheduledCloseStatus {
+  userIds: number[];
+  closeAtMs: number;
 }
 
 export interface GeneratorStartConfig {
@@ -268,6 +277,8 @@ export interface StoreValue {
   startAfkMode: (config: AfkStartConfig) => Promise<void>;
   stopAfkMode: () => Promise<void>;
   refreshAfkStatus: () => Promise<void>;
+  scheduleCloseAccounts: (userIds: number[], minutes: number) => Promise<void>;
+  cancelScheduledClose: () => Promise<void>;
   refreshCookie: (userId: number) => Promise<boolean>;
   moveToGroup: (userIds: number[], group: string) => Promise<void>;
   sortGroupAlphabetically: (groupKey: string) => void;
@@ -345,6 +356,10 @@ export interface StoreValue {
   afkDialogOpen: boolean;
   setAfkDialogOpen: (open: boolean) => void;
   afkStatus: AfkStatus | null;
+  scheduledClose: ScheduledCloseStatus | null;
+  hotkeyErrors: string[];
+  setHotkeysPaused: (paused: boolean) => void;
+  setHotkeyBinding: (key: HotkeyAction, accelerator: string) => void;
   versionsDialogOpen: boolean;
   setVersionsDialogOpen: (open: boolean) => void;
   setDefaultVersion: (versionId: string | null) => void;
@@ -465,6 +480,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [generatorStatus, setGeneratorStatus] = useState<GeneratorStatus | null>(null);
   const [afkDialogOpen, setAfkDialogOpen] = useState(false);
   const [afkStatus, setAfkStatus] = useState<AfkStatus | null>(null);
+  const [scheduledClose, setScheduledClose] = useState<ScheduledCloseStatus | null>(null);
+  const [hotkeysPaused, setHotkeysPaused] = useState(false);
+  const [hotkeyErrors, setHotkeyErrors] = useState<string[]>([]);
+  const hotkeyChainRef = useRef<Promise<void>>(Promise.resolve());
+  const hotkeyErrorsRef = useRef<string[]>([]);
+  const afkHotkeyBusyRef = useRef(false);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
   const [missingAssets, setMissingAssets] = useState<{ userId: number; username: string; assetIds: number[] } | null>(null);
   const [nexusOpen, setNexusOpen] = useState(false);
@@ -1483,6 +1504,77 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function scheduleCloseAccounts(userIds: number[], minutes: number) {
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 1440) {
+      addToast(tr("Enter a whole number of minutes between 1 and 1440"));
+      return;
+    }
+    if (userIds.length === 0) return;
+    try {
+      const status = await invoke<ScheduledCloseStatus>("schedule_close_accounts", { userIds, minutes });
+      setScheduledClose(status);
+      addToast(tr("Scheduled close in {{minutes}} min", { minutes }));
+    } catch (e) {
+      addToast(tr("Error: {{error}}", { error: String(e) }));
+    }
+  }
+
+  async function cancelScheduledClose() {
+    try {
+      const cancelled = await invoke<boolean>("cancel_scheduled_close");
+      setScheduledClose(null);
+      if (cancelled) addToast(tr("Scheduled close cancelled"));
+    } catch (e) {
+      addToast(tr("Error: {{error}}", { error: String(e) }));
+    }
+  }
+
+  async function readAfkConfig(): Promise<AfkStartConfig> {
+    const all = await invoke<Record<string, Record<string, string>>>("get_all_settings");
+    const afk = all.Afk || {};
+    return {
+      intervalSeconds: Math.max(1, parseInt(afk.IntervalMinutes || "10", 10) || 10) * 60,
+      key: afk.Key || "Space",
+      interWindowDelayMs: parseInt(afk.InterWindowDelayMs || "250", 10) || 250,
+    };
+  }
+
+  async function toggleAfkFromHotkey() {
+    if (afkHotkeyBusyRef.current) return;
+    afkHotkeyBusyRef.current = true;
+    try {
+      const status = await invoke<AfkStatus>("get_afk_mode_status");
+      if (status.active) await stopAfkMode();
+      else await startAfkMode(await readAfkConfig());
+    } catch {
+    } finally {
+      afkHotkeyBusyRef.current = false;
+    }
+  }
+
+  async function triggerAfkFromHotkey() {
+    try {
+      const config = await readAfkConfig();
+      const hit = await invoke<number>("afk_trigger_now", {
+        key: config.key,
+        interWindowDelayMs: config.interWindowDelayMs,
+      });
+      addToast(
+        hit > 0
+          ? tr("Sent {{key}} to {{count}} Roblox windows", { key: config.key, count: hit })
+          : tr("No open Roblox windows found")
+      );
+    } catch (e) {
+      addToast(tr("Error: {{error}}", { error: String(e) }));
+    }
+  }
+
+  const setHotkeyBinding = useCallback((key: HotkeyAction, accelerator: string) => {
+    setSettings((prev) =>
+      prev ? { ...prev, Hotkeys: { ...(prev.Hotkeys || {}), [key]: accelerator } } : prev
+    );
+  }, []);
+
   async function restartRobloxClients(userIds: number[]) {
     const uniqueIds = Array.from(new Set(userIds));
     const launchedIds = uniqueIds.filter((userId) => launchedByProgram.has(userId));
@@ -2193,6 +2285,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     refreshBottingStatus();
     refreshGeneratorStatus();
     refreshAfkStatus();
+    invoke<ScheduledCloseStatus | null>("get_scheduled_close")
+      .then(setScheduledClose)
+      .catch(() => {});
     const unsubs: Array<() => void> = [];
     const listeners = [
       listen<BottingStatus>("botting-status", (e) => {
@@ -2208,8 +2303,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setAfkStatus(e.payload);
         if (completed) void playAfkCycleSound();
       }),
-      listen("afk-stopped", () => {
+      listen<{ reason?: string; count?: number }>("afk-stopped", (e) => {
         setAfkStatus((prev) => (prev ? { ...prev, active: false } : prev));
+        if (e.payload?.reason === "auto-close") {
+          const count = e.payload.count ?? 0;
+          addToast(
+            count > 0
+              ? tr(count === 1 ? "Closed {{count}} Roblox process" : "Closed {{count}} Roblox processes", { count })
+              : tr("No open Roblox processes found")
+          );
+          void playAfkCycleSound();
+        }
+      }),
+      listen<{ closeAtMs: number; count: number }>("scheduled-close-fired", (e) => {
+        setScheduledClose((prev) => (prev && prev.closeAtMs !== e.payload.closeAtMs ? prev : null));
+        const count = e.payload.count ?? 0;
+        addToast(
+          count > 0
+            ? tr(count === 1 ? "Closed {{count}} Roblox process" : "Closed {{count}} Roblox processes", { count })
+            : tr("No open Roblox processes found")
+        );
       }),
       listen("generator-account-added", () => {
         loadAccounts();
@@ -2257,7 +2370,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubs.forEach((fn) => fn());
     };
-  }, [needsPassword, initialized, setActionStatusMessage]);
+  }, [needsPassword, initialized, setActionStatusMessage, addToast]);
 
   useEffect(() => {
     if (needsPassword || !initialized) return;
@@ -2287,6 +2400,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
     };
   }, [needsPassword, initialized]);
+
+  const afkToggleHotkey = settings?.Hotkeys?.AfkToggle ?? "";
+  const afkTriggerHotkey = settings?.Hotkeys?.AfkTriggerNow ?? "";
+
+  useEffect(() => {
+    if (needsPassword || !initialized) return;
+    const bindings = [
+      { key: "AfkToggle", accelerator: afkToggleHotkey, label: tr("Toggle AFK mode"), run: toggleAfkFromHotkey },
+      { key: "AfkTriggerNow", accelerator: afkTriggerHotkey, label: tr("Send AFK key now"), run: triggerAfkFromHotkey },
+    ];
+    hotkeyChainRef.current = hotkeyChainRef.current.then(async () => {
+      await unregisterAll().catch(() => {});
+      if (hotkeysPaused) return;
+      const failed: string[] = [];
+      for (const binding of bindings) {
+        if (!binding.accelerator) continue;
+        try {
+          await register(binding.accelerator, (event) => {
+            if (event.state === "Pressed") void binding.run();
+          });
+        } catch {
+          failed.push(binding.key);
+        }
+      }
+      for (const binding of bindings) {
+        if (failed.includes(binding.key) && !hotkeyErrorsRef.current.includes(binding.key)) {
+          addToast(tr("Could not register the hotkey for {{action}}", { action: binding.label }));
+        }
+      }
+      hotkeyErrorsRef.current = failed;
+      setHotkeyErrors(failed);
+    });
+  }, [needsPassword, initialized, afkToggleHotkey, afkTriggerHotkey, hotkeysPaused, addToast]);
 
   useEffect(() => {
     function onActionStatus(event: Event) {
@@ -2607,6 +2753,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     startAfkMode,
     stopAfkMode,
     refreshAfkStatus,
+    scheduleCloseAccounts,
+    cancelScheduledClose,
     refreshCookie,
     moveToGroup,
     sortGroupAlphabetically,
@@ -2678,6 +2826,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     afkDialogOpen,
     setAfkDialogOpen,
     afkStatus,
+    scheduledClose,
+    hotkeyErrors,
+    setHotkeysPaused,
+    setHotkeyBinding,
     versionsDialogOpen,
     setVersionsDialogOpen,
     setDefaultVersion,

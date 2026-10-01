@@ -7,6 +7,7 @@ import { DeveloperTab } from "./DeveloperTab";
 import { OptimizationTab } from "./OptimizationTab";
 import { WebServerTab } from "./WebServerTab";
 import { WatcherTab } from "./WatcherTab";
+import { HotkeysTab } from "./HotkeysTab";
 import { GeneratorTab } from "./GeneratorTab";
 import { IsolationTab } from "./IsolationTab";
 import { VersionsTab } from "./VersionsTab";
@@ -68,6 +69,7 @@ export function TabContent({
             {tab === "developer" && <DeveloperTab s={s} />}
             {tab === "webserver" && <WebServerTab s={s} />}
             {tab === "watcher" && <WatcherTab s={s} />}
+            {tab === "hotkeys" && <HotkeysTab s={s} />}
             {tab === "generator" && <GeneratorTab s={s} />}
             {tab === "isolation" && <IsolationTab s={s} />}
             {tab === "versions" && <VersionsTab s={s} />}

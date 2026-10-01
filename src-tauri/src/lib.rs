@@ -37,6 +37,7 @@ include!("commands/generators.rs");
 include!("commands/launch.rs");
 include!("commands/window_arrange.rs");
 include!("commands/afk.rs");
+include!("commands/scheduled_close.rs");
 include!("commands/diagnostics.rs");
 include!("commands/isolation.rs");
 include!("commands/versions.rs");
@@ -132,6 +133,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(account_store)
         .manage(settings_store)
         .manage(theme_store)
@@ -332,6 +334,9 @@ pub fn run() {
             stop_afk_mode,
             get_afk_mode_status,
             afk_trigger_now,
+            schedule_close_accounts,
+            cancel_scheduled_close,
+            get_scheduled_close,
             cmd_kill_all_roblox,
             get_running_instances,
             cmd_enable_multi_roblox,

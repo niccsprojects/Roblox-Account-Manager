@@ -5,7 +5,7 @@ import { TabBar } from "./TabBar";
 import { TabContent } from "./TabContent";
 import { useTr } from "../../i18n/text";
 import { ENABLE_WEBSERVER } from "../../featureFlags";
-import { Settings as SettingsIcon, Code, Gauge, Server, Eye, Sparkles, ShieldCheck, Package, MoreHorizontal, X } from "lucide-react";
+import { Settings as SettingsIcon, Code, Gauge, Server, Eye, Sparkles, ShieldCheck, Package, MoreHorizontal, Keyboard, X } from "lucide-react";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -19,6 +19,7 @@ export type TabId =
   | "developer"
   | "webserver"
   | "watcher"
+  | "hotkeys"
   | "generator"
   | "isolation"
   | "versions"
@@ -26,8 +27,8 @@ export type TabId =
   | "miscellaneous";
 
 export const TAB_ORDER: TabId[] = ENABLE_WEBSERVER
-  ? ["general", "developer", "webserver", "watcher", "generator", "isolation", "versions", "optimization", "miscellaneous"]
-  : ["general", "developer", "watcher", "generator", "isolation", "versions", "optimization", "miscellaneous"];
+  ? ["general", "developer", "webserver", "watcher", "hotkeys", "generator", "isolation", "versions", "optimization", "miscellaneous"]
+  : ["general", "developer", "watcher", "hotkeys", "generator", "isolation", "versions", "optimization", "miscellaneous"];
 
 export interface TabDef {
   id: TabId;
@@ -97,6 +98,11 @@ export function SettingsDialog({
       id: "watcher",
       label: "Watcher",
       icon: <Eye size={15} strokeWidth={1.5} />,
+    },
+    {
+      id: "hotkeys",
+      label: "Hotkeys",
+      icon: <Keyboard size={15} strokeWidth={1.5} />,
     },
     {
       id: "generator",

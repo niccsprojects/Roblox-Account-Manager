@@ -245,6 +245,24 @@ export function ContextMenu() {
       },
     });
 
+    items.push({
+      label: t("Close selected after…"),
+      submenu: [
+        ...[5, 10, 30, 60].map((m) => ({
+          label: t("{{count}} min", { count: m }),
+          action: () => void store.scheduleCloseAccounts(launchedSelectedIds, m),
+        })),
+        {
+          label: t("Custom"),
+          action: async () => {
+            const input = await prompt(t("Close after how many minutes?"));
+            if (input === null) return;
+            await store.scheduleCloseAccounts(launchedSelectedIds, Number(input.trim()));
+          },
+        },
+      ],
+    });
+
     items.push({ separator: true, label: "" });
   }
 

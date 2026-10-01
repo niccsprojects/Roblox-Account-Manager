@@ -928,5 +928,22 @@
   "Older clients are offered so nobody has to fetch them from untrusted sites. Running an outdated version can look suspicious to Roblox, so prefer the current one unless you have a specific reason.": "Older clients are offered so nobody has to fetch them from untrusted sites. Running an outdated version can look suspicious to Roblox, so prefer the current one unless you have a specific reason.",
   "Can't follow {{name}}, they are not on this account's friends list": "Can't follow {{name}}, they are not on this account's friends list",
   "Skipped {{count}} accounts that are not friends with {{name}}": "Skipped {{count}} accounts that are not friends with {{name}}",
-  "Skipped {{count}} account that is not friends with {{name}}": "Skipped {{count}} account that is not friends with {{name}}"
+  "Skipped {{count}} account that is not friends with {{name}}": "Skipped {{count}} account that is not friends with {{name}}",
+  "Close all clients after (minutes), 0 = never": "Close all clients after (minutes), 0 = never",
+  "Closing all clients in {{time}}": "Closing all clients in {{time}}",
+  "Close selected after…": "Close selected after…",
+  "{{count}} min": "{{count}} min",
+  "Close after how many minutes?": "Close after how many minutes?",
+  "Enter a whole number of minutes between 1 and 1440": "Enter a whole number of minutes between 1 and 1440",
+  "Scheduled close in {{minutes}} min": "Scheduled close in {{minutes}} min",
+  "Scheduled close cancelled": "Scheduled close cancelled",
+  "Closing {{count}} in {{time}}": "Closing {{count}} in {{time}}",
+  "Hotkeys": "Hotkeys",
+  "Toggle AFK mode": "Toggle AFK mode",
+  "Send AFK key now": "Send AFK key now",
+  "Not set": "Not set",
+  "Press a key combination": "Press a key combination",
+  "Hold Ctrl, Alt or Shift with the key": "Hold Ctrl, Alt or Shift with the key",
+  "Click a field, then press the combination. Esc cancels, Backspace clears": "Click a field, then press the combination. Esc cancels, Backspace clears",
+  "Could not register the hotkey for {{action}}": "Could not register the hotkey for {{action}}"
 }

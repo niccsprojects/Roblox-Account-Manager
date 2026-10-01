@@ -926,5 +926,22 @@
   "Older clients are offered so nobody has to fetch them from untrusted sites. Running an outdated version can look suspicious to Roblox, so prefer the current one unless you have a specific reason.": "Ältere Clients werden angeboten, damit niemand sie von unsicheren Seiten laden muss. Eine veraltete Version kann für Roblox verdächtig wirken, nimm also lieber die aktuelle, außer du hast einen bestimmten Grund.",
   "Can't follow {{name}}, they are not on this account's friends list": "Folgen nicht möglich, {{name}} ist nicht in der Freundesliste dieses Kontos",
   "Skipped {{count}} accounts that are not friends with {{name}}": "{{count}} Konten übersprungen, die nicht mit {{name}} befreundet sind",
-  "Skipped {{count}} account that is not friends with {{name}}": "{{count}} Konto übersprungen, das nicht mit {{name}} befreundet ist"
+  "Skipped {{count}} account that is not friends with {{name}}": "{{count}} Konto übersprungen, das nicht mit {{name}} befreundet ist",
+  "Close all clients after (minutes), 0 = never": "Alle Clients schließen nach (Minuten), 0 = nie",
+  "Closing all clients in {{time}}": "Alle Clients werden geschlossen in {{time}}",
+  "Close selected after…": "Auswahl schließen nach…",
+  "{{count}} min": "{{count}} Min",
+  "Close after how many minutes?": "Nach wie vielen Minuten schließen?",
+  "Enter a whole number of minutes between 1 and 1440": "Gib eine ganze Zahl zwischen 1 und 1440 Minuten ein",
+  "Scheduled close in {{minutes}} min": "Schließen geplant in {{minutes}} Min",
+  "Scheduled close cancelled": "Geplantes Schließen abgebrochen",
+  "Closing {{count}} in {{time}}": "{{count}} werden geschlossen in {{time}}",
+  "Hotkeys": "Tastenkürzel",
+  "Toggle AFK mode": "AFK-Modus umschalten",
+  "Send AFK key now": "AFK-Taste jetzt senden",
+  "Not set": "Nicht festgelegt",
+  "Press a key combination": "Tastenkombination drücken",
+  "Hold Ctrl, Alt or Shift with the key": "Halte Strg, Alt oder Umschalt zusammen mit der Taste",
+  "Click a field, then press the combination. Esc cancels, Backspace clears": "Klicke auf ein Feld und drücke dann die Kombination. Esc bricht ab, Rücktaste löscht",
+  "Could not register the hotkey for {{action}}": "Tastenkürzel für {{action}} konnte nicht registriert werden"
 }
