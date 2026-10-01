@@ -65,7 +65,10 @@ async fn fire_scheduled_close(app: tauri::AppHandle, close_at_ms: i64, delay_ms:
             closed += 1;
         }
     }
-    let _ = app.emit("scheduled-close-fired", closed);
+    let _ = app.emit(
+        "scheduled-close-fired",
+        serde_json::json!({ "closeAtMs": close_at_ms, "count": closed }),
+    );
 }
 
 #[tauri::command]
