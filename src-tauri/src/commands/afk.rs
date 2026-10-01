@@ -277,7 +277,9 @@ async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
                     match tokio::time::timeout(wait, AFK_CYCLE_LOCK.lock()).await {
                         Ok(guard) => guard,
                         Err(_) => {
-                            auto_closed = true;
+                            auto_closed = !session
+                                .stop_flag
+                                .load(std::sync::atomic::Ordering::Relaxed);
                             break 'session;
                         }
                     }
