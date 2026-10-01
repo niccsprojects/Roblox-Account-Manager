@@ -85,7 +85,7 @@ export function isDirectFollowJoin(target: FollowTarget): boolean {
 }
 
 export function needsFollowWarning(target: FollowTarget): boolean {
-  return !(target.presenceType === 2 && !!target.placeId);
+  return target.presenceType !== 2;
 }
 
 type ActionStatusTone = "info" | "success" | "warn" | "error";
@@ -1216,6 +1216,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   async function launchFollow(userId: number, target: FollowTarget) {
     const directJoin = isDirectFollowJoin(target);
+    if (!directJoin) {
+      const isFriend = await invoke<boolean>("check_friendship", {
+        userId,
+        targetUserId: target.userId,
+      }).catch(() => true);
+      if (!isFriend) {
+        addToast(tr("Can't follow {{name}}, they are not on this account's friends list", { name: target.name }));
+        return;
+      }
+    }
     const message = directJoin
       ? tr("Joining {{name}}...", { name: target.name })
       : tr("Following {{name}}...", { name: target.name });
@@ -1297,7 +1307,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         userPresenceType?: number;
         user_presence_type?: number;
         placeId?: number | null;
-        rootPlaceId?: number | null;
         gameId?: string | null;
       }[]
     >("get_presence", { userIds: [user.id], viewerUserId });
@@ -1306,7 +1315,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       userId: user.id,
       name: user.name || name,
       presenceType: entry?.userPresenceType ?? entry?.user_presence_type ?? 0,
-      placeId: entry?.placeId ?? entry?.rootPlaceId ?? null,
+      placeId: entry?.placeId ?? null,
       jobId: entry?.gameId ?? "",
     };
   }
@@ -1346,7 +1355,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     try {
       if (follow) {
-        await invoke("launch_multiple", {
+        const skipped = await invoke<number>("launch_multiple", {
           userIds,
           placeId: directFollowJoin ? follow.placeId : follow.userId,
           jobId: directFollowJoin ? follow.jobId : "",
@@ -1355,10 +1364,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           followUserId: follow.userId,
         });
         await loadAccounts();
+        const launched = userIds.length - skipped;
         if (directFollowJoin && follow.placeId) {
           void recordRecentGame(follow.placeId, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
         }
-        addToast(tr("Following {{name}} with {{count}} accounts...", { name: follow.name, count: userIds.length }));
+        if (skipped > 0) {
+          addToast(tr(
+            skipped === 1
+              ? "Skipped {{count}} account that is not friends with {{name}}"
+              : "Skipped {{count}} accounts that are not friends with {{name}}",
+            { count: skipped, name: follow.name }
+          ));
+        }
+        if (launched === 0) {
+          setJoiningAccounts(new Set());
+          setLaunchProgress(null);
+        } else {
+          addToast(tr("Following {{name}} with {{count}} accounts...", { name: follow.name, count: launched }));
+        }
         return;
       }
 

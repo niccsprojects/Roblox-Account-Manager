@@ -165,6 +165,22 @@ function OptimizationProfileSection({
         min={240}
         max={4320}
       />
+      {isWindows ? (
+        <div className="flex items-center gap-3 py-2 px-1">
+          <div className="text-[13px] text-zinc-300">{t("Window mode")}</div>
+          <div className="ml-auto w-[170px]">
+            <Select
+              value={s.get("General", generalKey(profile, "ClientWindowMode"), "")}
+              onChange={(value) => s.set("General", generalKey(profile, "ClientWindowMode"), value)}
+              options={[
+                { value: "", label: "Roblox default" },
+                { value: "windowed", label: "Windowed" },
+                { value: "fullscreen", label: "Fullscreen" },
+              ]}
+            />
+          </div>
+        </div>
+      ) : null}
       <Toggle
         checked={s.getBool("General", generalKey(profile, "StartRobloxMinimized"))}
         onChange={(v) => s.setBool("General", generalKey(profile, "StartRobloxMinimized"), v)}

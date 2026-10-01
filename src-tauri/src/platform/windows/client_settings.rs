@@ -119,11 +119,22 @@ fn upsert_vector2_property(props: &mut String, name: &str, x: u32, y: u32) {
     props.push('\n');
 }
 
+fn apply_window_props(props: &mut String, fullscreen: Option<bool>, window_size: Option<(u32, u32)>) {
+    if let Some(fullscreen) = fullscreen.or(window_size.map(|_| false)) {
+        upsert_scalar_property(props, "bool", "Fullscreen", if fullscreen { "true" } else { "false" });
+    }
+    if let Some((w, h)) = window_size {
+        upsert_scalar_property(props, "bool", "StartMaximized", "false");
+        upsert_vector2_property(props, "StartScreenSize", w.max(320), h.max(240));
+    }
+}
+
 fn apply_global_basic_settings_overrides(
     max_fps: Option<u32>,
     master_volume: Option<f32>,
     graphics_level: Option<u32>,
     window_size: Option<(u32, u32)>,
+    fullscreen: Option<bool>,
 ) -> Result<(), String> {
     let Some(path) = get_global_basic_settings_file() else {
         return Ok(());
@@ -173,13 +184,7 @@ fn apply_global_basic_settings_overrides(
         upsert_scalar_property(&mut props, "bool", "MaxQualityEnabled", "false");
     }
 
-    if let Some((w, h)) = window_size {
-        let width = w.max(320);
-        let height = h.max(240);
-        upsert_scalar_property(&mut props, "bool", "StartMaximized", "false");
-        upsert_scalar_property(&mut props, "bool", "Fullscreen", "false");
-        upsert_vector2_property(&mut props, "StartScreenSize", width, height);
-    }
+    apply_window_props(&mut props, fullscreen, window_size);
 
     xml.replace_range(start..end, &props);
     std::fs::write(&path, xml)
@@ -192,6 +197,7 @@ pub fn apply_runtime_client_settings(
     master_volume: Option<f32>,
     graphics_level: Option<u32>,
     window_size: Option<(u32, u32)>,
+    fullscreen: Option<bool>,
     fast_flags: Option<&serde_json::Map<String, serde_json::Value>>,
 ) -> Result<(), String> {
     if max_fps.is_some() || fast_flags.is_some() {
@@ -202,10 +208,10 @@ pub fn apply_runtime_client_settings(
         || master_volume.is_some()
         || graphics_level.is_some()
         || window_size.is_some()
+        || fullscreen.is_some()
     {
-        apply_global_basic_settings_overrides(max_fps, master_volume, graphics_level, window_size)?;
+        apply_global_basic_settings_overrides(max_fps, master_volume, graphics_level, window_size, fullscreen)?;
     }
-
     Ok(())
 }
 
@@ -229,4 +235,45 @@ pub fn copy_custom_client_settings(
     };
     std::fs::write(settings_file, content)
         .map_err(|e| format!("Failed to copy custom ClientAppSettings.json: {}", e))
+}
+
+#[cfg(test)]
+mod window_props_tests {
+    use super::apply_window_props;
+
+    #[test]
+    fn windowed_mode_writes_fullscreen_false_without_size() {
+        let mut props = String::from("\n\t\t\t<bool name=\"Fullscreen\">true</bool>\n");
+        apply_window_props(&mut props, Some(false), None);
+        assert!(props.contains("<bool name=\"Fullscreen\">false</bool>"));
+        assert!(!props.contains("StartScreenSize"));
+        assert!(!props.contains("StartMaximized"));
+    }
+
+    #[test]
+    fn unset_mode_leaves_fullscreen_alone() {
+        let original = "
+			<bool name=\"Fullscreen\">true</bool>
+";
+        let mut props = String::from(original);
+        apply_window_props(&mut props, None, None);
+        assert_eq!(props, original);
+    }
+
+    #[test]
+    fn unset_mode_with_size_override_keeps_windowed_default() {
+        let mut props = String::new();
+        apply_window_props(&mut props, None, Some((800, 600)));
+        assert!(props.contains("<bool name=\"Fullscreen\">false</bool>"));
+    }
+
+    #[test]
+    fn fullscreen_mode_with_size_override_writes_all_three() {
+        let mut props = String::new();
+        apply_window_props(&mut props, Some(true), Some((100, 100)));
+        assert!(props.contains("<bool name=\"Fullscreen\">true</bool>"));
+        assert!(props.contains("<bool name=\"StartMaximized\">false</bool>"));
+        assert!(props.contains("<X>320</X>"));
+        assert!(props.contains("<Y>240</Y>"));
+    }
 }
