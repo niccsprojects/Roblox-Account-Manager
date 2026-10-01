@@ -56,7 +56,8 @@ export function HotkeyField({
       setHint(true);
       return;
     }
-    onChange([...modifiers, keyName(e.code)].join("+"));
+    const key = e.code.startsWith("Key") && /^[a-z]$/i.test(e.key) ? e.key.toUpperCase() : keyName(e.code);
+    onChange([...modifiers, key].join("+"));
     e.currentTarget.blur();
   }
 

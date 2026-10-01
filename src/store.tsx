@@ -484,6 +484,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [hotkeysPaused, setHotkeysPaused] = useState(false);
   const [hotkeyErrors, setHotkeyErrors] = useState<string[]>([]);
   const hotkeyChainRef = useRef<Promise<void>>(Promise.resolve());
+  const hotkeyErrorsRef = useRef<string[]>([]);
+  const afkHotkeyBusyRef = useRef(false);
   const [versionsDialogOpen, setVersionsDialogOpen] = useState(false);
   const [missingAssets, setMissingAssets] = useState<{ userId: number; username: string; assetIds: number[] } | null>(null);
   const [nexusOpen, setNexusOpen] = useState(false);
@@ -1538,11 +1540,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }
 
   async function toggleAfkFromHotkey() {
+    if (afkHotkeyBusyRef.current) return;
+    afkHotkeyBusyRef.current = true;
     try {
       const status = await invoke<AfkStatus>("get_afk_mode_status");
       if (status.active) await stopAfkMode();
       else await startAfkMode(await readAfkConfig());
-    } catch {}
+    } catch {
+    } finally {
+      afkHotkeyBusyRef.current = false;
+    }
   }
 
   async function triggerAfkFromHotkey() {
@@ -2308,9 +2315,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           void playAfkCycleSound();
         }
       }),
-      listen<number>("scheduled-close-fired", (e) => {
-        setScheduledClose(null);
-        const count = e.payload ?? 0;
+      listen<{ closeAtMs: number; count: number }>("scheduled-close-fired", (e) => {
+        setScheduledClose((prev) => (prev && prev.closeAtMs !== e.payload.closeAtMs ? prev : null));
+        const count = e.payload.count ?? 0;
         addToast(
           count > 0
             ? tr(count === 1 ? "Closed {{count}} Roblox process" : "Closed {{count}} Roblox processes", { count })
@@ -2417,14 +2424,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           failed.push(binding.key);
         }
       }
-      setHotkeyErrors((prev) => {
-        for (const binding of bindings) {
-          if (failed.includes(binding.key) && !prev.includes(binding.key)) {
-            addToast(tr("Could not register the hotkey for {{action}}", { action: binding.label }));
-          }
+      for (const binding of bindings) {
+        if (failed.includes(binding.key) && !hotkeyErrorsRef.current.includes(binding.key)) {
+          addToast(tr("Could not register the hotkey for {{action}}", { action: binding.label }));
         }
-        return failed;
-      });
+      }
+      hotkeyErrorsRef.current = failed;
+      setHotkeyErrors(failed);
     });
   }, [needsPassword, initialized, afkToggleHotkey, afkTriggerHotkey, hotkeysPaused, addToast]);
 
