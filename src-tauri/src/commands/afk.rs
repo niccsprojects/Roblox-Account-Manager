@@ -147,10 +147,16 @@ fn emit_afk_status(app: &tauri::AppHandle) {
     let _ = app.emit("afk-status", current_afk_status());
 }
 
+#[cfg(any(target_os = "windows", test))]
+fn afk_cycle_should_stop(stopped: bool, deadline_ms: Option<i64>, now: i64) -> bool {
+    stopped || deadline_ms.is_some_and(|at| now >= at)
+}
+
 #[cfg(target_os = "windows")]
 fn run_afk_cycle_blocking(
     config: &AfkConfig,
     stop_flag: Option<&std::sync::atomic::AtomicBool>,
+    deadline_ms: Option<i64>,
 ) -> Result<u32, String> {
     use platform::windows;
 
@@ -162,10 +168,11 @@ fn run_afk_cycle_blocking(
 
     let mut hit = 0u32;
     for pid in pids {
-        if let Some(flag) = stop_flag {
-            if flag.load(std::sync::atomic::Ordering::Relaxed) {
-                break;
-            }
+        let stopped = stop_flag
+            .map(|f| f.load(std::sync::atomic::Ordering::Relaxed))
+            .unwrap_or(false);
+        if afk_cycle_should_stop(stopped, deadline_ms, now_ms()) {
+            break;
         }
         let hwnd = match windows::find_main_window(pid) {
             Some(hwnd) => hwnd,
@@ -264,9 +271,21 @@ async fn run_afk_session(app: tauri::AppHandle, session: AfkSession) {
         let cycle_config = config.clone();
         let cycle_stop = session.stop_flag.clone();
         let result = {
-            let _guard = AFK_CYCLE_LOCK.lock().await;
+            let _guard = match close_at {
+                Some(at) => {
+                    let wait = std::time::Duration::from_millis((at - now_ms()).max(0) as u64);
+                    match tokio::time::timeout(wait, AFK_CYCLE_LOCK.lock()).await {
+                        Ok(guard) => guard,
+                        Err(_) => {
+                            auto_closed = true;
+                            break 'session;
+                        }
+                    }
+                }
+                None => AFK_CYCLE_LOCK.lock().await,
+            };
             tokio::task::spawn_blocking(move || {
-                run_afk_cycle_blocking(&cycle_config, Some(&cycle_stop))
+                run_afk_cycle_blocking(&cycle_config, Some(&cycle_stop), close_at)
             })
             .await
             .unwrap_or_else(|e| Err(format!("AFK cycle failed: {}", e)))
@@ -411,7 +430,7 @@ async fn afk_trigger_now(key: String, inter_window_delay_ms: u64) -> Result<u32,
         inter_window_delay_ms: inter_window_delay_ms.clamp(50, 5000),
     };
     let _guard = AFK_CYCLE_LOCK.lock().await;
-    tokio::task::spawn_blocking(move || run_afk_cycle_blocking(&config, None))
+    tokio::task::spawn_blocking(move || run_afk_cycle_blocking(&config, None, None))
         .await
         .unwrap_or_else(|e| Err(format!("AFK cycle failed: {}", e)))
 }
@@ -486,5 +505,14 @@ mod afk_wait_tests {
     #[test]
     fn close_wins_over_due_cycle() {
         assert_eq!(afk_wait_step(10_000, 9000, Some(10_000)), AfkWait::Close);
+    }
+
+    #[test]
+    fn cycle_stops_at_close_deadline() {
+        use super::afk_cycle_should_stop;
+        assert!(!afk_cycle_should_stop(false, None, 10_000));
+        assert!(!afk_cycle_should_stop(false, Some(20_000), 10_000));
+        assert!(afk_cycle_should_stop(false, Some(10_000), 10_000));
+        assert!(afk_cycle_should_stop(true, None, 0));
     }
 }
