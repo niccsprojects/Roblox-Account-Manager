@@ -195,7 +195,12 @@ async fn handle_follow_user(
         None => return reply(404, "Account not found", v2),
     };
 
-    let target = match roblox::get_user_id(None, &target_username).await {
+    let lookup = match roblox::get_user_id(Some(&account.security_token), &target_username).await {
+        Err(error) if error.contains("(status ") => roblox::get_user_id(None, &target_username).await,
+        result => result,
+    };
+
+    let target = match lookup {
         Ok(u) => u,
         Err(e) => return reply(400, &e, v2),
     };
