@@ -278,7 +278,6 @@ pub fn run() {
             get_user_info,
             lookup_user,
             send_friend_request,
-            check_friendship,
             block_user,
             unblock_user,
             get_blocked_users,
