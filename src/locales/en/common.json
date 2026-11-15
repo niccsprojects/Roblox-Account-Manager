@@ -430,6 +430,7 @@
   "Skipped invalid line (use username:password)": "Skipped invalid line (use username:password)",
   "Enter the account username and password. A secure browser opens to finish sign-in.": "Enter the account username and password. A secure browser opens to finish sign-in.",
   "Complete any CAPTCHA or 2-step verification in the browser window. This finishes automatically.": "Complete any CAPTCHA or 2-step verification in the browser window. This finishes automatically.",
+  "Automatic sign in did not finish. Complete it in the browser window": "Automatic sign in did not finish. Complete it in the browser window",
   "Opening secure browser...": "Opening secure browser...",
   "Signing in...": "Signing in...",
   "Log in & Add": "Log in & Add",

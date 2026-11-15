@@ -69,12 +69,7 @@ impl CdpClient {
             match client.get(format!("http://127.0.0.1:{}/json", port)).send().await {
                 Ok(resp) => match resp.json::<Value>().await {
                     Ok(targets) => {
-                        ws_url = targets.as_array().and_then(|arr| {
-                            arr.iter()
-                                .find(|t| t.get("type").and_then(Value::as_str) == Some("page"))
-                                .and_then(|t| t.get("webSocketDebuggerUrl").and_then(Value::as_str))
-                                .map(|s| s.to_string())
-                        });
+                        ws_url = targets.as_array().and_then(|arr| pick_page_target(arr));
                         if ws_url.is_some() {
                             break;
                         }
@@ -215,38 +210,94 @@ impl CdpClient {
             }))
     }
 
-    pub async fn wait_for_selector(&mut self, selector: &str, attempts: u32) -> bool {
-        let expression = format!(
-            "document.querySelector({}) ? true : false",
-            serde_json::to_string(selector).unwrap_or_default()
-        );
-        for _ in 0..attempts {
-            if let Ok(Value::Bool(true)) = self.eval(&expression).await {
-                return true;
-            }
-            tokio::time::sleep(Duration::from_millis(300)).await;
-        }
-        false
-    }
-
-    pub async fn fill_login(&mut self, username: &str, password: &str) -> Result<(), String> {
+    pub async fn fill_login(&mut self, username: &str, password: &str) -> String {
         let user = serde_json::to_string(username).unwrap_or_default();
         let pass = serde_json::to_string(password).unwrap_or_default();
         let script = format!(
             "(function(){{\
+if(!/(^|\\.)roblox\\.com$/.test(location.hostname))return 'wrong-page';\
+var w=window,changed=false;\
 var u=document.querySelector('#login-username');\
 var p=document.querySelector('#login-password');\
 var b=document.querySelector('#login-button');\
-if(!u||!p)return 'no-fields';\
-var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;\
-s.call(u,{user});u.dispatchEvent(new Event('input',{{bubbles:true}}));\
-s.call(p,{pass});p.dispatchEvent(new Event('input',{{bubbles:true}}));\
-if(b){{b.disabled=false;b.click();return 'clicked';}}\
-return 'filled';}})()",
+if(!u)return 'no-fields';\
+function put(e,v,k){{\
+if(e.value===v)return true;\
+if(w[k])return false;\
+w[k]=1;e.focus();\
+Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(e,v);\
+e.dispatchEvent(new Event('input',{{bubbles:true}}));\
+e.dispatchEvent(new Event('change',{{bubbles:true}}));\
+changed=true;return true;}}\
+if(!put(u,{user},'__ramUser'))return 'retype-user';\
+if(!p||p.offsetParent===null){{\
+if(!changed&&b&&!b.disabled&&!w.__ramNext){{w.__ramNext=1;b.click();return 'continued';}}\
+return 'waiting-password';}}\
+if(!put(p,{pass},'__ramPass'))return 'retype-pass';\
+if(changed)return 'filled';\
+if(!b||b.disabled)return 'waiting-button';\
+b.click();return 'clicked';}})()",
             user = user,
             pass = pass
         );
-        self.eval(&script).await?;
+        match self.eval(&script).await {
+            Ok(Value::String(status)) => status,
+            _ => String::new(),
+        }
+    }
+
+    pub async fn insert_text(&mut self, selector: &str, text: &str) -> Result<(), String> {
+        let focus = format!(
+            "(function(){{var e=document.querySelector({});if(!e)return false;e.focus();e.select();return true;}})()",
+            serde_json::to_string(selector).unwrap_or_default()
+        );
+        if self.eval(&focus).await? != Value::Bool(true) {
+            return Err("Field not found".to_string());
+        }
+        self.send("Input.insertText", json!({ "text": text })).await?;
         Ok(())
+    }
+}
+
+fn pick_page_target(targets: &[Value]) -> Option<String> {
+    let pages: Vec<&Value> = targets
+        .iter()
+        .filter(|t| t.get("type").and_then(Value::as_str) == Some("page"))
+        .filter(|t| t.get("webSocketDebuggerUrl").and_then(Value::as_str).is_some())
+        .collect();
+    pages
+        .iter()
+        .find(|t| {
+            t.get("url")
+                .and_then(Value::as_str)
+                .is_some_and(|u| u.starts_with("https://www.roblox.com/login"))
+        })
+        .or(pages.first())
+        .and_then(|t| t.get("webSocketDebuggerUrl").and_then(Value::as_str))
+        .map(str::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn picks_login_page_over_other_tabs() {
+        let targets = vec![
+            json!({ "type": "service_worker", "url": "https://www.roblox.com/login", "webSocketDebuggerUrl": "ws://sw" }),
+            json!({ "type": "page", "url": "chrome://welcome/", "webSocketDebuggerUrl": "ws://welcome" }),
+            json!({ "type": "page", "url": "https://www.roblox.com/login?returnUrl=x", "webSocketDebuggerUrl": "ws://login" }),
+        ];
+        assert_eq!(pick_page_target(&targets).as_deref(), Some("ws://login"));
+    }
+
+    #[test]
+    fn falls_back_to_first_debuggable_page() {
+        let targets = vec![
+            json!({ "type": "page", "url": "about:blank" }),
+            json!({ "type": "page", "url": "about:blank", "webSocketDebuggerUrl": "ws://blank" }),
+        ];
+        assert_eq!(pick_page_target(&targets).as_deref(), Some("ws://blank"));
+        assert_eq!(pick_page_target(&[]), None);
     }
 }

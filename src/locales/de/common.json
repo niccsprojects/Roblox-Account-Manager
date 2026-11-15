@@ -429,6 +429,7 @@
   "Skipped invalid line (use username:password)": "Ungültige Zeile übersprungen (Benutzername:Passwort verwenden)",
   "Enter the account username and password. A secure browser opens to finish sign-in.": "Benutzername und Passwort des Kontos eingeben. Ein sicherer Browser öffnet sich zum Abschließen der Anmeldung.",
   "Complete any CAPTCHA or 2-step verification in the browser window. This finishes automatically.": "Schließe CAPTCHA oder Zwei-Schritt-Verifizierung im Browserfenster ab. Dies wird automatisch beendet.",
+  "Automatic sign in did not finish. Complete it in the browser window": "Die automatische Anmeldung wurde nicht abgeschlossen. Schließe sie im Browserfenster ab",
   "Opening secure browser...": "Sicherer Browser wird geöffnet...",
   "Signing in...": "Anmeldung läuft...",
   "Log in & Add": "Anmelden & hinzufügen",
