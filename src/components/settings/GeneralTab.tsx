@@ -356,6 +356,12 @@ export function GeneralTab({ s }: { s: UseSettingsReturn }) {
         description="Allow multiple Roblox instances to run simultaneously"
       />
       <Toggle
+        checked={s.getBool("General", "AutoCloseRobloxForMultiRbx")}
+        onChange={(v) => s.setBool("General", "AutoCloseRobloxForMultiRbx", v)}
+        label="Close running Roblox when it blocks Multi Roblox"
+        description="If an open Roblox window keeps Multi Roblox from starting, close it and continue the launch"
+      />
+      <Toggle
         checked={s.getBool("General", "BottingEnabled")}
         onChange={(v) => s.setBool("General", "BottingEnabled", v)}
         label={<>Auto Rejoin<WarningBadge>advanced</WarningBadge></>}

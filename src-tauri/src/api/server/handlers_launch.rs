@@ -46,12 +46,9 @@ async fn handle_launch_account(
         let multi_rbx = state.settings.get_bool("General", "EnableMultiRbx");
 
         if multi_rbx {
-            match windows::enable_multi_roblox() {
-                Ok(true) => {}
-                Ok(false) => {
-                    return reply(500, "Failed to enable Multi Roblox. Close all Roblox processes and try again.", v2);
-                }
-                Err(e) => return reply(500, &e, v2),
+            let auto_close = state.settings.get_bool("General", "AutoCloseRobloxForMultiRbx");
+            if let Err(e) = crate::ensure_multi_roblox_enabled(auto_close).await {
+                return reply(500, &e, v2);
             }
         } else {
             let _ = windows::disable_multi_roblox();
@@ -211,12 +208,9 @@ async fn handle_follow_user(
         let multi_rbx = state.settings.get_bool("General", "EnableMultiRbx");
 
         if multi_rbx {
-            match windows::enable_multi_roblox() {
-                Ok(true) => {}
-                Ok(false) => {
-                    return reply(500, "Failed to enable Multi Roblox. Close all Roblox processes and try again.", v2);
-                }
-                Err(e) => return reply(500, &e, v2),
+            let auto_close = state.settings.get_bool("General", "AutoCloseRobloxForMultiRbx");
+            if let Err(e) = crate::ensure_multi_roblox_enabled(auto_close).await {
+                return reply(500, &e, v2);
             }
         } else {
             let _ = windows::disable_multi_roblox();

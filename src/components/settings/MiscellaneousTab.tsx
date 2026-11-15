@@ -48,12 +48,6 @@ export function MiscellaneousTab({
         label="Auto Close Last Process"
         description="Close the previous Roblox instance when launching a new one for the same account"
       />
-      <Toggle
-        checked={s.getBool("General", "AutoCloseRobloxForMultiRbx")}
-        onChange={(v) => s.setBool("General", "AutoCloseRobloxForMultiRbx", v)}
-        label="Auto Close Roblox for Multi Roblox"
-        description="If Multi Roblox cannot be enabled, close open Roblox windows automatically and continue"
-      />
       <NumberField
         value={s.getNumber("General", "PresenceUpdateRate", 5)}
         onChange={(v) => s.setNumber("General", "PresenceUpdateRate", v)}
