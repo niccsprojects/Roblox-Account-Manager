@@ -8,8 +8,8 @@ export function UpdateBanner() {
   if (!store.updateInfo) return null;
 
   return (
-    <div className="flex items-center justify-between px-4 py-1.5 bg-sky-600/15 border-b border-sky-500/20 shrink-0">
-      <span className="text-xs text-sky-300">
+    <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--textboxes-bg)] border-b border-[var(--accent-color)] shrink-0">
+      <span className="text-xs text-[var(--panel-fg)]">
         {t("v{{version}} available", { version: store.updateInfo.version })}
       </span>
       <button

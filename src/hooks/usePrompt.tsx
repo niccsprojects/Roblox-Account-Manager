@@ -245,7 +245,7 @@ export function PromptProvider({ children }: { children: ReactNode }) {
                       type="checkbox"
                       checked={dontShowAgain}
                       onChange={(e) => setDontShowAgain(e.target.checked)}
-                      className="h-3.5 w-3.5 rounded border-zinc-600 bg-zinc-800 text-sky-500 focus:ring-sky-500/30"
+                      className="h-3.5 w-3.5 rounded border-zinc-600 bg-zinc-800 text-sky-500"
                     />
                     <span>{t(confirmWithOptOutState.optOutLabel)}</span>
                   </label>

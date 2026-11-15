@@ -38,7 +38,7 @@ export function NumberField({
           className={`w-20 px-2.5 py-1 rounded-md text-[13px] text-right transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
             disabled
               ? "cursor-not-allowed border border-zinc-800/60 bg-zinc-800/40 text-zinc-500"
-              : "bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:border-sky-500/40"
+              : "bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:!border-[var(--accent-color)]"
           }`}
         />
         {suffix && <span className="text-[11px] text-zinc-600">{t(suffix)}</span>}

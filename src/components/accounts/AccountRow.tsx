@@ -115,7 +115,7 @@ export function AccountRowView({
       className={`group/row theme-row-hover relative flex items-center gap-3 px-3 py-1.5 select-none border-l-2 transition-colors duration-100 ${cursor} ${
         selected ? "theme-row-selected" : "border-l-transparent"
       } ${dimmed ? "opacity-40" : ""} ${
-        overlay ? "theme-panel rounded-lg shadow-2xl ring-1 ring-[var(--accent-strong)]" : ""
+        overlay ? "theme-panel rounded-lg shadow-2xl ring-1 ring-[var(--accent-color)]" : ""
       }`}
       onClick={overlay ? undefined : handleClick}
       onContextMenu={overlay ? undefined : handleContext}

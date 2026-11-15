@@ -119,7 +119,7 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
             autoComplete="off"
             onChange={(e) => s.set("BloxGen", "ApiKey", e.target.value.trim())}
             placeholder="BLOX-XXXXXXXXXXXXXXXX"
-            className="flex-1 min-w-0 px-2.5 py-1 rounded-md text-[13px] font-mono bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-sky-500/40 transition-colors"
+            className="flex-1 min-w-0 px-2.5 py-1 rounded-md text-[13px] font-mono bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:!border-[var(--accent-color)] transition-colors"
           />
           <button
             type="button"

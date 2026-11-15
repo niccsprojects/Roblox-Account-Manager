@@ -119,12 +119,8 @@ body {
   color: var(--accent-color) !important;
 }
 
-.theme-accent-bg {
-  background: var(--accent-soft) !important;
-}
-
 .theme-accent-border {
-  border-color: var(--accent-strong) !important;
+  border-color: var(--accent-color) !important;
 }
 
 .theme-check {
@@ -154,14 +150,13 @@ body {
 }
 
 .theme-check:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--input-focus);
+  outline: 1px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .theme-check[aria-checked="true"] {
-  background: var(--accent-soft);
-  border-color: var(--accent-strong);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: var(--textboxes-bg);
+  border-color: var(--accent-color);
 }
 
 .theme-check:disabled {
@@ -193,8 +188,7 @@ body {
 }
 
 .theme-input:focus {
-  border-color: var(--buttons-bc);
-  box-shadow: 0 0 0 2px var(--input-focus);
+  border-color: var(--accent-color);
   outline: none;
 }
 
@@ -300,8 +294,7 @@ body {
 }
 
 .theme-modal-scope .focus\:border-zinc-600:focus {
-  border-color: var(--buttons-bc) !important;
-  box-shadow: 0 0 0 2px var(--input-focus);
+  border-color: var(--accent-color) !important;
 }
 
 .theme-modal-scope .hover\:bg-zinc-700:hover,
@@ -607,14 +600,11 @@ body {
 }
 
 .restricted-auth-input:focus {
-  border-color: var(--accent-strong);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  border-color: var(--accent-color);
 }
 
 .restricted-auth-btn {
-  border-color: var(--accent-strong);
   color: var(--panel-fg);
-  background: var(--accent-soft);
 }
 
 :root[data-show-headers="false"] .theme-group-header {
@@ -829,8 +819,7 @@ body {
 }
 
 .sidebar-input:focus {
-  border-color: var(--buttons-bc);
-  box-shadow: 0 0 0 2px var(--input-focus);
+  border-color: var(--accent-color);
 }
 
 .sidebar-input::placeholder {
