@@ -169,7 +169,7 @@ export function SingleSelectSidebar() {
         : { label: t("Offline"), dot: "", dotStyle: { backgroundColor: "var(--panel-muted)" }, text: "theme-muted" };
 
   return (
-    <div data-tour="launch-sidebar" className="theme-surface theme-border w-72 border-l flex flex-col shrink-0 animate-slide-right">
+    <div className="theme-surface theme-border w-72 border-l flex flex-col shrink-0 animate-slide-right">
       <div className="p-4 border-b theme-border">
         <div className="flex items-center gap-3">
           {hideAvatar ? (

@@ -57,7 +57,7 @@ export function StatusBar() {
   }, [bottingActive, afkActive, scheduledClose]);
 
   return (
-    <div data-tour="status-bar" className="theme-surface theme-border flex items-center justify-between gap-3 px-4 py-2 border-t text-[12px] shrink-0">
+    <div className="theme-surface theme-border flex items-center justify-between gap-3 px-4 py-2 border-t text-[12px] shrink-0">
       <div className="flex items-center min-w-0 overflow-hidden pr-1">
         <div
           className={`overflow-hidden transition-[max-width,opacity,margin] duration-150 ease-out ${

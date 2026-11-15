@@ -322,12 +322,6 @@ export interface StoreValue {
   openEncryptionSetupFromSettings: () => void;
   closeEncryptionSetup: () => void;
   applyEncryptionMethod: (method: "default" | "password", password?: string) => Promise<void>;
-  firstRunWalkthroughOpen: boolean;
-  firstRunWalkthroughMode: "firstRun" | "manual";
-  openFirstRunWalkthroughFromSettings: () => void;
-  closeFirstRunWalkthrough: () => void;
-  completeFirstRunWalkthrough: () => Promise<void>;
-  skipFirstRunWalkthrough: () => Promise<void>;
   initialized: boolean;
 
   settingsOpen: boolean;
@@ -451,8 +445,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [accountsEncrypted, setAccountsEncrypted] = useState<boolean | null>(null);
   const [applyingEncryption, setApplyingEncryption] = useState(false);
   const [encryptionSetupError, setEncryptionSetupError] = useState<string | null>(null);
-  const [firstRunWalkthroughOpen, setFirstRunWalkthroughOpen] = useState(false);
-  const [firstRunWalkthroughMode, setFirstRunWalkthroughMode] = useState<"firstRun" | "manual">("firstRun");
   const [initialized, setInitialized] = useState(false);
   const [dragState, _setDragState] = useState<DragState | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
@@ -509,7 +501,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const reservedLaunchIdsRef = useRef<Set<number>>(new Set());
   const [launchActive, setLaunchActive] = useState(false);
   const actionStatusTimeoutRef = useRef<number | null>(null);
-  const walkthroughOpenTimeoutRef = useRef<number | null>(null);
   const lastAfkCyclesRef = useRef(0);
 
   const devMode = settings?.Developer?.DevMode === "true";
@@ -1803,29 +1794,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setEncryptionSetupError(null);
   }, [encryptionSetupMode]);
 
-  const openFirstRunWalkthroughFromSettings = useCallback(() => {
-    if (walkthroughOpenTimeoutRef.current !== null) {
-      window.clearTimeout(walkthroughOpenTimeoutRef.current);
-      walkthroughOpenTimeoutRef.current = null;
-    }
-    setSettingsOpen(false);
-    setFirstRunWalkthroughMode("manual");
-    setFirstRunWalkthroughOpen(false);
-    walkthroughOpenTimeoutRef.current = window.setTimeout(() => {
-      setFirstRunWalkthroughOpen(true);
-      walkthroughOpenTimeoutRef.current = null;
-    }, 120);
-  }, []);
-
-  const closeFirstRunWalkthrough = useCallback(() => {
-    if (walkthroughOpenTimeoutRef.current !== null) {
-      window.clearTimeout(walkthroughOpenTimeoutRef.current);
-      walkthroughOpenTimeoutRef.current = null;
-    }
-    setFirstRunWalkthroughOpen(false);
-    setFirstRunWalkthroughMode("manual");
-  }, []);
-
   const setDefaultVersion = useCallback(
     async (versionId: string | null) => {
       const value = versionId ?? "";
@@ -1859,73 +1827,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     [addToast]
   );
-
-  const setFirstRunWalkthroughStateLocal = useCallback((state: "completed" | "skipped") => {
-    setSettings((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        General: {
-          ...(prev.General || {}),
-          FirstRunWalkthroughState: state,
-        },
-      };
-    });
-  }, []);
-
-  const persistFirstRunWalkthroughState = useCallback(async (state: "completed" | "skipped") => {
-    await invoke("update_setting", {
-      section: "General",
-      key: "FirstRunWalkthroughState",
-      value: state,
-    }).catch(() => {});
-  }, []);
-
-  const completeFirstRunWalkthrough = useCallback(async () => {
-    const shouldPersist =
-      firstRunWalkthroughMode === "firstRun" ||
-      settings?.General?.FirstRunWalkthroughState === "pending";
-
-    if (shouldPersist) {
-      setFirstRunWalkthroughStateLocal("completed");
-    }
-    setFirstRunWalkthroughOpen(false);
-
-    if (shouldPersist) {
-      await persistFirstRunWalkthroughState("completed");
-      addToast(tr("First-Time Walkthrough complete"));
-    }
-    setFirstRunWalkthroughMode("manual");
-  }, [
-    addToast,
-    firstRunWalkthroughMode,
-    persistFirstRunWalkthroughState,
-    setFirstRunWalkthroughStateLocal,
-    settings?.General?.FirstRunWalkthroughState,
-  ]);
-
-  const skipFirstRunWalkthrough = useCallback(async () => {
-    const shouldPersist =
-      firstRunWalkthroughMode === "firstRun" ||
-      settings?.General?.FirstRunWalkthroughState === "pending";
-
-    if (shouldPersist) {
-      setFirstRunWalkthroughStateLocal("skipped");
-    }
-    setFirstRunWalkthroughOpen(false);
-
-    if (shouldPersist) {
-      await persistFirstRunWalkthroughState("skipped");
-      addToast(tr("First-Time Walkthrough skipped"));
-    }
-    setFirstRunWalkthroughMode("manual");
-  }, [
-    addToast,
-    firstRunWalkthroughMode,
-    persistFirstRunWalkthroughState,
-    setFirstRunWalkthroughStateLocal,
-    settings?.General?.FirstRunWalkthroughState,
-  ]);
 
   const applyEncryptionMethod = useCallback(async (method: "default" | "password", password?: string) => {
     setApplyingEncryption(true);
@@ -1969,13 +1870,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await loadAccounts();
       setEncryptionSetupOpen(false);
       setEncryptionSetupMode("settings");
-      if (
-        encryptionSetupMode === "firstRun" &&
-        (settings?.General?.FirstRunWalkthroughState ?? "pending") === "pending"
-      ) {
-        setFirstRunWalkthroughMode("firstRun");
-        setFirstRunWalkthroughOpen(true);
-      }
       addToast(method === "password" ? tr("Password lock enabled") : tr("Default encryption enabled"));
     } catch (e) {
       setEncryptionSetupError(String(e));
@@ -1985,10 +1879,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [
     addToast,
-    encryptionSetupMode,
     loadAccounts,
     refreshEncryptionState,
-    settings?.General?.FirstRunWalkthroughState,
   ]);
 
   async function unlock(password: string) {
@@ -2078,15 +1970,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setEncryptionSetupOpen(true);
       }
 
-      if (
-        !needs &&
-        loadedSettings?.General?.FirstRunWalkthroughState === "pending" &&
-        loadedSettings?.General?.EncryptionOnboardingState !== "pending"
-      ) {
-        setFirstRunWalkthroughMode("firstRun");
-        setFirstRunWalkthroughOpen(true);
-      }
-
       try {
         const t = await invoke<ThemeData>("get_theme");
         applyThemePreview(t);
@@ -2094,22 +1977,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setInitialized(true);
     })();
   }, [applyThemePreview, refreshEncryptionState]);
-
-  useEffect(() => {
-    if (!initialized || needsPassword) return;
-    if (encryptionSetupOpen || firstRunWalkthroughOpen) return;
-    if (settings?.General?.FirstRunWalkthroughState !== "pending") return;
-    if (settings?.General?.EncryptionOnboardingState === "pending") return;
-    setFirstRunWalkthroughMode("firstRun");
-    setFirstRunWalkthroughOpen(true);
-  }, [
-    encryptionSetupOpen,
-    firstRunWalkthroughOpen,
-    initialized,
-    needsPassword,
-    settings?.General?.EncryptionOnboardingState,
-    settings?.General?.FirstRunWalkthroughState,
-  ]);
 
   useEffect(() => {
     void i18n.changeLanguage(normalizeLanguage(settings?.General?.Language));
@@ -2581,10 +2448,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         window.clearTimeout(actionStatusTimeoutRef.current);
         actionStatusTimeoutRef.current = null;
       }
-      if (walkthroughOpenTimeoutRef.current !== null) {
-        window.clearTimeout(walkthroughOpenTimeoutRef.current);
-        walkthroughOpenTimeoutRef.current = null;
-      }
     };
   }, []);
 
@@ -2795,12 +2658,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     openEncryptionSetupFromSettings,
     closeEncryptionSetup,
     applyEncryptionMethod,
-    firstRunWalkthroughOpen,
-    firstRunWalkthroughMode,
-    openFirstRunWalkthroughFromSettings,
-    closeFirstRunWalkthrough,
-    completeFirstRunWalkthrough,
-    skipFirstRunWalkthrough,
     initialized,
     settingsOpen,
     setSettingsOpen,

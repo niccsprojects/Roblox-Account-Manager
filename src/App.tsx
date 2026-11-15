@@ -3,7 +3,6 @@ import { StoreProvider, useStore } from "./store";
 import { PromptProvider } from "./hooks/usePrompt";
 import { PasswordScreen } from "./components/layout/PasswordScreen";
 import { EncryptionSetupScreen } from "./components/layout/EncryptionSetupScreen";
-import { FirstRunWalkthrough } from "./components/layout/FirstRunWalkthrough";
 import { AppErrorBoundary } from "./components/layout/AppErrorBoundary";
 import { TitleBar } from "./components/layout/TitleBar";
 import { ModalWindowControls } from "./components/layout/ModalWindowControls";
@@ -53,15 +52,14 @@ function AppContent() {
     (ENABLE_NEXUS && store.nexusOpen) ||
     store.scriptsOpen ||
     store.updateDialogOpen ||
-    store.firstRunWalkthroughOpen ||
     !!store.modal;
 
   useEffect(() => {
-    if (!store.initialized || store.needsPassword || store.firstRunWalkthroughOpen) return;
+    if (!store.initialized || store.needsPassword) return;
     if (hasCheckedForUpdatesRef.current) return;
     hasCheckedForUpdatesRef.current = true;
     store.checkForUpdates();
-  }, [store.checkForUpdates, store.firstRunWalkthroughOpen, store.initialized, store.needsPassword]);
+  }, [store.checkForUpdates, store.initialized, store.needsPassword]);
 
   if (!store.initialized) {
     return (
@@ -205,8 +203,6 @@ function AppContent() {
       />
 
       <UpdateDialog />
-
-      {store.firstRunWalkthroughOpen && <FirstRunWalkthrough />}
 
       {store.modal && (
         <div
