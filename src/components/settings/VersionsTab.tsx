@@ -33,7 +33,7 @@ export function VersionsTab({ s }: { s: UseSettingsReturn }) {
   const isWindows = store.platformCapabilities?.os === "windows";
   const savedCustomPath = s.get("Versions", "CustomInstallPath", "");
   const [customPath, setCustomPath] = useState(savedCustomPath);
-  const [detectedPath, setDetectedPath] = useState<string | null>(null);
+  const [detectedPath, setDetectedPath] = useState<string | null | undefined>(undefined);
 
   useEffect(() => {
     setCustomPath(savedCustomPath);
@@ -193,10 +193,12 @@ export function VersionsTab({ s }: { s: UseSettingsReturn }) {
               {t("Browse…")}
             </button>
           </div>
-          {detectedPath && (
+          {detectedPath !== undefined && (
             <div className="px-1 pb-1">
               <span className="text-[11px] text-zinc-500 break-all">
-                {t("Detected: {{path}}", { path: detectedPath })}
+                {detectedPath
+                  ? t("Detected: {{path}}", { path: detectedPath })
+                  : t("No Roblox installation found on this PC")}
               </span>
             </div>
           )}
