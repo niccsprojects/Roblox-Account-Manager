@@ -331,6 +331,7 @@
   "{{count}} server{{suffix}}": "{{count}} Server",
   "{{name}} - already exists": "{{name}} - existiert bereits",
   "{{name}} is not in a game. Try anyway?": "{{name}} ist gerade nicht im Spiel. Trotzdem versuchen?",
+  "{{name}} is not a friend of this account, so Roblox only lets it in if they allow everyone to join": "{{name}} ist kein Freund dieses Kontos. Roblox lässt es nur beitreten, wenn {{name}} allen das Beitreten erlaubt",
   "{{name}} not found in any server": "{{name}} wurde auf keinem Server gefunden",
   "Roblox hides who is in each server, so {{name}} can only be found while their joins are visible to this account": "Roblox verbirgt, wer auf welchem Server ist. {{name}} lässt sich nur finden, solange dieses Konto beitreten darf",
   "+ New Group...": "+ Neue Gruppe...",

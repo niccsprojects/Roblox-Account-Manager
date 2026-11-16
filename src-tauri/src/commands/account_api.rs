@@ -221,6 +221,18 @@ async fn send_friend_request(
 }
 
 #[tauri::command]
+async fn check_friendship(
+    state: tauri::State<'_, AccountStore>,
+    user_id: i64,
+    target_user_id: i64,
+) -> Result<bool, String> {
+    run_with_session_retry(state.inner(), user_id, |cookie| async move {
+        api::roblox::is_friends_with(&cookie, user_id, target_user_id).await
+    })
+    .await
+}
+
+#[tauri::command]
 async fn block_user(
     state: tauri::State<'_, AccountStore>,
     user_id: i64,

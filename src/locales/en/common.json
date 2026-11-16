@@ -332,6 +332,7 @@
   "{{count}} server{{suffix}}": "{{count}} server{{suffix}}",
   "{{name}} - already exists": "{{name}} - already exists",
   "{{name}} is not in a game. Try anyway?": "{{name}} is not in a game. Try anyway?",
+  "{{name}} is not a friend of this account, so Roblox only lets it in if they allow everyone to join": "{{name}} is not a friend of this account, so Roblox only lets it in if they allow everyone to join",
   "{{name}} not found in any server": "{{name}} not found in any server",
   "Roblox hides who is in each server, so {{name}} can only be found while their joins are visible to this account": "Roblox hides who is in each server, so {{name}} can only be found while their joins are visible to this account",
   "+ New Group...": "+ New Group...",

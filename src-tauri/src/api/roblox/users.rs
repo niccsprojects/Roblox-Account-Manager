@@ -237,6 +237,51 @@ pub async fn send_friend_request(security_token: &str, target_user_id: i64) -> R
     Err(map_friend_request_failure(status, &body, challenged))
 }
 
+fn parse_friendship_status(body: &serde_json::Value, target_user_id: i64) -> Option<bool> {
+    body.get("data")?
+        .as_array()?
+        .iter()
+        .find(|entry| entry.get("id").and_then(serde_json::Value::as_i64) == Some(target_user_id))
+        .and_then(|entry| entry.get("status").and_then(serde_json::Value::as_str))
+        .map(|status| status.eq_ignore_ascii_case("Friends"))
+}
+
+pub async fn is_friends_with(
+    security_token: &str,
+    viewer_user_id: i64,
+    target_user_id: i64,
+) -> Result<bool, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    let response = client
+        .get(format!(
+            "https://friends.roblox.com/v1/users/{}/friends/statuses?userIds={}",
+            viewer_user_id, target_user_id
+        ))
+        .header(COOKIE, cookie_header(security_token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Failed to get friendship status (status {})",
+            response.status().as_u16()
+        ));
+    }
+
+    let body: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse: {}", e))?;
+
+    parse_friendship_status(&body, target_user_id)
+        .ok_or_else(|| "Friendship status missing from response".to_string())
+}
+
 pub async fn block_user(security_token: &str, target_user_id: i64) -> Result<(), String> {
     let client = reqwest::Client::new();
 
@@ -438,5 +483,31 @@ pub async fn set_private_server_invite_privacy(security_token: &str, privacy: &s
     } else {
         let body = response.text().await.unwrap_or_default();
         Err(format!("Failed to set privacy: {}", &body[..body.len().min(200)]))
+    }
+}
+
+#[cfg(test)]
+mod friendship_status_tests {
+    use super::parse_friendship_status;
+
+    #[test]
+    fn friends_status_is_true() {
+        let body = serde_json::json!({ "data": [{ "id": 42, "status": "Friends" }] });
+        assert_eq!(parse_friendship_status(&body, 42), Some(true));
+    }
+
+    #[test]
+    fn other_statuses_are_false() {
+        for status in ["NotFriends", "RequestSent", "RequestReceived"] {
+            let body = serde_json::json!({ "data": [{ "id": 42, "status": status }] });
+            assert_eq!(parse_friendship_status(&body, 42), Some(false));
+        }
+    }
+
+    #[test]
+    fn missing_target_is_none() {
+        let other = serde_json::json!({ "data": [{ "id": 7, "status": "Friends" }] });
+        assert_eq!(parse_friendship_status(&other, 42), None);
+        assert_eq!(parse_friendship_status(&serde_json::json!({}), 42), None);
     }
 }
