@@ -1,9 +1,30 @@
-import { useEffect, useMemo, useState } from "react";
-import { KeyRound, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useStore } from "../../store";
 import { useTr } from "../../i18n/text";
+import { ModalWindowControls } from "./ModalWindowControls";
 
 type EncryptionMethod = "default" | "password";
+
+const METHODS: { id: EncryptionMethod; title: string; points: string[] }[] = [
+  {
+    id: "password",
+    title: "Password",
+    points: [
+      "Asked each time RAM starts",
+      "Copy the file to any PC and unlock it there",
+      "Lost password means lost accounts",
+    ],
+  },
+  {
+    id: "default",
+    title: "This device",
+    points: [
+      "Opens straight away, no prompt",
+      "Only readable on this PC",
+      "Nothing to remember",
+    ],
+  },
+];
 
 export function EncryptionSetupScreen() {
   const t = useTr();
@@ -14,26 +35,19 @@ export function EncryptionSetupScreen() {
   const [localError, setLocalError] = useState("");
 
   const isFirstRun = store.encryptionSetupMode === "firstRun";
-  const canClose = !isFirstRun;
-
-  useEffect(() => {
-    const preferred = isFirstRun
-      ? "password"
+  const currentMethod: EncryptionMethod | null =
+    isFirstRun || store.accountsEncrypted === null
+      ? null
       : store.accountsEncrypted
         ? "password"
         : "default";
-    setMethod(preferred);
+
+  useEffect(() => {
+    setMethod(isFirstRun || store.accountsEncrypted ? "password" : "default");
     setPassword("");
     setConfirmPassword("");
     setLocalError("");
   }, [isFirstRun, store.accountsEncrypted, store.encryptionSetupMode]);
-
-  const currentMethodLabel = useMemo(() => {
-    if (store.accountsEncrypted === null) return "";
-    return store.accountsEncrypted
-      ? t("Current method: Password Lock")
-      : t("Current method: Default Encryption");
-  }, [store.accountsEncrypted, t]);
 
   async function handleApply() {
     setLocalError("");
@@ -57,178 +71,115 @@ export function EncryptionSetupScreen() {
     } catch {}
   }
 
+  const error = localError || store.encryptionSetupError;
+
   return (
-    <div className="theme-app min-h-screen w-full flex items-center justify-center px-6 py-8 bg-[radial-gradient(1200px_420px_at_15%_0%,var(--accent-soft),transparent_62%),radial-gradient(900px_360px_at_85%_100%,var(--panel-soft),transparent_68%)]">
-      <div className="w-full max-w-xl rounded-2xl border theme-border theme-panel shadow-2xl overflow-hidden animate-scale-in">
-        <div className="px-6 py-5 border-b theme-border">
-          <div className="animate-fade-in-up" style={{ animationDelay: "0.03s" }}>
-            <h1 className="text-[15px] font-semibold text-[var(--panel-fg)]">
-              {isFirstRun ? t("Set Up Encryption") : t("Change Encryption Method")}
-            </h1>
-            <p className="text-[12px] theme-muted mt-0.5">
-              {t("Choose how AccountData.json is encrypted on this device.")}
-            </p>
-          </div>
-          {!isFirstRun && currentMethodLabel ? (
-            <div className="mt-3 text-[11px] theme-muted animate-fade-in-up" style={{ animationDelay: "0.07s" }}>
-              {currentMethodLabel}
-            </div>
-          ) : null}
+    <div className="theme-app min-h-screen w-full flex items-center justify-center px-6 py-8">
+      <div data-tauri-drag-region className="fixed inset-x-0 top-0 h-10" />
+      <ModalWindowControls visible />
+      <form
+        className="w-full max-w-[560px] animate-fade-in-up"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void handleApply();
+        }}
+      >
+        <h1 className="text-center text-[20px] font-semibold tracking-[-0.01em] text-[var(--panel-fg)] mb-6">
+          {isFirstRun ? t("How should RAM lock your accounts?") : t("Change how RAM locks your accounts")}
+        </h1>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {METHODS.map((option) => {
+            const selected = method === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setMethod(option.id)}
+                aria-pressed={selected}
+                className={[
+                  "text-left rounded-xl border px-4 pt-4 pb-[18px] transition-colors duration-200",
+                  selected
+                    ? "border-[var(--accent-color)] bg-[var(--textboxes-bg)]"
+                    : "border-[var(--textboxes-bc)] bg-transparent hover:border-[var(--border-color)]",
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between gap-3 mb-2.5">
+                  <span className="text-[14px] font-semibold text-[var(--panel-fg)]">
+                    {t(option.title)}
+                    {currentMethod === option.id ? (
+                      <span className="ml-2 text-[11px] font-normal theme-muted">{t("Current")}</span>
+                    ) : null}
+                  </span>
+                  <span
+                    className={[
+                      "h-[9px] w-[9px] shrink-0 rounded-full border transition-colors duration-200",
+                      selected ? "border-[var(--accent-color)] bg-[var(--accent-color)]" : "theme-border",
+                    ].join(" ")}
+                  />
+                </div>
+                <ul className="grid gap-[5px]">
+                  {option.points.map((point) => (
+                    <li key={point} className="text-[12px] leading-[1.45] theme-muted">
+                      {t(point)}
+                    </li>
+                  ))}
+                </ul>
+              </button>
+            );
+          })}
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="grid gap-2">
-            <button
-              type="button"
-              onClick={() => setMethod("password")}
-              aria-pressed={method === "password"}
-              className={[
-                "w-full text-left rounded-xl border p-3.5 transition-all duration-300 ease-out animate-fade-in-up",
-                method === "password"
-                  ? "theme-accent-border theme-surface"
-                  : "border-[var(--border-color)] bg-[var(--panel-soft)] hover:border-[var(--accent-strong)]",
-              ].join(" ")}
-              style={{ animationDelay: "0.11s" }}
-            >
-              <div className="flex items-start gap-3">
-                <div className={["mt-0.5", method === "password" ? "theme-accent" : "theme-muted"].join(" ")}><Lock size={16} strokeWidth={1.8} /></div>
-                <div className="flex-1">
-                  <div className="text-[13px] font-medium text-[var(--panel-fg)]">{t("Pass Lock (Recommended)")}</div>
-                  <div className={[
-                    "text-[11px] theme-muted mt-0.5 transition-all duration-300 ease-out overflow-hidden",
-                    method === "password" ? "max-h-24 opacity-100" : "max-h-10 opacity-90",
-                  ].join(" ")}>
-                    {t("Use a password to encrypt AccountData.json. You'll enter it when RAM starts.")}
-                  </div>
-                </div>
-                <div className={[
-                  "mt-1 h-2.5 w-2.5 rounded-full border transition-all duration-300 ease-out",
-                  method === "password"
-                    ? "theme-accent-border theme-accent-bg"
-                    : "theme-border bg-transparent",
-                ].join(" ")} />
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setMethod("default")}
-              aria-pressed={method === "default"}
-              className={[
-                "w-full text-left rounded-xl border p-3.5 transition-all duration-300 ease-out animate-fade-in-up",
-                method === "default"
-                  ? "theme-accent-border theme-surface"
-                  : "border-[var(--border-color)] bg-[var(--panel-soft)] hover:border-[var(--accent-strong)]",
-              ].join(" ")}
-              style={{ animationDelay: "0.15s" }}
-            >
-              <div className="flex items-start gap-3">
-                <div className={["mt-0.5", method === "default" ? "theme-accent" : "theme-muted"].join(" ")}><KeyRound size={16} strokeWidth={1.8} /></div>
-                <div className="flex-1">
-                  <div className="text-[13px] font-medium text-[var(--panel-fg)]">{t("Default Encryption")}</div>
-                  <div className={[
-                    "text-[11px] theme-muted mt-0.5 transition-all duration-300 ease-out overflow-hidden",
-                    method === "default" ? "max-h-24 opacity-100" : "max-h-10 opacity-90",
-                  ].join(" ")}>
-                    {t("Use local default protection without a custom password.")}
-                  </div>
-                </div>
-                <div className={[
-                  "mt-1 h-2.5 w-2.5 rounded-full border transition-all duration-300 ease-out",
-                  method === "default"
-                    ? "theme-accent-border theme-accent-bg"
-                    : "theme-border bg-transparent",
-                ].join(" ")} />
-              </div>
-            </button>
+        {method === "password" ? (
+          <div key="password" className="mt-3.5 grid gap-2 animate-fade-in-up">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t("Password, 8+ characters")}
+              className="w-full rounded-lg theme-input px-3 py-2 text-[13px] focus:!shadow-none focus:!border-[var(--accent-color)]"
+              autoFocus
+            />
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder={t("Repeat password")}
+              className="w-full rounded-lg theme-input px-3 py-2 text-[13px] focus:!shadow-none focus:!border-[var(--accent-color)]"
+            />
           </div>
+        ) : null}
 
-          <div
-            className={[
-              "rounded-xl border theme-border bg-[rgba(0,0,0,0.18)] overflow-hidden",
-              "transition-all duration-300 ease-out",
-              method === "password" ? "max-h-52" : "max-h-24",
-            ].join(" ")}
-            style={{ transitionProperty: "max-height" }}
-          >
-            <div key={method} className="animate-fade-in-up p-3.5">
-              {method === "password" ? (
-                <div className="space-y-2">
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={t("Create Encryption Password")}
-                    className="w-full rounded-lg theme-input px-3 py-2 text-[13px]"
-                    autoFocus
-                  />
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={t("Confirm Encryption Password")}
-                    className="w-full rounded-lg theme-input px-3 py-2 text-[13px]"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        void handleApply();
-                      }
-                    }}
-                  />
-                  <div className="text-[11px] theme-muted">{t("At least 8 characters.")}</div>
-                </div>
-              ) : (
-                <div className="text-[12px] theme-muted pt-0.5">
-                  {t("This can be changed later in Settings.")}
-                </div>
-              )}
-            </div>
+        {error ? (
+          <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300">
+            {error}
           </div>
+        ) : null}
 
-          {(localError || store.encryptionSetupError) && (
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300 animate-fade-in-up" style={{ animationDelay: "0.02s" }}>
-              {localError || store.encryptionSetupError}
-            </div>
-          )}
-        </div>
-
-        <div className="px-6 py-4 border-t theme-border flex items-center justify-between gap-4 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
-          <div className="text-[11px] theme-muted max-w-[62%]">
-            {isFirstRun
-              ? t("Required on first setup to secure your account vault.")
-              : t("Re-encrypts your current AccountData.json with the selected method.")}
-          </div>
-          <div className={["grid gap-2 shrink-0", canClose ? "grid-cols-2" : "grid-cols-1"].join(" ")}>
-            {canClose ? (
+        <div className="mt-3.5 flex items-center justify-between gap-4">
+          <p className="text-[12px] theme-muted">
+            {isFirstRun ? t("You can switch later in Settings.") : ""}
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            {isFirstRun ? null : (
               <button
                 type="button"
                 onClick={store.closeEncryptionSetup}
-                className="w-[132px] h-9 px-3 rounded-lg text-[12px] theme-btn-ghost"
+                className="h-9 px-4 rounded-lg text-[12.5px] theme-btn-ghost"
               >
                 {t("Cancel")}
               </button>
-            ) : null}
+            )}
             <button
-              type="button"
-              onClick={() => {
-                void handleApply();
-              }}
+              type="submit"
               disabled={store.applyingEncryption}
-              className="w-[132px] h-9 px-3.5 rounded-lg text-[12px] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              style={{
-                border: "1px solid var(--accent-strong)",
-                background: "var(--accent-soft)",
-                color: "var(--panel-fg)",
-              }}
+              className="h-9 px-[18px] text-[12.5px] font-medium theme-btn !text-[var(--panel-fg)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {store.applyingEncryption
-                ? t("Applying encryption...")
-                : isFirstRun
-                  ? t("Continue")
-                  : t("Apply Encryption")}
+              {store.applyingEncryption ? t("Applying encryption...") : isFirstRun ? t("Continue") : t("Apply")}
             </button>
           </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

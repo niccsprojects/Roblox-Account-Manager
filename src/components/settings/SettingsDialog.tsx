@@ -148,7 +148,6 @@ export function SettingsDialog({
       onClick={handleClose}
     >
       <div
-        data-tour="settings-modal"
         className={`theme-modal-scope theme-panel theme-border bg-zinc-900 border border-zinc-800/80 rounded-2xl shadow-2xl w-[520px] h-[85vh] max-h-[760px] flex flex-col overflow-hidden ${closing ? "animate-scale-out" : "animate-scale-in"}`}
         onClick={(e) => e.stopPropagation()}
       >

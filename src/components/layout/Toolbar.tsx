@@ -172,7 +172,6 @@ export function Toolbar() {
         <div ref={addRef} className="relative">
           <button
             onClick={() => setAddMenuOpen(!addMenuOpen)}
-            data-tour="toolbar-add"
             className="theme-btn flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors"
           >
             <Plus size={14} strokeWidth={2.5} />
@@ -190,7 +189,6 @@ export function Toolbar() {
               </button>
               <button
                 onClick={handleBrowserLogin}
-                data-tour="add-browser-login"
                 className="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[var(--panel-fg)] hover:bg-[var(--panel-soft)] text-left"
               >
                 <Globe size={14} strokeWidth={1.5} className="theme-muted" />
@@ -302,7 +300,6 @@ export function Toolbar() {
         <Tooltip content={t("Settings")} side="bottom">
           <button
             onClick={() => store.setSettingsOpen(true)}
-            data-tour="toolbar-settings"
             className="theme-btn-ghost p-1.5 rounded-lg transition-colors"
           >
             <Settings size={16} strokeWidth={1.5} />
