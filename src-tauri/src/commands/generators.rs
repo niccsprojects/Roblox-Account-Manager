@@ -265,12 +265,12 @@ fn generator_client() -> reqwest::Client {
         .unwrap_or_else(|_| reqwest::Client::new())
 }
 
-fn response_snippet(text: &str) -> String {
+fn response_snippet(text: &str, api_key: &str) -> String {
     let trimmed = text.trim();
     if trimmed.is_empty() {
         return "Empty response".to_string();
     }
-    trimmed.chars().take(200).collect()
+    redact_api_key(trimmed, api_key).chars().take(200).collect()
 }
 
 fn set_generator_runtime<F>(runtime: &std::sync::Mutex<GeneratorRuntime>, update: F)
@@ -749,6 +749,8 @@ struct BloxGenResponse {
     error: Option<String>,
     #[serde(rename = "timeRemaining", default)]
     time_remaining: Option<i64>,
+    #[serde(rename = "dailyLimit", default)]
+    daily_limit: Option<i64>,
 }
 
 #[derive(serde::Deserialize)]
@@ -823,18 +825,21 @@ async fn bloxgen_generate(
                 .unwrap_or_else(|| "Account generation failed".to_string());
             return GenerateOutcome::Transient(message);
         }
-        return GenerateOutcome::Transient(response_snippet(&text));
+        return GenerateOutcome::Transient(response_snippet(&text, api_key));
     }
 
     let message = parsed
         .as_ref()
         .and_then(|p| p.message.clone().or_else(|| p.error.clone()))
         .filter(|m| !m.is_empty())
-        .unwrap_or_else(|| response_snippet(&text));
+        .unwrap_or_else(|| response_snippet(&text, api_key));
 
     match status.as_u16() {
         429 => match parsed.as_ref().and_then(|p| p.time_remaining) {
             Some(ms) if ms > 0 => GenerateOutcome::Cooldown(ms),
+            _ if parsed.as_ref().is_some_and(|p| p.daily_limit.is_some()) => {
+                GenerateOutcome::Fatal(message)
+            }
             _ => GenerateOutcome::Transient(message),
         },
         404 | 500 | 502 | 503 | 504 => GenerateOutcome::Transient(message),
@@ -868,7 +873,7 @@ async fn bloxgen_test_key(endpoint: &str, api_key: &str) -> Result<f64, String> 
                 .or(payload.error)
                 .unwrap_or_else(|| "Failed to read balance".to_string()));
         }
-        return Err(response_snippet(&text));
+        return Err(response_snippet(&text, api_key));
     }
 
     Err(parsed
@@ -879,7 +884,9 @@ async fn bloxgen_test_key(endpoint: &str, api_key: &str) -> Result<f64, String> 
 
 #[cfg(test)]
 mod generator_key_rotation_tests {
-    use super::{mask_api_key, parse_api_keys, redact_api_key, KeyChoice, KeyRotation};
+    use super::{
+        mask_api_key, parse_api_keys, redact_api_key, response_snippet, KeyChoice, KeyRotation,
+    };
 
     fn rotation(count: usize) -> KeyRotation {
         KeyRotation::new((0..count).map(|i| format!("KEY-{:08}", i)).collect())
@@ -900,6 +907,13 @@ mod generator_key_rotation_tests {
             redact_api_key("bad key BLOX-ABCDEFGH1234", "BLOX-ABCDEFGH1234"),
             "bad key …1234"
         );
+    }
+
+    #[test]
+    fn snippet_redacts_key_before_truncating() {
+        let key = "BLOX-ABCDEFGH1234";
+        let snippet = response_snippet(&format!("{}{}", "x".repeat(190), key), key);
+        assert_eq!(snippet, format!("{}…1234", "x".repeat(190)));
     }
 
     #[test]
