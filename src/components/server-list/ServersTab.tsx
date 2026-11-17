@@ -286,7 +286,7 @@ export function ServersTab({
             onChange={(e) => setPlaceId(e.target.value.replace(/\D/g, ""))}
             placeholder={t("Enter Place ID")}
             className="flex-1 sidebar-input font-mono text-xs"
-            onKeyDown={(e) => e.key === "Enter" && loadServers()}
+            onKeyDown={(e) => e.key === "Enter" && !finding && loadServers()}
           />
         </div>
         <button
