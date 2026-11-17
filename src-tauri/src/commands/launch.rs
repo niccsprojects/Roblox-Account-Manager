@@ -420,35 +420,6 @@ async fn launch_roblox(
     }
 }
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-async fn filter_follow_friends(
-    state: &AccountStore,
-    user_ids: Vec<i64>,
-    target_user_id: i64,
-    cancelled: impl Fn() -> bool,
-) -> (Vec<i64>, u32) {
-    let mut allowed = Vec::with_capacity(user_ids.len());
-    let mut skipped = 0u32;
-    let mut pending = user_ids.into_iter();
-    while let Some(uid) = pending.next() {
-        if cancelled() {
-            allowed.push(uid);
-            allowed.extend(pending);
-            break;
-        }
-        let is_friend = run_with_session_retry(state, uid, |cookie| async move {
-            api::roblox::is_friends_with(&cookie, uid, target_user_id).await
-        })
-        .await;
-        if matches!(is_friend, Ok(false)) {
-            skipped += 1;
-        } else {
-            allowed.push(uid);
-        }
-    }
-    (allowed, skipped)
-}
-
 #[cfg(target_os = "windows")]
 #[tauri::command]
 async fn launch_multiple(
@@ -469,17 +440,8 @@ async fn launch_multiple(
     let follow_launch = follow_target.is_some() && job_id.trim().is_empty();
     let tracker = windows::tracker();
     tracker.reset_launch_cancelled();
-    let (user_ids, skipped_non_friends) = match follow_target {
-        Some(target_user_id) if follow_launch => {
-            filter_follow_friends(state.inner(), user_ids, target_user_id, || {
-                tracker.is_launch_cancelled()
-            })
-            .await
-        }
-        _ => (user_ids, 0),
-    };
     if user_ids.is_empty() {
-        return Ok(skipped_non_friends);
+        return Ok(0);
     }
     let shuffle_job = shuffle_job && follow_target.is_none();
     let delay = settings.get_int("General", "AccountJoinDelay").unwrap_or(8) as u64;
@@ -809,7 +771,7 @@ async fn launch_multiple(
     }
 
     let _ = app.emit("launch-complete", serde_json::json!({}));
-    Ok(skipped_non_friends)
+    Ok(0)
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -833,17 +795,8 @@ async fn launch_multiple(
         let follow_launch = follow_target.is_some() && job_id.trim().is_empty();
         let tracker = macos::tracker();
         tracker.reset_launch_cancelled();
-        let (user_ids, skipped_non_friends) = match follow_target {
-            Some(target_user_id) if follow_launch => {
-                filter_follow_friends(state.inner(), user_ids, target_user_id, || {
-                    tracker.is_launch_cancelled()
-                })
-                .await
-            }
-            _ => (user_ids, 0),
-        };
         if user_ids.is_empty() {
-            return Ok(skipped_non_friends);
+            return Ok(0);
         }
         let shuffle_job = shuffle_job && follow_target.is_none();
         let delay = settings.get_int("General", "AccountJoinDelay").unwrap_or(8) as u64;
@@ -1011,7 +964,7 @@ async fn launch_multiple(
         }
 
         let _ = app.emit("launch-complete", serde_json::json!({}));
-        return Ok(skipped_non_friends);
+        return Ok(0);
     }
 
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]

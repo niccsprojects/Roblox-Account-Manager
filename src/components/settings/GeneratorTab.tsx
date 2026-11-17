@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { UseSettingsReturn } from "../../hooks/useSettings";
-import { useStore } from "../../store";
+import { useStore, type GeneratorKeyTestResult } from "../../store";
 import { NumberField } from "../ui/NumberField";
 import { TextField } from "../ui/TextField";
+import { TextAreaField } from "../ui/TextAreaField";
+import { apiKeysToStored, apiKeysToText, describeKeyTests, parseApiKeys } from "../../utils/generatorKeys";
 import { Select } from "../ui/Select";
 import { Divider } from "../ui/Divider";
 import { SectionLabel } from "../ui/SectionLabel";
@@ -25,12 +27,14 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
   const store = useStore();
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [testResults, setTestResults] = useState<{ ok: boolean; message: string }[] | null>(null);
+  const [keysText, setKeysText] = useState<string | null>(null);
 
   const provider = s.get("Generator", "Provider", "bloxgen") || "bloxgen";
   const endpoint = s.get("BloxGen", "Endpoint", "https://core.bloxgen.net");
   const apiKey = s.get("BloxGen", "ApiKey", "");
   const accountType = s.get("BloxGen", "AccountType", "alt");
+  const hasKey = parseApiKeys(apiKey).length > 0;
 
   const status = store.generatorStatus;
   const running = status?.active === true;
@@ -38,19 +42,16 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
 
   async function handleTestKey() {
     setTesting(true);
-    setTestResult(null);
+    setTestResults(null);
     try {
-      const balance = await invoke<number>("generator_test_key", {
+      const results = await invoke<GeneratorKeyTestResult[]>("generator_test_keys", {
         provider,
         endpoint,
         apiKey,
       });
-      setTestResult({
-        ok: true,
-        message: t("Valid key — balance {{balance}}", { balance: balance.toFixed(4) }),
-      });
+      setTestResults(describeKeyTests(results, t));
     } catch (e) {
-      setTestResult({ ok: false, message: String(e) });
+      setTestResults([{ ok: false, message: String(e) }]);
     } finally {
       setTesting(false);
     }
@@ -64,8 +65,8 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
         await store.stopGenerator();
         return;
       }
-      if (!apiKey.trim()) {
-        setTestResult({ ok: false, message: t("An API key is required") });
+      if (!hasKey) {
+        setTestResults([{ ok: false, message: t("An API key is required") }]);
         return;
       }
       await store.startGenerator({
@@ -109,28 +110,18 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
         label="Endpoint"
         placeholder="https://core.bloxgen.net"
       />
-      <div className="flex items-center gap-3 py-2 px-1">
-        <span className="text-[13px] text-zinc-300 shrink-0">{t("API Key")}</span>
-        <div className="ml-auto flex items-center gap-1.5 flex-1 min-w-0 max-w-[260px]">
-          <input
-            type={showKey ? "text" : "password"}
-            value={apiKey}
-            spellCheck={false}
-            autoComplete="off"
-            onChange={(e) => s.set("BloxGen", "ApiKey", e.target.value.trim())}
-            placeholder="BLOX-XXXXXXXXXXXXXXXX"
-            className="flex-1 min-w-0 px-2.5 py-1 rounded-md text-[13px] font-mono bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 placeholder-zinc-600 focus:outline-none focus:!border-[var(--accent-color)] transition-colors"
-          />
-          <button
-            type="button"
-            onClick={() => setShowKey((v) => !v)}
-            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors shrink-0"
-            aria-label={showKey ? t("Hide API key") : t("Show API key")}
-          >
-            {showKey ? <EyeOff size={14} strokeWidth={1.5} /> : <Eye size={14} strokeWidth={1.5} />}
-          </button>
-        </div>
-      </div>
+      <TextAreaField
+        value={keysText ?? apiKeysToText(apiKey)}
+        onChange={(v) => {
+          setKeysText(v);
+          s.set("BloxGen", "ApiKey", apiKeysToStored(v));
+        }}
+        label="API Keys"
+        description="One key per line. When a key is on cooldown, the next one is used"
+        placeholder="BLOX-XXXXXXXXXXXXXXXX"
+        rows={3}
+        masked={!showKey}
+      />
       <div className="flex items-center gap-3 py-2 px-1">
         <span className="text-[13px] text-zinc-300 shrink-0">{t("Account Type")}</span>
         <Select
@@ -140,23 +131,33 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
           className="ml-auto w-48"
         />
       </div>
-      <div className="flex items-center justify-between gap-3 py-2 px-1">
-        <span className="text-[11px] text-zinc-500 min-w-0 truncate">
-          {testResult ? (
-            <span className={testResult.ok ? "text-emerald-400" : "text-red-400"}>
-              {testResult.message}
-            </span>
-          ) : (
-            t("Check the key and view your balance")
-          )}
-        </span>
-        <button
-          onClick={handleTestKey}
-          disabled={testing || !apiKey.trim()}
-          className="px-3 py-1 rounded text-[12px] font-medium bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/60 text-zinc-300 transition-colors disabled:opacity-50 shrink-0"
-        >
-          {testing ? "..." : t("Test API key")}
-        </button>
+      <div className="flex items-start justify-between gap-3 py-2 px-1">
+        <div className="text-[11px] text-zinc-500 min-w-0 space-y-0.5">
+          {testResults
+            ? testResults.map((r, i) => (
+                <div key={i} className={`break-words ${r.ok ? "text-emerald-400" : "text-red-400"}`}>
+                  {r.message}
+                </div>
+              ))
+            : t("Check each key and view its balance")}
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowKey((v) => !v)}
+            className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+            aria-label={showKey ? t("Hide API keys") : t("Show API keys")}
+          >
+            {showKey ? <EyeOff size={14} strokeWidth={1.5} /> : <Eye size={14} strokeWidth={1.5} />}
+          </button>
+          <button
+            onClick={handleTestKey}
+            disabled={testing || !hasKey}
+            className="px-3 py-1 rounded text-[12px] font-medium bg-zinc-800 hover:bg-zinc-700 border border-zinc-700/60 text-zinc-300 transition-colors disabled:opacity-50"
+          >
+            {testing ? "..." : t("Test API keys")}
+          </button>
+        </div>
       </div>
 
       <Divider />

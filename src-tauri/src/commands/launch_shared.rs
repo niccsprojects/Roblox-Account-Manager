@@ -506,8 +506,11 @@ async fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), S
         if auto_close_conflicts {
             let killed = platform::windows::kill_all_roblox();
             eprintln!("[multi-roblox] auto-close killed {} roblox process(es)", killed);
-            if killed > 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !platform::windows::get_roblox_pids().is_empty()
+                && std::time::Instant::now() < deadline
+            {
+                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
             }
             let _ = platform::windows::tracker().cleanup_dead_processes();
             let enabled_after = platform::windows::enable_multi_roblox()?;
@@ -516,7 +519,7 @@ async fn ensure_multi_roblox_enabled(auto_close_conflicts: bool) -> Result<(), S
             }
         }
         return Err(
-            "A Roblox client is already running. Close it or enable Auto-close Roblox for Multi-Roblox in settings.".into(),
+            "A Roblox client is already running. Close it or enable \"Close running Roblox when it blocks Multi Roblox\" in settings.".into(),
         );
     }
 

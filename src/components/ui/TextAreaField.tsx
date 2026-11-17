@@ -9,6 +9,7 @@ export function TextAreaField({
   disabled = false,
   error,
   description,
+  masked = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -18,6 +19,7 @@ export function TextAreaField({
   disabled?: boolean;
   error?: string | null;
   description?: string;
+  masked?: boolean;
 }) {
   const t = useTr();
 
@@ -34,7 +36,7 @@ export function TextAreaField({
         rows={rows}
         disabled={disabled}
         spellCheck={false}
-        className={`mt-2 w-full resize-y rounded-lg border bg-zinc-800/60 px-3 py-2 text-[12px] text-zinc-200 placeholder-zinc-600 transition-colors focus:outline-none ${
+        className={`${masked ? "text-masked " : ""}mt-2 w-full resize-y rounded-lg border bg-zinc-800/60 px-3 py-2 text-[12px] text-zinc-200 placeholder-zinc-600 transition-colors focus:outline-none ${
           disabled
             ? "cursor-not-allowed border-zinc-800/60 opacity-60"
             : error

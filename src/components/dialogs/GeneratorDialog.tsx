@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useStore } from "../../store";
+import { useStore, type GeneratorKeyTestResult } from "../../store";
+import { apiKeysToStored, apiKeysToText, describeKeyTests, parseApiKeys } from "../../utils/generatorKeys";
 import { useModalClose } from "../../hooks/useModalClose";
 import { useTr } from "../../i18n/text";
 import { Select } from "../ui/Select";
@@ -90,7 +91,7 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
 
   const [provider, setProvider] = useState("bloxgen");
   const [endpoint, setEndpoint] = useState("https://core.bloxgen.net");
-  const [apiKey, setApiKey] = useState("");
+  const [keysText, setKeysText] = useState("");
   const [accountType, setAccountType] = useState("alt");
   const [extraDelaySeconds, setExtraDelaySeconds] = useState(1);
   const [targetGroup, setTargetGroup] = useState("BloxGen");
@@ -99,7 +100,7 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
   const [showKey, setShowKey] = useState(false);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [testResults, setTestResults] = useState<{ ok: boolean; message: string }[] | null>(null);
   const [nowMs, setNowMs] = useState(Date.now());
   const [log, setLog] = useState<GeneratedEntry[]>([]);
 
@@ -114,7 +115,7 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
         const bg = all.BloxGen || {};
         setProvider(gen.Provider || "bloxgen");
         setEndpoint(bg.Endpoint || "https://core.bloxgen.net");
-        setApiKey(bg.ApiKey || "");
+        setKeysText(apiKeysToText(bg.ApiKey || ""));
         setAccountType(bg.AccountType || "alt");
         setExtraDelaySeconds(parseInt(gen.ExtraDelaySeconds || "1", 10) || 0);
         setTargetGroup(gen.TargetGroup || "BloxGen");
@@ -153,23 +154,24 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
 
   async function handleTestKey() {
     setTesting(true);
-    setTestResult(null);
+    setTestResults(null);
     try {
-      const balance = await invoke<number>("generator_test_key", { provider, endpoint, apiKey });
-      setTestResult({
-        ok: true,
-        message: t("Valid key — balance {{balance}}", { balance: balance.toFixed(4) }),
+      const results = await invoke<GeneratorKeyTestResult[]>("generator_test_keys", {
+        provider,
+        endpoint,
+        apiKey: apiKeysToStored(keysText),
       });
+      setTestResults(describeKeyTests(results, t));
     } catch (e) {
-      setTestResult({ ok: false, message: String(e) });
+      setTestResults([{ ok: false, message: String(e) }]);
     } finally {
       setTesting(false);
     }
   }
 
   async function handleStart() {
-    if (!apiKey.trim()) {
-      setTestResult({ ok: false, message: t("An API key is required") });
+    if (!hasKey) {
+      setTestResults([{ ok: false, message: t("An API key is required") }]);
       return;
     }
     setLog([]);
@@ -178,7 +180,7 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
       await store.startGenerator({
         provider,
         endpoint,
-        apiKey,
+        apiKey: apiKeysToStored(keysText),
         accountType,
         extraDelaySeconds,
         targetGroup,
@@ -203,6 +205,23 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
   if (!visible) return null;
 
   const configDisabled = running || busy;
+  const hasKey = parseApiKeys(keysText).length > 0;
+  const rotation =
+    status && status.keyCount > 1
+      ? [
+          status.activeKeyIndex !== null
+            ? t("Key {{index}} of {{count}} ({{hint}})", {
+                index: status.activeKeyIndex + 1,
+                count: status.keyCount,
+                hint: status.activeKeyHint ?? "",
+              })
+            : t("{{count}} keys", { count: status.keyCount }),
+          t("{{count}} on cooldown", { count: status.keysCooling }),
+          status.keysRejected > 0 ? t("{{count}} rejected", { count: status.keysRejected }) : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
   const countdown = formatCountdown(status?.nextAttemptAtMs ?? null, nowMs);
   const showCountdown =
     running && (status?.phase === "cooldown" || status?.phase === "waiting") && !!status?.nextAttemptAtMs;
@@ -265,23 +284,25 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
                     placeholder="https://core.bloxgen.net"
                     className="sidebar-input text-xs font-mono disabled:opacity-60"
                   />
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type={showKey ? "text" : "password"}
-                      value={apiKey}
+                  <div className="flex items-start gap-1.5">
+                    <textarea
+                      value={keysText}
+                      rows={3}
                       disabled={configDisabled}
                       spellCheck={false}
                       autoComplete="off"
-                      onChange={(e) => setApiKey(e.target.value.trim())}
-                      onBlur={() => persist("BloxGen", "ApiKey", apiKey.trim())}
-                      placeholder="BLOX-XXXXXXXXXXXXXXXX"
-                      className="sidebar-input text-xs font-mono flex-1 min-w-0 disabled:opacity-60"
+                      onChange={(e) => setKeysText(e.target.value)}
+                      onBlur={() => persist("BloxGen", "ApiKey", apiKeysToStored(keysText))}
+                      placeholder={t("One key per line")}
+                      className={`sidebar-input text-xs font-mono flex-1 min-w-0 resize-y disabled:opacity-60 ${
+                        showKey ? "" : "text-masked"
+                      }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowKey((v) => !v)}
                       className="p-1.5 rounded-md theme-muted hover:text-[var(--panel-fg)] transition-colors shrink-0"
-                      aria-label={showKey ? t("Hide API key") : t("Show API key")}
+                      aria-label={showKey ? t("Hide API keys") : t("Show API keys")}
                     >
                       {showKey ? <EyeOff size={14} strokeWidth={1.5} /> : <Eye size={14} strokeWidth={1.5} />}
                     </button>
@@ -298,19 +319,17 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
                   />
                   <button
                     onClick={handleTestKey}
-                    disabled={testing || !apiKey.trim()}
+                    disabled={testing || !hasKey}
                     className="sidebar-btn-sm flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Wallet size={13} strokeWidth={1.75} />
-                    {testing ? t("Checking...") : t("Test API key")}
+                    {testing ? t("Checking...") : t("Test API keys")}
                   </button>
-                  {testResult ? (
-                    <div
-                      className={`text-[11px] ${testResult.ok ? "text-emerald-300" : "text-red-300"} break-words`}
-                    >
-                      {testResult.message}
+                  {testResults?.map((r, i) => (
+                    <div key={i} className={`text-[11px] ${r.ok ? "text-emerald-300" : "text-red-300"} break-words`}>
+                      {r.message}
                     </div>
-                  ) : null}
+                  ))}
                 </div>
               </section>
 
@@ -366,7 +385,7 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
                 <div className="grid grid-cols-1 gap-1.5">
                   <button
                     onClick={handleStart}
-                    disabled={running || busy || !apiKey.trim()}
+                    disabled={running || busy || !hasKey}
                     className="sidebar-btn-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {t("Start Generator")}
@@ -418,6 +437,12 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
                   </div>
                 </div>
               </div>
+
+              {rotation ? (
+                <div className="mt-2 rounded-lg border theme-border px-3 py-1.5 text-[11px] theme-muted font-mono">
+                  {rotation}
+                </div>
+              ) : null}
 
               {status?.lastError ? (
                 <div className="mt-2 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-[11px] text-red-300 break-words animate-fade-in">
