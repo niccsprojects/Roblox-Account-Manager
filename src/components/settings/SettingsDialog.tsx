@@ -5,7 +5,7 @@ import { TabBar } from "./TabBar";
 import { TabContent } from "./TabContent";
 import { useTr } from "../../i18n/text";
 import { ENABLE_WEBSERVER } from "../../featureFlags";
-import { Settings as SettingsIcon, Code, Gauge, Server, Eye, Sparkles, ShieldCheck, Package, MoreHorizontal, Keyboard, X } from "lucide-react";
+import { Settings as SettingsIcon, Code, Gauge, Server, Eye, UserPlus, ShieldCheck, Package, MoreHorizontal, Keyboard, X } from "lucide-react";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -107,7 +107,7 @@ export function SettingsDialog({
     {
       id: "generator",
       label: "Generator",
-      icon: <Sparkles size={15} strokeWidth={1.5} />,
+      icon: <UserPlus size={15} strokeWidth={1.5} />,
     },
     {
       id: "isolation",
