@@ -6,6 +6,8 @@ pub struct ThumbnailRequest {
     pub thumbnail_type: String,
     #[serde(rename = "targetId")]
     pub target_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     pub size: String,
     pub format: String,
 }
