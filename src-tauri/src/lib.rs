@@ -128,7 +128,7 @@ fn get_platform_capabilities() -> PlatformCapabilities {
         supports_single_launch: launch,
         supports_multi_launch: launch,
         supports_watcher: launch,
-        supports_watcher_memory: launch,
+        supports_watcher_memory: windows,
         supports_window_controls: windows,
         supports_botting: windows,
         supports_updater: true,

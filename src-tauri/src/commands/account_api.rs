@@ -18,15 +18,19 @@ fn is_auth_session_error(error: &str) -> bool {
         || lower.contains("code 9002")
 }
 
+fn is_usable_cookie(token: &str) -> bool {
+    !token.trim().is_empty() && reqwest::header::HeaderValue::from_str(token).is_ok()
+}
+
 fn any_stored_cookie(state: &AccountStore) -> Option<String> {
     state.get_all().ok().and_then(|accounts| {
         accounts
             .iter()
-            .find(|account| account.valid && !account.security_token.trim().is_empty())
+            .find(|account| account.valid && is_usable_cookie(&account.security_token))
             .or_else(|| {
                 accounts
                     .iter()
-                    .find(|account| !account.security_token.trim().is_empty())
+                    .find(|account| is_usable_cookie(&account.security_token))
             })
             .map(|account| account.security_token.clone())
     })
