@@ -2960,7 +2960,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                 onClick={() => setRunningOnly((prev) => !prev)}
                 className={`px-2 py-1.5 rounded-lg border text-[11px] transition-colors ${
                   runningOnly
-                    ? "bg-[var(--textboxes-bg)] border-[var(--accent-color)] text-[var(--panel-fg)]"
+                    ? "bg-[var(--textboxes-bg)] border-[var(--accent-color)] text-[var(--textboxes-fg)]"
                     : "bg-zinc-800/40 border-zinc-700/60 text-zinc-400"
                 }`}
               >
@@ -2974,7 +2974,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                   onClick={() => setNewMenuOpen((prev) => !prev)}
                   className={`px-2.5 py-1 rounded-md border text-[11px] transition-all duration-200 ${
                     newMenuOpen
-                      ? "bg-[var(--textboxes-bg)] border-[var(--accent-color)] text-[var(--panel-fg)]"
+                      ? "bg-[var(--textboxes-bg)] border-[var(--accent-color)] text-[var(--textboxes-fg)]"
                       : "bg-zinc-800/40 border-zinc-700/60 text-zinc-300 hover:bg-zinc-700/50 hover:-translate-y-[1px]"
                   }`}
                 >
@@ -3163,7 +3163,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                     className={`px-2.5 py-1.5 rounded-lg border text-[11px] transition-colors ${
                       workersRef.current.has(selectedScript.id)
                         ? "border-red-500/35 bg-red-500/15 text-red-300"
-                        : "border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[var(--panel-fg)]"
+                        : "border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)]"
                     }`}
                   >
                     <span className="inline-flex items-center gap-1">
@@ -3223,7 +3223,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                       onClick={() => setTab(id)}
                       className={`px-2.5 py-1 rounded-md text-[11px] border transition-colors ${
                         tab === id
-                          ? "border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[var(--panel-fg)]"
+                          ? "border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)]"
                           : "border-zinc-700/70 bg-zinc-800/40 text-zinc-400 hover:text-zinc-200"
                       }`}
                     >
@@ -3516,7 +3516,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                               setStickLogsToBottom(true);
                               scrollLogsToBottom("smooth");
                             }}
-                            className="absolute right-3 bottom-3 px-2.5 py-1 rounded-md border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[11px] text-[var(--panel-fg)] hover:bg-[var(--panel-soft)] transition-all duration-200"
+                            className="absolute right-3 bottom-3 px-2.5 py-1 rounded-md border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[11px] text-[var(--textboxes-fg)] hover:bg-[var(--panel-soft)] transition-all duration-200"
                           >
                             {t("Jump to latest")}
                           </button>
@@ -3640,7 +3640,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                           handleRunScript(selectedScript.id);
                         });
                       }}
-                      className="px-3 py-1.5 rounded-lg border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[12px] text-[var(--panel-fg)] hover:bg-[var(--panel-soft)] transition-colors"
+                      className="px-3 py-1.5 rounded-lg border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[12px] text-[var(--textboxes-fg)] hover:bg-[var(--panel-soft)] transition-colors"
                     >
                       <span className="inline-flex items-center gap-1.5">
                         <Play size={11} strokeWidth={2} />

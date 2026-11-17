@@ -567,7 +567,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                 onClick={() => handleLayoutModeChange("split")}
                 className={`px-2.5 py-1 text-[11px] rounded-md transition ${
                   useSplitLayout
-                    ? "bg-[var(--textboxes-bg)] text-[var(--panel-fg)] border theme-accent-border"
+                    ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] border theme-accent-border"
                     : "theme-muted hover:text-[var(--panel-fg)]"
                 }`}
               >
@@ -578,7 +578,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                 onClick={() => handleLayoutModeChange("classic")}
                 className={`px-2.5 py-1 text-[11px] rounded-md transition ${
                   !useSplitLayout
-                    ? "bg-[var(--textboxes-bg)] text-[var(--panel-fg)] border theme-accent-border"
+                    ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] border theme-accent-border"
                     : "theme-muted hover:text-[var(--panel-fg)]"
                 }`}
               >
@@ -701,7 +701,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                             }}
                             className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${
                               playerUserIds.length === 0
-                                ? "bg-[var(--textboxes-bg)] text-[var(--accent-color)]"
+                                ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                                 : "text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                             }`}
                           >
@@ -719,7 +719,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                                 }}
                                 className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${
                                   active
-                                    ? "bg-[var(--textboxes-bg)] text-[var(--accent-color)]"
+                                    ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                                     : "text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                                 }`}
                               >
@@ -1441,7 +1441,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                     }}
                     className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${
                       playerUserIds.length === 0
-                        ? "bg-[var(--textboxes-bg)] text-[var(--accent-color)]"
+                        ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                         : "text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                     }`}
                   >
@@ -1459,7 +1459,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                         }}
                         className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${
                           active
-                            ? "bg-[var(--textboxes-bg)] text-[var(--accent-color)]"
+                            ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                             : "text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                         }`}
                       >

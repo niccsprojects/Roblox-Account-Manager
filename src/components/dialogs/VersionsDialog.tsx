@@ -538,7 +538,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                     setManualHash("");
                     setManualLabel("");
                   }}
-                  className="flex items-center gap-1.5 theme-btn !text-[var(--panel-fg)] px-3 py-1.5 text-[12px] font-medium"
+                  className="flex items-center gap-1.5 theme-btn px-3 py-1.5 text-[12px] font-medium"
                 >
                   <Download size={13} strokeWidth={2} />
                   {t("Install")}

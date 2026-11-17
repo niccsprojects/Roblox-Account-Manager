@@ -13,7 +13,7 @@ export function Toolbar() {
   const prompt = usePrompt();
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addRef = useRef<HTMLDivElement>(null);
-  const activeToggleStyle = "border theme-accent-border bg-[var(--textboxes-bg)] text-[var(--panel-fg)]";
+  const activeToggleStyle = "border theme-accent-border bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)]";
 
   useEffect(() => {
     if (!addMenuOpen) return;

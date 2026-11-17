@@ -558,7 +558,7 @@ function ControlPanel({
               }}
               className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors ${
                 selectedUsername === acc.username
-                  ? "theme-row-selected"
+                  ? "theme-row-selected outline -outline-offset-1 outline-[var(--accent-color)]"
                   : "hover:bg-zinc-800/40"
               }`}
             >

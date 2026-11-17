@@ -9,7 +9,7 @@ export function UpdateBanner() {
 
   return (
     <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--textboxes-bg)] border-b border-[var(--accent-color)] shrink-0">
-      <span className="text-xs text-[var(--panel-fg)]">
+      <span className="text-xs text-[var(--textboxes-fg)]">
         {t("v{{version}} available", { version: store.updateInfo.version })}
       </span>
       <button
