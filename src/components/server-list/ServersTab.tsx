@@ -168,6 +168,7 @@ export function ServersTab({
       const live = presence[0];
       if (live?.gameId && (live.placeId === pid || live.rootPlaceId === pid)) {
         const jobId = live.gameId;
+        if (live.placeId && live.placeId !== pid) setPlaceId(String(live.placeId));
         setServers((prev) => [
           prev.find((s) => s.id === jobId) ?? {
             id: jobId,
@@ -260,7 +261,7 @@ export function ServersTab({
     }
 
     setFinding(false);
-  }, [findUsername, placeId, userId, addToast]);
+  }, [findUsername, placeId, setPlaceId, userId, addToast]);
 
   // Auto-refresh once whenever the dialog opens, if Place ID already has a value.
   // This mirrors the legacy "open and load immediately" workflow.
