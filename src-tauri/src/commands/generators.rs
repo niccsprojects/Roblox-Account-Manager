@@ -698,6 +698,20 @@ async fn generator_test_key(
     provider: String,
     endpoint: String,
     api_key: String,
+) -> Result<f64, String> {
+    let provider = GeneratorProvider::from_id(&provider)?;
+    let keys = parse_api_keys(&api_key);
+    let key = keys.first().ok_or("An API key is required")?;
+    provider_test_key(provider, &endpoint, key)
+        .await
+        .map_err(|e| redact_api_key(&e, key))
+}
+
+#[tauri::command]
+async fn generator_test_keys(
+    provider: String,
+    endpoint: String,
+    api_key: String,
 ) -> Result<Vec<GeneratorKeyTestResult>, String> {
     let provider = GeneratorProvider::from_id(&provider)?;
     let keys = parse_api_keys(&api_key);

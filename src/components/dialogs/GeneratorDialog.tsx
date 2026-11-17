@@ -156,7 +156,7 @@ export function GeneratorDialog({ open, onClose }: GeneratorDialogProps) {
     setTesting(true);
     setTestResults(null);
     try {
-      const results = await invoke<GeneratorKeyTestResult[]>("generator_test_key", {
+      const results = await invoke<GeneratorKeyTestResult[]>("generator_test_keys", {
         provider,
         endpoint,
         apiKey: apiKeysToStored(keysText),

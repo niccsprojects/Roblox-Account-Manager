@@ -44,7 +44,7 @@ export function GeneratorTab({ s }: { s: UseSettingsReturn }) {
     setTesting(true);
     setTestResults(null);
     try {
-      const results = await invoke<GeneratorKeyTestResult[]>("generator_test_key", {
+      const results = await invoke<GeneratorKeyTestResult[]>("generator_test_keys", {
         provider,
         endpoint,
         apiKey,

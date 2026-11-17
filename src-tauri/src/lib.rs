@@ -327,6 +327,7 @@ pub fn run() {
             stop_generator,
             get_generator_status,
             generator_test_key,
+            generator_test_keys,
             cmd_kill_roblox,
             focus_roblox_window,
             arrange_roblox_windows,
