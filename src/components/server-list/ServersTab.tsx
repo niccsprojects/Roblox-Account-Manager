@@ -413,7 +413,7 @@ export function ServersTab({
             onChange={(e) => setFindUsername(e.target.value)}
             placeholder={t("Find player...")}
             className="flex-1 sidebar-input text-xs"
-            onKeyDown={(e) => e.key === "Enter" && !finding && findPlayer()}
+            onKeyDown={(e) => e.key === "Enter" && !finding && !loading && findPlayer()}
           />
           <button
             onClick={findPlayer}
