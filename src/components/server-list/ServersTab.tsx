@@ -161,11 +161,37 @@ export function ServersTab({
         username: findUsername.trim(),
       });
 
-      const headshots = await invoke<{ target_id: number; image_url: string | null }[]>("get_avatar_headshots", {
+      const presence = await invoke<{ placeId?: number | null; rootPlaceId?: number | null; gameId?: string | null }[]>(
+        "get_presence",
+        { userIds: [user.id], viewerUserId: userId }
+      ).catch(() => []);
+      const live = presence[0];
+      if (live?.gameId && (live.placeId === pid || live.rootPlaceId === pid)) {
+        const jobId = live.gameId;
+        if (live.placeId && live.placeId !== pid) setPlaceId(String(live.placeId));
+        setServers((prev) => [
+          prev.find((s) => s.id === jobId) ?? {
+            id: jobId,
+            maxPlayers: 0,
+            playing: 0,
+            playerTokens: [],
+            fps: 0,
+            ping: null,
+            name: null,
+            vipServerId: null,
+            accessCode: null,
+          },
+        ]);
+        addToast(t("Found {{name}} in server!", { name: user.name }));
+        setFinding(false);
+        return;
+      }
+
+      const headshots = await invoke<{ targetId: number; imageUrl: string | null }[]>("get_avatar_headshots", {
         userIds: [user.id],
         size: "48x48",
       });
-      const targetUrl = headshots?.[0]?.image_url;
+      const targetUrl = headshots?.[0]?.imageUrl;
       if (!targetUrl) {
         addToast(t("Could not get avatar for player"));
         setFinding(false);
@@ -175,6 +201,7 @@ export function ServersTab({
       let cursor: string | null = null;
       let pagesScanned = 0;
       let found = false;
+      let sawTokens = false;
 
       while (!found) {
         const pageResult: ServersResponse = await invoke("get_servers", {
@@ -189,6 +216,7 @@ export function ServersTab({
 
         for (const server of pageResult.data) {
           if (server.playerTokens.length === 0) continue;
+          sawTokens = true;
 
           const batchRequests = server.playerTokens.map((token: string, i: number) => ({
             requestId: `${i}:undefined:AvatarHeadShot:48x48:png:regular`,
@@ -200,12 +228,12 @@ export function ServersTab({
           }));
 
           try {
-            const thumbResult = await invoke<{ target_id: number; image_url: string | null }[]>("batch_thumbnails", {
+            const thumbResult = await invoke<{ targetId: number; imageUrl: string | null }[]>("batch_thumbnails", {
               requests: batchRequests,
             });
 
             const thumbs = Array.isArray(thumbResult) ? thumbResult : [];
-            const match = thumbs.some((t) => t.image_url === targetUrl);
+            const match = thumbs.some((t) => t.imageUrl === targetUrl);
             if (match) {
               setServers([server]);
               setFinding(false);
@@ -217,18 +245,23 @@ export function ServersTab({
         }
 
         if (!pageResult.nextPageCursor || found) break;
+        if (!sawTokens && pageResult.data.some((s) => s.playing > 0)) break;
         cursor = pageResult.nextPageCursor;
       }
 
       if (!found) {
-        addToast(t("{{name}} not found in any server", { name: user.name }));
+        addToast(
+          sawTokens
+            ? t("{{name}} not found in any server", { name: user.name })
+            : t("Roblox hides who is in each server, so {{name}} can only be found while their joins are visible to this account", { name: user.name })
+        );
       }
     } catch (e) {
       addToast(t("Player search failed: {{error}}", { error: String(e) }));
     }
 
     setFinding(false);
-  }, [findUsername, placeId, userId, addToast]);
+  }, [findUsername, placeId, setPlaceId, userId, addToast]);
 
   // Auto-refresh once whenever the dialog opens, if Place ID already has a value.
   // This mirrors the legacy "open and load immediately" workflow.
@@ -240,6 +273,7 @@ export function ServersTab({
     if (!(pid > 0)) return;
 
     autoRefreshSeenRef.current = refreshOnOpenSignal;
+    if (busyRef.current) return;
     loadServers();
   }, [refreshOnOpenSignal, placeId, loadServers]);
 
@@ -253,7 +287,7 @@ export function ServersTab({
             onChange={(e) => setPlaceId(e.target.value.replace(/\D/g, ""))}
             placeholder={t("Enter Place ID")}
             className="flex-1 sidebar-input font-mono text-xs"
-            onKeyDown={(e) => e.key === "Enter" && loadServers()}
+            onKeyDown={(e) => e.key === "Enter" && !finding && loadServers()}
           />
         </div>
         <button
@@ -379,7 +413,7 @@ export function ServersTab({
             onChange={(e) => setFindUsername(e.target.value)}
             placeholder={t("Find player...")}
             className="flex-1 sidebar-input text-xs"
-            onKeyDown={(e) => e.key === "Enter" && !finding && findPlayer()}
+            onKeyDown={(e) => e.key === "Enter" && !finding && !loading && findPlayer()}
           />
           <button
             onClick={findPlayer}

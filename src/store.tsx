@@ -1238,14 +1238,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   async function launchFollow(userId: number, target: FollowTarget) {
     const directJoin = isDirectFollowJoin(target);
     if (!directJoin) {
-      const isFriend = await invoke<boolean>("check_friendship", {
-        userId,
-        targetUserId: target.userId,
-      }).catch(() => true);
-      if (!isFriend) {
-        addToast(tr("Can't follow {{name}}, they are not on this account's friends list", { name: target.name }));
-        return;
-      }
+      void invoke<boolean>("check_friendship", { userId, targetUserId: target.userId })
+        .then((isFriend) => {
+          if (!isFriend) {
+            addToast(tr("{{name}} is not a friend of this account, so Roblox only lets it in if they allow everyone to join", { name: target.name }));
+          }
+        })
+        .catch(() => {});
     }
     const message = directJoin
       ? tr("Joining {{name}}...", { name: target.name })
@@ -1388,14 +1387,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const launched = userIds.length - skipped;
         if (directFollowJoin && follow.placeId) {
           void recordRecentGame(follow.placeId, userIds[0], parseInt(settings?.General?.MaxRecentGames || "8") || 8).catch(() => {});
-        }
-        if (skipped > 0) {
-          addToast(tr(
-            skipped === 1
-              ? "Skipped {{count}} account that is not friends with {{name}}"
-              : "Skipped {{count}} accounts that are not friends with {{name}}",
-            { count: skipped, name: follow.name }
-          ));
         }
         if (launched === 0) {
           setJoiningAccounts(new Set());

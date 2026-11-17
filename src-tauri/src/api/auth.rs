@@ -411,7 +411,7 @@ pub async fn log_out_other_sessions(security_token: &str) -> Result<RefreshResul
 
     let response = send_authenticated(security_token, |csrf| {
         client
-            .post("https://www.roblox.com/authentication/signoutfromallsessionsandreauthenticate")
+            .post("https://auth.roblox.com/v1/logoutfromallsessionsandreauthenticate")
             .header(COOKIE, cookie_header(security_token))
             .header(REFERER, "https://www.roblox.com/")
             .header("X-CSRF-TOKEN", csrf)
