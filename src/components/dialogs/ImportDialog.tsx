@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { X, File as FileIcon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useStore } from "../../store";
 import { useModalClose } from "../../hooks/useModalClose";
 import { usePrompt } from "../../hooks/usePrompt";
 import { SlidingTabBar } from "../ui/SlidingTabBar";
-import { useTr } from "../../i18n/text";
+import { tr, useTr } from "../../i18n/text";
 import { COOKIE_PATTERN } from "../../utils/cookies";
 
 type TabId = "cookie" | "userpass" | "legacy";
@@ -70,6 +71,16 @@ export function ImportDialog({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, handleClose, defaultTab]);
+
+  const { addToast } = store;
+  useEffect(() => {
+    const pending = listen("login-autofill-failed", () =>
+      addToast(tr("Automatic sign in did not finish. Complete it in the browser window")),
+    );
+    return () => {
+      pending.then((unlisten) => unlisten()).catch(() => {});
+    };
+  }, [addToast]);
 
   useEffect(() => {
     if (open && tab === "cookie" && textareaRef.current) {

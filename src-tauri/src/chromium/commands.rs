@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -208,6 +208,47 @@ pub async fn close_login_browser(
     Ok(())
 }
 
+async fn auto_submit_login(
+    chromium: &ChromiumManager,
+    cdp: &mut CdpClient,
+    username: &str,
+    password: &str,
+) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let mut wrong_page = 0u32;
+    let mut no_fields = 0u32;
+    while Instant::now() < deadline {
+        if !chromium.is_alive(LOGIN_KEY) {
+            return false;
+        }
+        if let Ok(Some(_)) = cdp.get_roblosecurity().await {
+            return true;
+        }
+        let status = cdp.fill_login(username, password).await;
+        no_fields = if status == "no-fields" { no_fields + 1 } else { 0 };
+        match status.as_str() {
+            "retype-user" => {
+                let _ = cdp.insert_text("#login-username", username).await;
+            }
+            "retype-pass" => {
+                let _ = cdp.insert_text("#login-password", password).await;
+            }
+            "wrong-page" => {
+                wrong_page += 1;
+                if wrong_page % 10 == 0 {
+                    let _ = cdp.navigate(ROBLOX_LOGIN_URL).await;
+                }
+            }
+            "no-fields" if no_fields % 20 == 0 => {
+                let _ = cdp.navigate(ROBLOX_LOGIN_URL).await;
+            }
+            _ => {}
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    false
+}
+
 #[tauri::command]
 pub async fn import_userpass(
     app: AppHandle,
@@ -263,8 +304,10 @@ pub async fn import_userpass(
         return Err(e);
     }
 
-    if cdp.wait_for_selector("#login-username", 40).await {
-        let _ = cdp.fill_login(&username, &password).await;
+    if !auto_submit_login(&chromium, &mut cdp, &username, &password).await
+        && chromium.is_alive(LOGIN_KEY)
+    {
+        let _ = app.emit("login-autofill-failed", ());
     }
 
     let mut captured = None;
