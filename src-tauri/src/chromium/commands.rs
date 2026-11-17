@@ -227,7 +227,6 @@ async fn auto_submit_login(
         let status = cdp.fill_login(username, password).await;
         no_fields = if status == "no-fields" { no_fields + 1 } else { 0 };
         match status.as_str() {
-            "clicked" => return true,
             "retype-user" => {
                 let _ = cdp.insert_text("#login-username", username).await;
             }

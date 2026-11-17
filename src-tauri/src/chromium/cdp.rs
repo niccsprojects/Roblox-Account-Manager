@@ -217,6 +217,7 @@ impl CdpClient {
             "(function(){{\
 if(!/(^|\\.)roblox\\.com$/.test(location.hostname))return 'wrong-page';\
 var w=window,changed=false;\
+if(w.__ramSubmitted)return 'submitted';\
 var u=document.querySelector('#login-username');\
 var p=document.querySelector('#login-password');\
 var b=document.querySelector('#login-button');\
@@ -236,7 +237,7 @@ return 'waiting-password';}}\
 if(!put(p,{pass},'__ramPass'))return 'retype-pass';\
 if(changed)return 'filled';\
 if(!b||b.disabled)return 'waiting-button';\
-b.click();return 'clicked';}})()",
+w.__ramSubmitted=1;b.click();return 'clicked';}})()",
             user = user,
             pass = pass
         );
