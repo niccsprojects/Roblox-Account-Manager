@@ -74,14 +74,13 @@ export function ImportDialog({
 
   const { addToast } = store;
   useEffect(() => {
-    if (!open) return;
     const pending = listen("login-autofill-failed", () =>
       addToast(t("Automatic sign in did not finish. Complete it in the browser window")),
     );
     return () => {
       pending.then((unlisten) => unlisten()).catch(() => {});
     };
-  }, [open, addToast, t]);
+  }, [addToast, t]);
 
   useEffect(() => {
     if (open && tab === "cookie" && textareaRef.current) {

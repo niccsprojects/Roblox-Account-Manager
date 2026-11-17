@@ -216,6 +216,7 @@ async fn auto_submit_login(
 ) -> bool {
     let deadline = Instant::now() + Duration::from_secs(30);
     let mut wrong_page = 0u32;
+    let mut no_fields = 0u32;
     while Instant::now() < deadline {
         if !chromium.is_alive(LOGIN_KEY) {
             return false;
@@ -223,7 +224,9 @@ async fn auto_submit_login(
         if let Ok(Some(_)) = cdp.get_roblosecurity().await {
             return true;
         }
-        match cdp.fill_login(username, password).await.as_str() {
+        let status = cdp.fill_login(username, password).await;
+        no_fields = if status == "no-fields" { no_fields + 1 } else { 0 };
+        match status.as_str() {
             "clicked" => return true,
             "retype-user" => {
                 let _ = cdp.insert_text("#login-username", username).await;
@@ -236,6 +239,9 @@ async fn auto_submit_login(
                 if wrong_page % 10 == 0 {
                     let _ = cdp.navigate(ROBLOX_LOGIN_URL).await;
                 }
+            }
+            "no-fields" if no_fields % 20 == 0 => {
+                let _ = cdp.navigate(ROBLOX_LOGIN_URL).await;
             }
             _ => {}
         }
