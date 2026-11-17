@@ -833,6 +833,10 @@ body {
   box-shadow: 0 0 0 2px var(--input-focus);
 }
 
+.text-masked {
+  -webkit-text-security: disc;
+}
+
 .sidebar-input::placeholder {
   color: var(--panel-muted);
   opacity: 0.6;

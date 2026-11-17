@@ -128,6 +128,7 @@ const SCRIPT_INVOKE_COMMANDS = [
   "stop_generator",
   "get_generator_status",
   "generator_test_key",
+  "generator_test_keys",
   "start_web_server",
   "stop_web_server",
   "start_nexus_server",

@@ -156,6 +156,18 @@ export interface GeneratorStatus {
   lastUserId: number | null;
   lastError: string | null;
   lastGeneratedAtMs: number | null;
+  keyCount: number;
+  keysCooling: number;
+  keysRejected: number;
+  activeKeyIndex: number | null;
+  activeKeyHint: string | null;
+}
+
+export interface GeneratorKeyTestResult {
+  index: number;
+  hint: string;
+  balance: number | null;
+  error: string | null;
 }
 
 export interface AfkStatus {
