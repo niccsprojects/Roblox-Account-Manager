@@ -273,6 +273,7 @@ export function ServersTab({
     if (!(pid > 0)) return;
 
     autoRefreshSeenRef.current = refreshOnOpenSignal;
+    if (busyRef.current) return;
     loadServers();
   }, [refreshOnOpenSignal, placeId, loadServers]);
 
