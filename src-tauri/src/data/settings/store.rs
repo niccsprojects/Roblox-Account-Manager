@@ -43,7 +43,7 @@ impl SettingsStore {
             ("Language", "en", None),
             ("AutoCookieRefresh", "true", None),
             ("AutoCloseLastProcess", "false", None),
-            ("AutoCloseRobloxForMultiRbx", "false", None),
+            ("AutoCloseRobloxForMultiRbx", "true", None),
             ("ShowPresence", "true", None),
             ("PresenceUpdateRate", "5", None),
             ("WarnOnOnlineJoin", "true", None),
@@ -113,6 +113,10 @@ impl SettingsStore {
         if !general.exists("ThemeWindowsNavbarAutoEnabledV1") {
             general.set("ThemeWindowsNavbar", "true", None);
             general.set("ThemeWindowsNavbarAutoEnabledV1", "true", None);
+        }
+        if !general.exists("AutoCloseRobloxForMultiRbxDefaultOnV1") {
+            general.set("AutoCloseRobloxForMultiRbx", "true", None);
+            general.set("AutoCloseRobloxForMultiRbxDefaultOnV1", "true", None);
         }
         if !general.exists("EncryptionOnboardingState") {
             general.set(
