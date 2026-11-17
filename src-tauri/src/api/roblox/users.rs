@@ -91,24 +91,6 @@ pub async fn get_robux(security_token: &str) -> Result<i64, String> {
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
 
-    if response.status().is_success() {
-        let body: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-        return Ok(body["robux"].as_i64().unwrap_or(0));
-    }
-
-    let client = no_redirect_client();
-
-    let response = client
-        .get("https://www.roblox.com/mobileapi/userinfo")
-        .header(COOKIE, cookie_header(security_token))
-        .header("Accept", "application/json")
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {}", e))?;
-
     if !response.status().is_success() {
         let status = response.status().as_u16();
         let body = response.text().await.unwrap_or_default();
@@ -120,7 +102,7 @@ pub async fn get_robux(security_token: &str) -> Result<i64, String> {
         .await
         .map_err(|e| format!("Failed to parse response: {}", e))?;
 
-    Ok(body["RobuxBalance"].as_i64().unwrap_or(0))
+    Ok(body["robux"].as_i64().unwrap_or(0))
 }
 
 #[allow(dead_code)]

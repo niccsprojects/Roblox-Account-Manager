@@ -91,6 +91,53 @@ fn frontend_ready() {
     webview_recovery::mark_ready();
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlatformCapabilities {
+    os: &'static str,
+    session_type: &'static str,
+    preferred_runner: &'static str,
+    detected_runner: &'static str,
+    runner_path: Option<String>,
+    supports_single_launch: bool,
+    supports_multi_launch: bool,
+    supports_watcher: bool,
+    supports_watcher_memory: bool,
+    supports_window_controls: bool,
+    supports_botting: bool,
+    supports_updater: bool,
+    supports_client_settings: bool,
+    reasons: Vec<String>,
+    warnings: Vec<String>,
+}
+
+#[tauri::command]
+fn get_platform_capabilities() -> PlatformCapabilities {
+    let windows = cfg!(target_os = "windows");
+    let launch = windows || cfg!(target_os = "macos");
+    let mut reasons = Vec::new();
+    if !launch {
+        reasons.push("Launching is only supported on Windows and macOS".to_string());
+    }
+    PlatformCapabilities {
+        os: std::env::consts::OS,
+        session_type: "",
+        preferred_runner: "",
+        detected_runner: "",
+        runner_path: None,
+        supports_single_launch: launch,
+        supports_multi_launch: launch,
+        supports_watcher: launch,
+        supports_watcher_memory: windows,
+        supports_window_controls: windows,
+        supports_botting: windows,
+        supports_updater: true,
+        supports_client_settings: launch,
+        reasons,
+        warnings: Vec::new(),
+    }
+}
+
 pub fn run() {
     #[cfg(target_os = "windows")]
     webview_recovery::prepare_environment();
@@ -238,6 +285,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             frontend_ready,
+            get_platform_capabilities,
             data::accounts::get_accounts,
             data::accounts::save_accounts,
             data::accounts::add_account,

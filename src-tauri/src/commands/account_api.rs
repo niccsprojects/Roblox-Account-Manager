@@ -18,6 +18,24 @@ fn is_auth_session_error(error: &str) -> bool {
         || lower.contains("code 9002")
 }
 
+fn is_usable_cookie(token: &str) -> bool {
+    !token.trim().is_empty() && reqwest::header::HeaderValue::from_str(token).is_ok()
+}
+
+fn any_stored_cookie(state: &AccountStore) -> Option<String> {
+    state.get_all().ok().and_then(|accounts| {
+        accounts
+            .iter()
+            .find(|account| account.valid && is_usable_cookie(&account.security_token))
+            .or_else(|| {
+                accounts
+                    .iter()
+                    .find(|account| is_usable_cookie(&account.security_token))
+            })
+            .map(|account| account.security_token.clone())
+    })
+}
+
 fn get_account(state: &AccountStore, user_id: i64) -> Result<crate::data::accounts::Account, String> {
     state
         .get_all()?
@@ -174,7 +192,16 @@ async fn get_user_info(user_id: i64) -> Result<api::roblox::UserInfo, String> {
 }
 
 #[tauri::command]
-async fn lookup_user(username: String) -> Result<api::roblox::UserLookupResult, String> {
+async fn lookup_user(
+    state: tauri::State<'_, AccountStore>,
+    username: String,
+) -> Result<api::roblox::UserLookupResult, String> {
+    if let Some(cookie) = any_stored_cookie(state.inner()) {
+        match api::roblox::get_user_id(Some(&cookie), &username).await {
+            Err(error) if error.contains("(status ") => {}
+            result => return result,
+        }
+    }
     api::roblox::get_user_id(None, &username).await
 }
 
@@ -441,19 +468,7 @@ async fn get_presence(
     let cookie = viewer_user_id
         .and_then(|id| get_cookie(state.inner(), id).ok())
         .filter(|cookie| !cookie.trim().is_empty())
-        .or_else(|| {
-            state.get_all().ok().and_then(|accounts| {
-                accounts
-                    .iter()
-                    .find(|account| account.valid && !account.security_token.trim().is_empty())
-                    .or_else(|| {
-                        accounts
-                            .iter()
-                            .find(|account| !account.security_token.trim().is_empty())
-                    })
-                    .map(|account| account.security_token.clone())
-            })
-        });
+        .or_else(|| any_stored_cookie(state.inner()));
 
     match cookie {
         Some(cookie) => match api::roblox::get_presence(&user_ids, Some(&cookie)).await {

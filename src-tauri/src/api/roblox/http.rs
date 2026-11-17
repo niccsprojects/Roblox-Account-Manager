@@ -9,13 +9,6 @@ fn game_join_client() -> reqwest::Client {
         .unwrap()
 }
 
-fn no_redirect_client() -> reqwest::Client {
-    reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .unwrap()
-}
-
 async fn send_with_retry<F>(mut make_request: F) -> Result<reqwest::Response, String>
 where
     F: FnMut() -> reqwest::RequestBuilder,
