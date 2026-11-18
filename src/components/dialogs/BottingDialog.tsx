@@ -1304,7 +1304,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                                     type="button"
                                     disabled={!canFocus || isRowBusy}
                                     className={[
-                                      "px-3 py-1 text-[11px] font-medium rounded-lg theme-btn !text-[var(--panel-fg)] transition",
+                                      "px-3 py-1 text-[11px] font-medium rounded-lg theme-btn transition",
                                       "disabled:opacity-50 disabled:cursor-not-allowed",
                                     ].join(" ")}
                                     onClick={() => {
@@ -1816,7 +1816,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                                 type="button"
                                 disabled={!canFocus || isRowBusy}
                                 className={[
-                                  "px-3 py-1 text-[11px] font-medium rounded-lg theme-btn !text-[var(--panel-fg)] transition",
+                                  "px-3 py-1 text-[11px] font-medium rounded-lg theme-btn transition",
                                   "disabled:opacity-50 disabled:cursor-not-allowed",
                                 ].join(" ")}
                                 onClick={() => {
