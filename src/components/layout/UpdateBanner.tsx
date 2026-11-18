@@ -14,7 +14,7 @@ export function UpdateBanner() {
       </span>
       <button
         onClick={() => store.setUpdateDialogOpen(true)}
-        className="text-xs font-medium text-sky-400 hover:text-sky-300 transition-colors"
+        className="text-xs font-medium text-[var(--textboxes-fg)] underline underline-offset-2 hover:opacity-80 transition-opacity"
       >
         {t("View Update")}
       </button>

@@ -3517,7 +3517,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                               setStickLogsToBottom(true);
                               scrollLogsToBottom("smooth");
                             }}
-                            className="absolute right-3 bottom-3 px-2.5 py-1 rounded-md border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[11px] text-[var(--textboxes-fg)] hover:bg-[var(--panel-soft)] transition-all duration-200"
+                            className="absolute right-3 bottom-3 px-2.5 py-1 rounded-md border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[11px] text-[var(--textboxes-fg)] hover:brightness-110 transition-all duration-200"
                           >
                             {t("Jump to latest")}
                           </button>
@@ -3641,7 +3641,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                           handleRunScript(selectedScript.id);
                         });
                       }}
-                      className="px-3 py-1.5 rounded-lg border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[12px] text-[var(--textboxes-fg)] hover:bg-[var(--panel-soft)] transition-colors"
+                      className="px-3 py-1.5 rounded-lg border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[12px] text-[var(--textboxes-fg)] hover:brightness-110 transition"
                     >
                       <span className="inline-flex items-center gap-1.5">
                         <Play size={11} strokeWidth={2} />
