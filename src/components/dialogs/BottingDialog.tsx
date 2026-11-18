@@ -567,7 +567,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                 onClick={() => handleLayoutModeChange("split")}
                 className={`px-2.5 py-1 text-[11px] rounded-md transition ${
                   useSplitLayout
-                    ? "theme-accent-bg theme-accent border theme-accent-border"
+                    ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] border theme-accent-border"
                     : "theme-muted hover:text-[var(--panel-fg)]"
                 }`}
               >
@@ -578,7 +578,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                 onClick={() => handleLayoutModeChange("classic")}
                 className={`px-2.5 py-1 text-[11px] rounded-md transition ${
                   !useSplitLayout
-                    ? "theme-accent-bg theme-accent border theme-accent-border"
+                    ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] border theme-accent-border"
                     : "theme-muted hover:text-[var(--panel-fg)]"
                 }`}
               >
@@ -655,7 +655,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                             key={a.UserID}
                             className={[
                               "px-2 py-1 rounded-md text-[11px] border theme-soft max-w-[160px] truncate",
-                              isPlayer ? "theme-accent-bg theme-accent-border theme-accent" : "theme-border text-[var(--panel-fg)]",
+                              isPlayer ? "theme-accent-border text-[var(--panel-fg)]" : "theme-border text-[var(--panel-fg)]",
                             ].join(" ")}
                           >
                             {a.Alias || a.Username}
@@ -701,7 +701,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                             }}
                             className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${
                               playerUserIds.length === 0
-                                ? "theme-accent-bg theme-accent"
+                                ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                                 : "text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                             }`}
                           >
@@ -719,7 +719,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                                 }}
                                 className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${
                                   active
-                                    ? "theme-accent-bg theme-accent"
+                                    ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                                     : "text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                                 }`}
                               >
@@ -960,7 +960,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                       <div className="rounded-md border theme-border px-2 py-1 bg-[rgba(16,185,129,0.14)] text-emerald-200">
                         {t("Accounts")}: {liveRows.length}
                       </div>
-                      <div className="rounded-md border border-sky-500/25 px-2 py-1 bg-sky-500/12 text-sky-200">
+                      <div className="rounded-md border border-[var(--accent-color)] px-2 py-1 text-[var(--panel-fg)]">
                         {t("Main accounts")}: {splitPlayersCount}
                       </div>
                       <div className="rounded-md border border-zinc-500/25 px-2 py-1 bg-zinc-500/12 text-zinc-200">
@@ -1017,7 +1017,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                         {t("Clear")}
                       </button>
 
-                      <div className="ml-auto rounded-md border border-sky-500/30 bg-sky-500/12 text-sky-200 text-[11px] px-2 py-1">
+                      <div className="ml-auto rounded-md border border-[var(--accent-color)] text-[var(--panel-fg)] text-[11px] px-2 py-1">
                         {t("Selected")}: {bulkSelectedUserIds.length}
                       </div>
                     </div>
@@ -1134,7 +1134,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                           : row.disconnected
                             ? "border-zinc-500/35 bg-zinc-500/15 text-zinc-200"
                             : row.isPlayer
-                              ? "border-sky-500/30 bg-sky-500/15 text-sky-200"
+                              ? "border-[var(--accent-color)] text-[var(--panel-fg)]"
                               : (row.nextRestartAtMs ?? 0) <= nowMs
                                 ? "border-amber-400/35 bg-amber-500/15 text-amber-100"
                                 : "border-emerald-500/30 bg-emerald-500/15 text-emerald-200";
@@ -1145,7 +1145,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                             className={[
                               "rounded-2xl border p-3 theme-soft animate-fade-in-up",
                               isBulkSelected
-                                ? "border-sky-500/45 ring-1 ring-sky-400/30"
+                                ? "border-[var(--accent-color)] ring-1 ring-[var(--accent-color)]"
                                 : row?.disconnected
                                   ? "border-zinc-500/30"
                                   : row?.isPlayer
@@ -1304,9 +1304,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                                     type="button"
                                     disabled={!canFocus || isRowBusy}
                                     className={[
-                                      "px-3 py-1 text-[11px] font-medium rounded-lg border border-sky-400/25",
-                                      "bg-[rgba(56,189,248,0.10)] text-sky-100",
-                                      "hover:bg-[rgba(56,189,248,0.18)] hover:border-sky-300/35 transition",
+                                      "px-3 py-1 text-[11px] font-medium rounded-lg theme-btn transition",
                                       "disabled:opacity-50 disabled:cursor-not-allowed",
                                     ].join(" ")}
                                     onClick={() => {
@@ -1397,7 +1395,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                     key={a.UserID}
                     className={[
                       "px-2 py-1 rounded-md text-[11px] border theme-soft max-w-[160px] truncate",
-                      isPlayer ? "theme-accent-bg theme-accent-border theme-accent" : "theme-border text-[var(--panel-fg)]",
+                      isPlayer ? "theme-accent-border text-[var(--panel-fg)]" : "theme-border text-[var(--panel-fg)]",
                     ].join(" ")}
                   >
                     {a.Alias || a.Username}
@@ -1443,7 +1441,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                     }}
                     className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${
                       playerUserIds.length === 0
-                        ? "theme-accent-bg theme-accent"
+                        ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                         : "text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                     }`}
                   >
@@ -1461,7 +1459,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                         }}
                         className={`w-full text-left px-3 py-2 text-[12px] transition-colors ${
                           active
-                            ? "theme-accent-bg theme-accent"
+                            ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                             : "text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                         }`}
                       >
@@ -1689,7 +1687,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                   : row.disconnected
                   ? "border-zinc-500/35 bg-zinc-500/15 text-zinc-200"
                   : row.isPlayer
-                    ? "border-sky-500/30 bg-sky-500/15 text-sky-200"
+                    ? "border-[var(--accent-color)] text-[var(--panel-fg)]"
                     : (row.nextRestartAtMs ?? 0) <= nowMs
                       ? "border-amber-400/35 bg-amber-500/15 text-amber-100"
                       : "border-emerald-500/30 bg-emerald-500/15 text-emerald-200";
@@ -1818,9 +1816,7 @@ export function BottingDialog({ open, onClose }: BottingDialogProps) {
                                 type="button"
                                 disabled={!canFocus || isRowBusy}
                                 className={[
-                                  "px-3 py-1 text-[11px] font-medium rounded-lg border border-sky-400/25",
-                                  "bg-[rgba(56,189,248,0.10)] text-sky-100",
-                                  "hover:bg-[rgba(56,189,248,0.18)] hover:border-sky-300/35 transition",
+                                  "px-3 py-1 text-[11px] font-medium rounded-lg theme-btn transition",
                                   "disabled:opacity-50 disabled:cursor-not-allowed",
                                 ].join(" ")}
                                 onClick={() => {

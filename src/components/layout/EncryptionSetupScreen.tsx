@@ -104,7 +104,7 @@ export function EncryptionSetupScreen() {
                 <div className={[
                   "mt-1 h-2.5 w-2.5 rounded-full border transition-all duration-300 ease-out",
                   method === "password"
-                    ? "theme-accent-border theme-accent-bg"
+                    ? "theme-accent-border bg-[var(--accent-color)]"
                     : "theme-border bg-transparent",
                 ].join(" ")} />
               </div>
@@ -136,7 +136,7 @@ export function EncryptionSetupScreen() {
                 <div className={[
                   "mt-1 h-2.5 w-2.5 rounded-full border transition-all duration-300 ease-out",
                   method === "default"
-                    ? "theme-accent-border theme-accent-bg"
+                    ? "theme-accent-border bg-[var(--accent-color)]"
                     : "theme-border bg-transparent",
                 ].join(" ")} />
               </div>

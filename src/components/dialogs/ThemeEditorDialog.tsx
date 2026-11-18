@@ -509,7 +509,7 @@ export function ThemeEditorDialog({ open, onClose }: { open: boolean; onClose: (
                         onClick={() => handlePresetSelection(preset.key)}
                         className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-all duration-150 ${
                           active
-                            ? "theme-accent theme-accent-bg theme-accent-border"
+                            ? "theme-accent-border bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)]"
                             : "border-transparent text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                         }`}
                       >
@@ -528,7 +528,7 @@ export function ThemeEditorDialog({ open, onClose }: { open: boolean; onClose: (
                           onClick={() => handlePresetSelection(preset.key)}
                           className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs border transition-all duration-150 ${
                             active
-                              ? "theme-accent theme-accent-bg theme-accent-border"
+                              ? "theme-accent-border bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)]"
                               : "border-transparent text-[var(--panel-fg)] hover:bg-[var(--panel-soft)]"
                           }`}
                         >

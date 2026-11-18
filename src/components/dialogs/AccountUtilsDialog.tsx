@@ -597,7 +597,7 @@ export function AccountUtilsDialog({ open, onClose }: { open: boolean; onClose: 
                     onClick={() => setSelectedOutfit(o.id)}
                     className={`w-full text-left px-2 py-1 rounded text-xs transition-colors ${
                       selectedOutfit === o.id
-                        ? "bg-sky-500/15 text-sky-300"
+                        ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                         : "text-zinc-300 hover:bg-zinc-700/50"
                     }`}
                   >

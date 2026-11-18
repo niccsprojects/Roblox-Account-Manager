@@ -2961,7 +2961,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                 onClick={() => setRunningOnly((prev) => !prev)}
                 className={`px-2 py-1.5 rounded-lg border text-[11px] transition-colors ${
                   runningOnly
-                    ? "bg-sky-500/15 border-sky-500/35 text-sky-300"
+                    ? "bg-[var(--textboxes-bg)] border-[var(--accent-color)] text-[var(--textboxes-fg)]"
                     : "bg-zinc-800/40 border-zinc-700/60 text-zinc-400"
                 }`}
               >
@@ -2975,7 +2975,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                   onClick={() => setNewMenuOpen((prev) => !prev)}
                   className={`px-2.5 py-1 rounded-md border text-[11px] transition-all duration-200 ${
                     newMenuOpen
-                      ? "bg-sky-500/18 border-sky-500/35 text-sky-300 shadow-[0_0_0_1px_rgba(56,189,248,0.2)]"
+                      ? "bg-[var(--textboxes-bg)] border-[var(--accent-color)] text-[var(--textboxes-fg)]"
                       : "bg-zinc-800/40 border-zinc-700/60 text-zinc-300 hover:bg-zinc-700/50 hover:-translate-y-[1px]"
                   }`}
                 >
@@ -3164,7 +3164,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                     className={`px-2.5 py-1.5 rounded-lg border text-[11px] transition-colors ${
                       workersRef.current.has(selectedScript.id)
                         ? "border-red-500/35 bg-red-500/15 text-red-300"
-                        : "border-sky-500/35 bg-sky-500/15 text-sky-300"
+                        : "border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)]"
                     }`}
                   >
                     <span className="inline-flex items-center gap-1">
@@ -3224,7 +3224,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                       onClick={() => setTab(id)}
                       className={`px-2.5 py-1 rounded-md text-[11px] border transition-colors ${
                         tab === id
-                          ? "border-sky-500/35 bg-sky-500/15 text-sky-300"
+                          ? "border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)]"
                           : "border-zinc-700/70 bg-zinc-800/40 text-zinc-400 hover:text-zinc-200"
                       }`}
                     >
@@ -3517,7 +3517,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                               setStickLogsToBottom(true);
                               scrollLogsToBottom("smooth");
                             }}
-                            className="absolute right-3 bottom-3 px-2.5 py-1 rounded-md border border-sky-500/35 bg-sky-500/18 text-[11px] text-sky-300 hover:bg-sky-500/28 transition-all duration-200"
+                            className="absolute right-3 bottom-3 px-2.5 py-1 rounded-md border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[11px] text-[var(--textboxes-fg)] hover:brightness-110 transition-all duration-200"
                           >
                             {t("Jump to latest")}
                           </button>
@@ -3641,7 +3641,7 @@ await ram.settings.set("endpoint", "http://127.0.0.1:3847/ram/bridge");
                           handleRunScript(selectedScript.id);
                         });
                       }}
-                      className="px-3 py-1.5 rounded-lg border border-sky-500/35 bg-sky-500/15 text-[12px] text-sky-300 hover:bg-sky-500/25 transition-colors"
+                      className="px-3 py-1.5 rounded-lg border border-[var(--accent-color)] bg-[var(--textboxes-bg)] text-[12px] text-[var(--textboxes-fg)] hover:brightness-110 transition"
                     >
                       <span className="inline-flex items-center gap-1.5">
                         <Play size={11} strokeWidth={2} />

@@ -43,7 +43,7 @@ function optimizationJsonError(raw: string, enabled: boolean, t: (text: string) 
 
 function AppliesBadge({ text }: { text: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-400/80">
+    <span className="inline-flex items-center gap-1 rounded border border-[var(--accent-color)] px-1.5 py-0.5 text-[10px] text-[var(--panel-fg)]">
       {text}
     </span>
   );

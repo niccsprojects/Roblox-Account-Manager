@@ -287,8 +287,8 @@ export function MultiSelectSidebar() {
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
         <SidebarSection title={t("Launch")}>
           {store.launchProgress?.mode === "multi" && (
-            <div className="theme-accent-bg theme-accent-border mb-2 rounded-lg border px-2.5 py-1.5 animate-fade-in">
-              <div className="theme-accent flex items-center gap-2 text-[11px]">
+            <div className="theme-accent-border bg-[var(--textboxes-bg)] mb-2 rounded-lg border px-2.5 py-1.5 animate-fade-in">
+              <div className="text-[var(--panel-fg)] flex items-center gap-2 text-[11px]">
                 <span className="w-2 h-2 rounded-full bg-[var(--accent-color)] animate-pulse" />
                 <span className="font-medium">
                   {t("Joining {{current}}/{{total}}", {

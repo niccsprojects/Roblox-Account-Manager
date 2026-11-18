@@ -88,7 +88,7 @@ export function GroupSection({
                 allSelected
                   ? { backgroundColor: "var(--accent-color)", borderColor: "var(--accent-color)" }
                   : someSelected
-                  ? { backgroundColor: "var(--accent-soft)", borderColor: "var(--accent-strong)" }
+                  ? { backgroundColor: "var(--textboxes-bg)", borderColor: "var(--accent-color)" }
                   : undefined
               }
               onClick={handleGroupCheckbox}

@@ -43,7 +43,7 @@ export function Toggle({
         />
         <div
           className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-[var(--toggle-knob-bg)] transition-all duration-200 ${
-            checked ? "left-[16px] shadow-[0_0_6px_var(--toggle-on-shadow)]" : "left-[2px] shadow-sm"
+            checked ? "left-[16px] shadow-sm" : "left-[2px] shadow-sm"
           }`}
         />
       </div>

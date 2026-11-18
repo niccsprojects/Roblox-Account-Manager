@@ -78,9 +78,9 @@ export function HotkeyField({
             setCapturing(false);
             setHint(false);
           }}
-          className={`ml-auto min-w-[150px] px-2.5 py-1 rounded-md text-[13px] font-mono text-right transition-colors bg-zinc-800/60 border focus:outline-none ${
+          className={`ml-auto min-w-[150px] px-2.5 py-1 rounded-md text-[13px] font-mono text-right transition-colors bg-zinc-800/60 border focus:outline-none focus-visible:!border-[var(--accent-color)] ${
             capturing
-              ? "border-sky-500/60 text-sky-200"
+              ? "!border-[var(--accent-color)] text-zinc-100"
               : error
                 ? "border-red-500/60 text-red-300"
                 : "border-zinc-700/60 text-zinc-200"

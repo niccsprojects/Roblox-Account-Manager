@@ -106,7 +106,7 @@ export function Select({ value, options, onChange, className = "", disabled = fa
                 onClick={() => { onChange(o.value); setOpen(false); }}
                 className={`w-full text-left px-2.5 py-1.5 text-xs transition-colors ${
                   o.value === value
-                    ? "text-sky-400 bg-sky-500/10"
+                    ? "bg-[var(--textboxes-bg)] text-[var(--textboxes-fg)] outline -outline-offset-1 outline-[var(--accent-color)]"
                     : "text-zinc-300 hover:bg-zinc-800"
                 }`}
               >

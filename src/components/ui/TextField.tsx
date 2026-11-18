@@ -32,7 +32,7 @@ export function TextField({
         className={`flex-1 min-w-0 px-2.5 py-1 rounded-md text-[13px] placeholder-zinc-600 transition-colors ${
           disabled
             ? "cursor-not-allowed border border-zinc-800/60 bg-zinc-800/40 text-zinc-500"
-            : "bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:border-sky-500/40"
+            : "bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:!border-[var(--accent-color)]"
         }`}
       />
     </div>

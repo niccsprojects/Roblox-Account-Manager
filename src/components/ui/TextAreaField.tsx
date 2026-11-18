@@ -41,7 +41,7 @@ export function TextAreaField({
             ? "cursor-not-allowed border-zinc-800/60 opacity-60"
             : error
               ? "border-red-500/50 focus:border-red-500/60"
-              : "border-zinc-700/60 focus:border-sky-500/40"
+              : "border-zinc-700/60 focus:!border-[var(--accent-color)]"
         }`}
       />
       {error ? <div className="mt-1.5 text-[11px] text-red-400">{t(error)}</div> : null}

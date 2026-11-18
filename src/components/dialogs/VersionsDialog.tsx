@@ -346,7 +346,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                                 if (e.key === "Enter") void handleSaveLabel(entry, renaming.value);
                                 if (e.key === "Escape") setRenaming(null);
                               }}
-                              className="px-2 py-1 rounded text-[12px] bg-zinc-800 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:border-sky-500/40"
+                              className="px-2 py-1 rounded text-[12px] bg-zinc-800 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:!border-[var(--accent-color)]"
                               placeholder={t("Nickname")}
                             />
                             <button
@@ -362,7 +362,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                               {entry.userLabel ?? entry.displayVersion ?? shortHash(entry.versionHash)}
                             </span>
                             {isDefault && (
-                              <span className="px-1.5 py-0.5 rounded bg-sky-500/15 text-[10px] text-sky-400">
+                              <span className="px-1.5 py-0.5 rounded border border-[var(--accent-color)] text-[10px] text-[var(--panel-fg)]">
                                 {t("Default")}
                               </span>
                             )}
@@ -506,7 +506,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                     value={manualChannel}
                     onChange={(e) => setManualChannel(e.target.value)}
                     placeholder="LIVE"
-                    className="mt-1 w-full px-2.5 py-1 rounded-md text-[13px] font-mono bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:border-sky-500/40"
+                    className="mt-1 w-full px-2.5 py-1 rounded-md text-[13px] font-mono bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:!border-[var(--accent-color)]"
                   />
                 </label>
                 <label className="block">
@@ -515,7 +515,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                     value={manualHash}
                     onChange={(e) => setManualHash(e.target.value)}
                     placeholder="version-abcdef0123456789"
-                    className="mt-1 w-full px-2.5 py-1 rounded-md text-[13px] font-mono bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:border-sky-500/40"
+                    className="mt-1 w-full px-2.5 py-1 rounded-md text-[13px] font-mono bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:!border-[var(--accent-color)]"
                   />
                 </label>
                 <label className="block">
@@ -524,7 +524,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                     value={manualLabel}
                     onChange={(e) => setManualLabel(e.target.value)}
                     placeholder={t("Pre-Hyperion")}
-                    className="mt-1 w-full px-2.5 py-1 rounded-md text-[13px] bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:border-sky-500/40"
+                    className="mt-1 w-full px-2.5 py-1 rounded-md text-[13px] bg-zinc-800/60 border border-zinc-700/60 text-zinc-200 focus:outline-none focus:!border-[var(--accent-color)]"
                   />
                 </label>
                 <button
@@ -538,7 +538,7 @@ export function VersionsDialog({ open, onClose }: VersionsDialogProps) {
                     setManualHash("");
                     setManualLabel("");
                   }}
-                  className="flex items-center gap-1.5 rounded-lg border border-sky-700/50 bg-sky-900/30 px-3 py-1.5 text-[12px] font-medium text-sky-200 transition-colors hover:bg-sky-900/50"
+                  className="flex items-center gap-1.5 theme-btn px-3 py-1.5 text-[12px] font-medium"
                 >
                   <Download size={13} strokeWidth={2} />
                   {t("Install")}

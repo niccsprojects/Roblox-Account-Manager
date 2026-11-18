@@ -153,13 +153,13 @@ export function IsolationTab({ s }: { s: UseSettingsReturn }) {
             onClick={() => s.set("Isolation", "Mode", opt.value)}
             className={`flex items-start gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
               opt.active
-                ? "border-sky-500/40 bg-sky-500/10"
-                : "border-zinc-800/60 bg-zinc-900/30 hover:border-zinc-700"
+                ? "border-[var(--accent-color)] bg-[var(--textboxes-bg)]"
+                : "border-[var(--textboxes-bc)] bg-transparent hover:border-[var(--border-color)]"
             }`}
           >
             <div
               className={`mt-1 h-3 w-3 shrink-0 rounded-full border ${
-                opt.active ? "border-sky-400 bg-sky-400" : "border-zinc-600"
+                opt.active ? "border-[var(--accent-color)] bg-[var(--accent-color)]" : "border-zinc-600"
               }`}
             />
             <div className="min-w-0">

@@ -433,13 +433,12 @@ export function AccountList() {
     >
       {dragSelectRect && (
         <div
-          className="pointer-events-none absolute z-30 rounded-md border theme-accent-border theme-accent-bg"
+          className="pointer-events-none absolute z-30 rounded-md border theme-accent-border"
           style={{
             left: dragSelectRect.left,
             top: dragSelectRect.top,
             width: dragSelectRect.width,
             height: dragSelectRect.height,
-            boxShadow: "0 0 0 1px var(--accent-strong), 0 0 20px var(--accent-soft)",
           }}
         />
       )}
